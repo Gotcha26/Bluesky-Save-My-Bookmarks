@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+"""Export des bookmarks Bluesky - Version corrigée"""
 import requests
 import time
 import sys
@@ -12,22 +14,17 @@ TOKEN_FILE = Path("Token-Bearer.txt")
 # --- Lecture du token ---
 if not TOKEN_FILE.exists():
     print("❌ Fichier Token-Bearer.txt introuvable")
-    input("Appuie sur Entrée pour quitter...")
     sys.exit(1)
 
 TOKEN = TOKEN_FILE.read_text(encoding="utf-8").strip()
 
 if not TOKEN.startswith("Bearer "):
     print("❌ Le token doit commencer par 'Bearer '")
-    input("Appuie sur Entrée pour quitter...")
     sys.exit(1)
 
 cursor = None
 urls = []
-
-# --- Limite pages vides ---
-MAX_EMPTY_PAGES = 5
-empty_pages = 0
+exit_code = 0
 
 try:
     session = requests.Session()
@@ -46,26 +43,41 @@ try:
         if cursor:
             params["cursor"] = cursor
 
-        r = session.get(API, params=params, timeout=20)
-        print(f"  HTTP {r.status_code}")
+        try:
+            r = session.get(API, params=params, timeout=20)
+            print(f"  HTTP {r.status_code}")
 
-        if r.status_code != 200:
-            print("⚠️ Contenu brut serveur :")
-            print(r.text)
+            if r.status_code == 400:
+                error_data = r.json()
+                error_type = error_data.get("error", "")
+                error_msg = error_data.get("message", "")
+                
+                if error_type == "ExpiredToken" or "expired" in error_msg.lower():
+                    print("\n❌ TOKEN EXPIRÉ")
+                    print("Le token Bearer a expiré ou est invalide.")
+                    print("👉 Récupérez un nouveau token (voir Instructions-token.md)")
+                    exit_code = 1
+                    break
+                else:
+                    print(f"⚠️ Erreur API : {error_msg}")
+                    r.raise_for_status()
+            
             r.raise_for_status()
+            
+        except requests.exceptions.RequestException as e:
+            print(f"⚠️ Erreur réseau : {e}")
+            exit_code = 1
+            break
 
         data = r.json()
         bookmarks = data.get("bookmarks", [])
 
         print(f"  {len(bookmarks)} bookmarks reçus")
 
+        # ARRÊT si page vide (pas d'attente de 5 pages vides)
         if len(bookmarks) == 0:
-            empty_pages += 1
-            if empty_pages >= MAX_EMPTY_PAGES:
-                print(f"⚠️ {MAX_EMPTY_PAGES} pages consécutives sans bookmark. Arrêt.")
-                break
-        else:
-            empty_pages = 0  # reset compteur
+            print("✓ Page vide détectée, fin de l'export")
+            break
 
         for bm in bookmarks:
             item = bm.get("item", {})
@@ -90,7 +102,7 @@ try:
 
         cursor = data.get("cursor")
         if not cursor:
-            print("\n✓ Fin de la pagination")
+            print("\n✓ Fin de la pagination (pas de cursor)")
             break
 
         page += 1
@@ -101,6 +113,7 @@ except Exception as e:
     print(str(e))
     print("\n--- Détails techniques ---")
     traceback.print_exc()
+    exit_code = 1
 
 finally:
     with open("urls.txt", "w", encoding="utf-8") as f:
@@ -108,4 +121,6 @@ finally:
 
     print(f"\n✔ Export terminé : {len(urls)} liens écrits dans urls.txt")
     print("\n=== Fin du script ===")
-    input("Appuie sur Entrée pour fermer la fenêtre...")
+    
+    # NE PAS attendre input - rendre la main au parent
+    sys.exit(exit_code)
