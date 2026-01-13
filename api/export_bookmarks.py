@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Export des bookmarks Bluesky - Version corrigée"""
+"""Export des bookmarks Bluesky"""
 import requests
 import time
 import sys
 import traceback
 from pathlib import Path
 
-print("=== Export des bookmarks Bluesky ===")
+print("=== [API] Export des bookmarks Bluesky ===")
 
 API = "https://shiitake.us-east.host.bsky.network/xrpc/app.bsky.bookmark.getBookmarks"
 TOKEN_FILE = Path("Token-Bearer.txt")
@@ -54,8 +54,8 @@ try:
                 
                 if error_type == "ExpiredToken" or "expired" in error_msg.lower():
                     print("\n❌ TOKEN EXPIRÉ")
-                    print("Le token Bearer a expiré ou est invalide.")
-                    print("👉 Récupérez un nouveau token (voir Instructions-token.md)")
+                    print("   Le token Bearer a expiré ou est invalide.")
+                    print("👉 Récupérez un nouveau token (voir Instructions-token.md) : \nhttps://github.com/Gotcha26/Bluesky-Save-My-Bookmarks/Instructions-token.md")
                     exit_code = 1
                     break
                 else:
@@ -74,7 +74,6 @@ try:
 
         print(f"  {len(bookmarks)} bookmarks reçus")
 
-        # ARRÊT si page vide (pas d'attente de 5 pages vides)
         if len(bookmarks) == 0:
             print("✓ Page vide détectée, fin de l'export")
             break
@@ -91,12 +90,10 @@ try:
 
             rkey = parts[4]
 
-            # --- Utilisation du handle si disponible ---
             author_handle = item.get("author", {}).get("handle")
             if author_handle:
                 urls.append(f"https://bsky.app/profile/{author_handle}/post/{rkey}")
             else:
-                # fallback DID si handle manquant
                 did = parts[2]
                 urls.append(f"https://bsky.app/profile/{did}/post/{rkey}")
 
@@ -116,11 +113,21 @@ except Exception as e:
     exit_code = 1
 
 finally:
+    # Sauvegarder l'ancien urls.txt si existant
+    urls_file = Path("urls.txt")
+    if urls_file.exists():
+        backup_file = Path("urls.txt.bak")
+        try:
+            backup_file.write_text(urls_file.read_text(encoding="utf-8"), encoding="utf-8")
+            print("\n✅ Sauvegarde créée : urls.txt.bak")
+        except Exception as e:
+            print(f"  ⚠️ Impossible de créer la sauvegarde : {e}")
+    
+    # Écrire le nouveau fichier
     with open("urls.txt", "w", encoding="utf-8") as f:
         f.write("\n".join(urls))
 
-    print(f"\n✔ Export terminé : {len(urls)} liens écrits dans urls.txt")
-    print("\n=== Fin du script ===")
+    print(f"\n✔  Export terminé : {len(urls)} liens écrits dans urls.txt")
+    print("\n=== Fin du script API ===")
     
-    # NE PAS attendre input - rendre la main au parent
     sys.exit(exit_code)

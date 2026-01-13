@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """
-post_analyzer.py
 Analyse préalable d'un post Bluesky pour déterminer son type et sa disponibilité
 """
 import requests
@@ -18,7 +17,6 @@ class PostType(Enum):
 
 class PostAnalyzer:
     def __init__(self):
-        # Utiliser l'API getRecord comme bsky_post_media.py pour avoir la structure brute
         self.api_base = "https://bsky.social/xrpc/com.atproto.repo.getRecord"
     
     def analyze(self, post_url):
@@ -33,7 +31,6 @@ class PostAnalyzer:
         handle = parts[1]
         post_id = parts[-1]
         
-        # Appel API avec paramètres getRecord
         try:
             params = {
                 "repo": handle,
@@ -42,7 +39,6 @@ class PostAnalyzer:
             }
             resp = requests.get(self.api_base, params=params, timeout=15)
             
-            # Gestion erreurs HTTP
             if resp.status_code == 400:
                 return PostType.ERROR_400, {"handle": handle, "post_id": post_id}, {"status": 400}
             elif resp.status_code == 500:
@@ -54,7 +50,6 @@ class PostAnalyzer:
         except Exception as e:
             return PostType.UNKNOWN, {"handle": handle, "post_id": post_id}, {"error": str(e)}
         
-        # Analyse du contenu (structure brute)
         value = data.get("value", {})
         embed = value.get("embed", {})
         embed_type = embed.get("$type", "")
@@ -73,9 +68,7 @@ class PostAnalyzer:
             "full_data": data
         }
         
-        # Détection type - ORDRE IMPORTANT
-        
-        # 1. Vidéo (structure brute : app.bsky.embed.video)
+        # 1. Vidéo
         if embed_type == "app.bsky.embed.video":
             video_blob = embed.get("video", {})
             cid = video_blob.get("ref", {}).get("$link")
@@ -89,15 +82,13 @@ class PostAnalyzer:
                     result_data["video_size"] = video_blob.get("size", 0)
                     return PostType.VIDEO, result_data, debug_info
         
-        # 2. Images directes (structure brute : app.bsky.embed.images)
+        # 2. Images directes
         if embed_type == "app.bsky.embed.images":
             images_list = embed.get("images", [])
-            # Dans la structure brute, les images ont "image.ref.$link" comme CID
             images = []
             for img in images_list:
                 img_ref = img.get("image", {}).get("ref", {}).get("$link")
                 if img_ref:
-                    # Reconstruction URL fullsize à partir du CID
                     images.append(f"https://cdn.bsky.app/img/feed_fullsize/plain/{img_ref}@jpeg")
             
             if images:
@@ -105,19 +96,16 @@ class PostAnalyzer:
                 result_data["image_count"] = len(images)
                 return PostType.IMAGES, result_data, debug_info
         
-        # 3. Repost (structure brute : app.bsky.embed.record)
+        # 3. Repost
         if embed_type == "app.bsky.embed.record":
-            # Dans la structure brute, on ne peut pas facilement accéder au contenu du repost
-            # Il faudrait faire une autre requête API
             result_data["is_repost"] = True
             return PostType.REPOST, result_data, debug_info
         
-        # 4. Quote post avec média (structure brute : app.bsky.embed.recordWithMedia)
+        # 4. Quote post avec média
         if embed_type == "app.bsky.embed.recordWithMedia":
             media = embed.get("media", {})
             media_type = media.get("$type", "")
             
-            # Vidéo dans recordWithMedia
             if media_type == "app.bsky.embed.video":
                 video_blob = media.get("video", {})
                 cid = video_blob.get("ref", {}).get("$link")
@@ -129,7 +117,6 @@ class PostAnalyzer:
                         result_data["video_cid"] = cid
                         return PostType.VIDEO, result_data, debug_info
             
-            # Images dans recordWithMedia
             if media_type == "app.bsky.embed.images":
                 images_list = media.get("images", [])
                 images = []
@@ -147,5 +134,5 @@ class PostAnalyzer:
         if result_data["text"] and not embed:
             return PostType.TEXT_ONLY, result_data, debug_info
         
-        # 6. Inconnu (cas edge)
+        # 6. Inconnu
         return PostType.UNKNOWN, result_data, debug_info

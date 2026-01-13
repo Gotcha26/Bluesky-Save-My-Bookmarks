@@ -11,9 +11,14 @@ from datetime import datetime
 from pathlib import Path
 import requests
 
-# Config
-from config import get_default_paths
+# Ajouter le répertoire parent au path pour les imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+# Charger config si disponible
+from core.config import get_default_paths
+
 default_paths = get_default_paths()
+
 TEXT_DIR = os.path.join(os.path.dirname(default_paths["img_dir"]), "texts")
 os.makedirs(TEXT_DIR, exist_ok=True)
 

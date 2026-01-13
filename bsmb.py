@@ -7,8 +7,8 @@ import sys
 import os
 import subprocess
 from pathlib import Path
-from config import load_config, save_config, ensure_dirs
-from database import Database
+from core.config import load_config, save_config, ensure_dirs, get_media_dirs
+from core.database import Database
 
 def clear_screen():
     subprocess.run("cls" if sys.platform == "win32" else "clear", shell=True)
@@ -23,18 +23,16 @@ def show_menu():
     has_urls = urls_file.exists() and urls_file.stat().st_size > 0
     has_downloads = stats["images"] > 0 or stats["videos"] > 0
     
-    dest_path = os.path.expandvars(config["img_dir"])
-    dest_base = os.path.dirname(dest_path)
+    dest_dir = config["download_dir"]
     
     print("\n" + "="*60)
     print("🔖 BSMB - Bsky Save My Bookmarks")
     print("="*60)
-    print(f"\n📂 Destination : {dest_base}")
-    print("\n1. Exporter les bookmarks (sauvegarde liens uniquement)")
+    print(f"\n📂 Destination : {dest_dir}")
+    print("\n1. Exporter les bookmarks (sauvegarde les liens uniquement)")
     
     if has_urls:
-        print("2. Télécharger les médias (nouveaux uniquement)")
-        print("3. Télécharger les médias (tout re-télécharger)")
+        print("2. Télécharger les nouveaux médias")
     
     print("4. Afficher les statistiques")
     
@@ -49,7 +47,7 @@ def show_menu():
 def get_token_from_clipboard():
     """Récupère le token depuis le presse-papier"""
     try:
-        import win32clipboard
+        import win32clipboard  # type: ignore
         win32clipboard.OpenClipboard()
         token = win32clipboard.GetClipboardData()
         win32clipboard.CloseClipboard()
@@ -110,10 +108,11 @@ def export_bookmarks(config):
     if not check_token(config):
         return False
     
-    print("\n🔄 Export des bookmarks...")
     result = subprocess.run(
-        ["python", "export_bsky_bookmarks.py"],
-        capture_output=False
+        ["python", "api/export_bookmarks.py"],
+        capture_output=False,
+        encoding='utf-8',
+        errors='replace'
     )
     if result.returncode == 0:
         print("✅ Export terminé")
@@ -134,7 +133,9 @@ def download_media(config, force=False, skip_token_check=False):
         print("⚠️ Aucune URL à traiter")
         return False
     
-    # Mode dev sans token
+    # Récupérer les chemins médias
+    media_dirs = get_media_dirs(config)  # <-- AJOUTER
+    
     if skip_token_check:
         print("\n" + "="*60)
         print("⚠️ MODE DÉVELOPPEMENT")
@@ -148,9 +149,8 @@ def download_media(config, force=False, skip_token_check=False):
         if confirm and confirm != "o":
             return False
         
-        # Appel direct à what.py sans DB
         result = subprocess.run(
-            ["python", "what.py", config["img_dir"], config["vid_dir"], "--no-db"] + urls
+            ["python", "core/orchestrator.py", media_dirs["img_dir"], media_dirs["vid_dir"], "--no-db"] + urls  # <-- MODIFIER
         )
         return result.returncode == 0
     
@@ -176,7 +176,9 @@ def download_media(config, force=False, skip_token_check=False):
     print("\n🚀 Lancement du téléchargement...\n")
     
     result = subprocess.run(
-        ["python", "what.py", config["img_dir"], config["vid_dir"]] + urls_to_process
+        ["python", "core/orchestrator.py", media_dirs["img_dir"], media_dirs["vid_dir"]] + urls_to_process,  # <-- MODIFIER
+        encoding='utf-8',
+        errors='replace'
     )
     
     db.close()
@@ -191,10 +193,10 @@ def show_stats(config):
     print("\n" + "="*40)
     print("📊 Statistiques")
     print("="*40)
-    print(f"Posts trackés    : {stats['posts']}")
+    print(f"Posts trackés       : {stats['posts']}")
     print(f"Images téléchargées : {stats['images']}")
     print(f"Vidéos téléchargées : {stats['videos']}")
-    print(f"Total médias     : {stats['images'] + stats['videos']}")
+    print(f"Total médias        : {stats['images'] + stats['videos']}")
     print("="*40)
 
 def configure(config):
@@ -202,12 +204,11 @@ def configure(config):
     while True:
         clear_screen()
         print("\n" + "="*60)
-        print("⚙️ Configuration")
+        print("⚙️ Configuration (éditable)")
         print("="*60)
-        print(f"\n1. Dossier images : {config['img_dir']}")
-        print(f"2. Dossier vidéos : {config['vid_dir']}")
-        print(f"3. Fichier token  : {config['token_file']}")
-        print(f"4. Fichier URLs   : {config['urls_file']}")
+        print(f"\n1. Dossier de téléchargements : {config['download_dir']}")
+        print(f"2. Fichier token  : {config['token_file']}")
+        print(f"3. Fichier URLs   : {config['urls_file']}")
         print("0. Retour")
         
         choice = input("\n👉 Choix : ").strip()
@@ -215,24 +216,19 @@ def configure(config):
         if choice == "0":
             break
         elif choice == "1":
-            new_val = input(f"Nouveau dossier images [{config['img_dir']}] : ").strip()
+            new_val = input(f"Nouveau dossier [{config['download_dir']}] : ").strip()
             if new_val:
-                config["img_dir"] = new_val
+                config["download_dir"] = new_val
                 save_config(config)
+                ensure_dirs(config)
                 print("✅ Sauvegardé")
         elif choice == "2":
-            new_val = input(f"Nouveau dossier vidéos [{config['vid_dir']}] : ").strip()
-            if new_val:
-                config["vid_dir"] = new_val
-                save_config(config)
-                print("✅ Sauvegardé")
-        elif choice == "3":
             new_val = input(f"Nouveau fichier token [{config['token_file']}] : ").strip()
             if new_val:
                 config["token_file"] = new_val
                 save_config(config)
                 print("✅ Sauvegardé")
-        elif choice == "4":
+        elif choice == "3":
             new_val = input(f"Nouveau fichier URLs [{config['urls_file']}] : ").strip()
             if new_val:
                 config["urls_file"] = new_val
@@ -251,12 +247,11 @@ def advanced_menu(config):
         
         urls_file = Path(config["urls_file"])
         has_urls = urls_file.exists() and urls_file.stat().st_size > 0
-        
-        print("\n1. Réinitialiser la base de données")
-        
+                
         if has_urls:
-            print("2. Mode développement (depuis urls.txt, sans token)")
-        
+            print("1. Mode développement (depuis urls.txt, sans token)")
+            print("2. Forcer le re-téléchargement de tous les médias")
+
         print("3. Supprimer les logs")
         print("4. Ouvrir le dossier de téléchargements")
         print("0. Retour")
@@ -265,42 +260,30 @@ def advanced_menu(config):
         
         if choice == "0":
             break
-        elif choice == "1":
-            print("\n" + "="*60)
-            print("⚠️ RÉINITIALISATION DE LA BASE DE DONNÉES")
-            print("="*60)
-            print("\nCette action va :")
-            print("  • Supprimer l'historique des posts traités")
-            print("  • Supprimer l'historique des médias téléchargés")
-            print("  • NE PAS supprimer les fichiers déjà téléchargés")
-            print()
-            confirm = input("Confirmer la réinitialisation ? (tapez 'RESET') : ").strip()
-            if confirm == "RESET":
-                db_file = Path(config["db_file"])
-                if db_file.exists():
-                    db_file.unlink()
-                    print("✅ Base de données réinitialisée")
-                else:
-                    print("⚠️ Aucune base de données à réinitialiser")
-            else:
-                print("❌ Réinitialisation annulée")
-            input("\nAppuyez sur Entrée...")
         
-        elif choice == "2":
+        elif choice == "1":
             if not has_urls:
                 print("\n⚠️ Aucune URL disponible dans urls.txt")
                 input("\nAppuyez sur Entrée...")
             else:
                 download_media(config, force=True, skip_token_check=True)
+
+        elif choice == "2":
+            if not has_urls:
+                print("\n⚠️ Aucune URL disponible dans urls.txt")
+                input("\nAppuyez sur Entrée...")
+            else:
+                download_media(config, force=True)
         
         elif choice == "3":
-            from config import cleanup_logs
+            from core.config import cleanup_logs
             deleted = cleanup_logs(config)
             print(f"\n✅ {deleted} fichier(s) log supprimé(s)")
             input("\nAppuyez sur Entrée...")
 
         elif choice == "4":
-            download_dir = os.path.expandvars(r"%USERPROFILE%\Downloads\BSMB")
+            media_dirs = get_media_dirs(config)
+            download_dir = config["download_dir"]
             if sys.platform == "win32":
                 os.startfile(download_dir)
             else:
@@ -309,7 +292,7 @@ def advanced_menu(config):
 def main():
     config = load_config()
     ensure_dirs(config)
-    from config import cleanup_old_logs
+    from core.config import cleanup_old_logs
     cleanup_old_logs(config)
     
     while True:
@@ -326,6 +309,18 @@ def main():
             print("\n👋 Au revoir !")
             break
         elif choice == "1":
+            clear_screen()
+            print("\n" + "="*60)
+            print("📥 EXPORT DES BOOKMARKS")
+            print("="*60)
+            print("\nCette opération va :")
+            print("  • Récupérer la liste complète de vos bookmarks Bluesky")
+            print("  • Créer/mettre à jour le fichier urls.txt")
+            print("  • Sauvegarder l'ancien urls.txt en urls.txt.bak")
+            print("\n⏱️ Durée estimée : ~5 secondes pour 100 bookmarks")
+            print("📦 Aucun média ne sera téléchargé à cette étape")
+            print("\n" + "="*60 + "\n")
+            
             export_bookmarks(config)
             input("\nAppuyez sur Entrée...")
         elif choice == "2":
@@ -334,21 +329,41 @@ def main():
                 print("   Lancez d'abord l'export des bookmarks (option 1)")
             else:
                 download_media(config, force=False)
-        elif choice == "3":
-            if not has_urls:
-                print("\n⚠️ Aucune URL disponible")
-                print("   Lancez d'abord l'export des bookmarks (option 1)")
-            else:
-                download_media(config, force=True)
         elif choice == "4":
+            clear_screen()
             show_stats(config)
-            input("\nAppuyez sur Entrée...")
+            print("\n" + "─"*40)
+            print("\nR. Réinitialiser la base de données")
+            print("0. Retour")
+            
+            sub_choice = input("\n👉 Choix : ").strip().upper()
+            
+            if sub_choice == "R":
+                print("\n" + "="*60)
+                print("⚠️ RÉINITIALISATION DE LA BASE DE DONNÉES")
+                print("="*60)
+                print("\nCette action va :")
+                print("  • Supprimer l'historique des posts traités")
+                print("  • Supprimer l'historique des médias téléchargés")
+                print("  • NE PAS supprimer les fichiers déjà téléchargés")
+                print()
+                confirm = input("Confirmer la réinitialisation ? (tapez 'RESET') : ").strip()
+                if confirm == "RESET":
+                    db_file = Path(config["db_file"])
+                    if db_file.exists():
+                        db_file.unlink()
+                        print("✅ Base de données réinitialisée")
+                    else:
+                        print("⚠️ Aucune base de données à réinitialiser")
+                else:
+                    print("❌ Réinitialisation annulée")
+                input("\nAppuyez sur Entrée...")
         elif choice == "5":
             if not has_downloads:
                 print("\n⚠️ Aucun média téléchargé")
                 input("\nAppuyez sur Entrée...")
             else:
-                download_dir = os.path.expandvars(r"%USERPROFILE%\Downloads\BSMB")
+                download_dir = config["download_dir"]  # <-- MODIFIER
                 if sys.platform == "win32":
                     os.startfile(download_dir)
                 else:

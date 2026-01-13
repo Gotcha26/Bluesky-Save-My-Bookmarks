@@ -4,7 +4,8 @@
 config.json
 Token-Bearer.txt
 bsmb.db
-urls.txt
+urls.*
+ToDo.md
 
 # Logs et rapports
 logs/
@@ -12,10 +13,6 @@ logs/
 deleted_posts*.txt
 reposts*.txt
 failed_downloads*.txt
-
-# Médias téléchargés
-images/
-videos/
 
 # Python
 __pycache__/

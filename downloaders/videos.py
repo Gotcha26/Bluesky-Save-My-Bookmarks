@@ -14,8 +14,11 @@ from urllib.parse import urlparse
 import json
 from pathlib import Path
 
+# Ajouter le répertoire parent au path pour les imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 # Charger config si disponible
-from config import get_default_paths
+from core.config import get_default_paths
 
 default_paths = get_default_paths()
 default_vid = default_paths["vid_dir"]
@@ -163,11 +166,6 @@ def download_video(video_info, handle, post_id):
         return False
 
 def main():
-    print("SCRIPT VID DEMARRE")
-    print(f"DEBUG VID: sys.argv = {sys.argv}")
-    print(f"DEBUG VID: VID_DIR = {VID_DIR}")
-    print(f"DEBUG VID: url = {url}")
-    print(f"DEBUG VID: len(sys.argv) = {len(sys.argv)}")
     parts = urlparse(url).path.strip("/").split("/")
     if len(parts) < 4:
         print("   [ERR] URL invalide")

@@ -1,6 +1,20 @@
 # 🔖 BSMB - Bsky Save My Bookmarks
 
-Utilitaire pour exporter et télécharger vos bookmarks Bluesky avec suivi automatique.
+Utilitaire pour exporter et télécharger vos bookmarks Bluesky avec suivi automatique et résolution des reposts.
+
+---
+
+## 📖 Table des matières
+
+- [Installation rapide](#-installation-rapide)
+- [Guide d'utilisation](#-guide-dutilisation)
+- [Structure du projet](#-structure-du-projet)
+- [Fonctionnalités](#-fonctionnalités)
+- [FAQ](#-faq)
+- [Dépannage](#-dépannage)
+- [Éthique et Traçabilité](#-éthique-et-traçabilité)
+
+---
 
 ## 🚀 Installation rapide
 
@@ -28,95 +42,158 @@ pip install requests yt-dlp
 python bsmb.py
 ```
 
-## 📋 Prérequis
+---
 
-- **Python 3.8+** (obligatoire)
-- **requests** (bibliothèque HTTP Python)
-- **yt-dlp** (téléchargeur vidéo universel - [GitHub](https://github.com/yt-dlp/yt-dlp))
-- **ffmpeg** (pour vidéos avec métadonnées)
-- **exiftool** (pour métadonnées EXIF images)
+## 🎯 Guide d'utilisation
 
-> **Note** : BSMB utilise yt-dlp comme fallback pour certains formats vidéo complexes, 
-> mais privilégie l'API native Bluesky pour des téléchargements plus rapides et fiables.
+### 📋 Première utilisation
 
-## 🎯 Utilisation
+#### 1. Récupérer votre token Bearer
 
-### Première utilisation
+BSMB a besoin de votre token Bearer Bluesky pour accéder à vos bookmarks.
 
-1. **Récupérer votre token Bearer**
-   - Consultez **`Instructions-token.md`** pour la procédure détaillée
-   - Ou lors du premier lancement, BSMB vous guidera :
-     - Option 1 : Coller depuis le presse-papier (recommandé)
-     - Option 2 : Lire depuis Token-Bearer.txt
+📖 **Consultez `Instructions-token.md`** pour la procédure détaillée (5 minutes).
 
-2. **Lancer BSMB**
-   ```bash
-   python bsmb.py
-   ```
-   ou double-clic sur `Start.bat` (Windows)
+**Résumé rapide :**
+1. Connectez-vous sur https://bsky.app
+2. Allez dans vos Conservés
+3. Ouvrez les outils de développement (F12)
+4. Onglet Réseau > Filtrez `getBookmarks`
+5. Copiez la valeur `Authorization: Bearer ...`
+6. Collez-la dans BSMB (option 1 au premier lancement)
 
-3. **Menu principal**
-   - Option 1 : Exporter bookmarks → crée `urls.txt` (sauvegarde liens uniquement)
-   - Options 2-3 apparaissent après l'export
-   - Option 2 : Télécharger nouveaux médias uniquement
-   - Option 3 : Tout re-télécharger (force)
-   - Option 4 : Voir les statistiques
-   - Option 5 : Configurer les chemins
-   - Option 6 : Ouvrir le dossier de téléchargements (si médias présents)
-   - Option 7 : Réinitialiser la base de données (en cas de problème)
-
-> **Important** : L'export des bookmarks (option 1) crée seulement un fichier texte.
-> Vous pouvez utiliser ce fichier `urls.txt` dans d'autres outils sans télécharger les médias.
-
-### Workflow recommandé
+#### 2. Exporter vos bookmarks
 
 ```
-1. Export bookmarks (option 1)
-   → Crée urls.txt avec vos liens
-   → Utilisable tel quel dans d'autres outils
-   ↓
-2. Télécharger nouveaux médias (option 2)
-   → Seuls les nouveaux posts sont traités
-   ↓
-3. Vérifier stats (option 4)
+Menu principal > Option 1 : Exporter les bookmarks
 ```
 
-## 🗂️ Structure des fichiers
+Cette opération :
+- ✅ Récupère **tous** vos bookmarks via l'API Bluesky
+- ✅ Crée/met à jour le fichier `urls.txt` avec la liste des liens
+- ✅ Sauvegarde l'ancien fichier en `urls.txt.bak`
+- ✅ Ne télécharge **aucun média** (juste la liste)
+- ⏱️ Durée : ~5 secondes pour 100 bookmarks
+
+> **Note :** Le fichier `urls.txt` peut être utilisé tel quel dans d'autres outils (yt-dlp, wget, etc.)
+
+#### 3. Télécharger les médias
+
+```
+Menu principal > Option 2 : Télécharger les médias (nouveaux uniquement)
+```
+- Ne télécharge que les posts **non traités**
+- Utilise la base de données pour tracker
+- Idéal pour les mises à jour régulières
+
+**Pour tout re-télécharger :**
+```
+Menu > Option 9 (Options avancées) > Option 2 : Forcer le re-téléchargement
+```
+- Force le téléchargement de **tous** les posts
+- Ignore l'historique de la base de données
+- Utile après une réinitialisation ou pour corriger des erreurs
+
+---
+
+### 🔄 Workflow recommandé
+
+```
+┌─────────────────────────────────────────────┐
+│  1. Export bookmarks (Option 1)            │
+│     → Crée/met à jour urls.txt             │
+│     → Sauvegarde urls.txt.bak              │
+│     → ~5 secondes                           │
+└─────────────────────────────────────────────┘
+              ↓
+┌─────────────────────────────────────────────┐
+│  2. Télécharger nouveaux médias (Option 2) │
+│     → Seuls les nouveaux posts traités     │
+│     → Durée variable selon le volume        │
+└─────────────────────────────────────────────┘
+              ↓
+┌─────────────────────────────────────────────┐
+│  3. Vérifier stats (Option 4)              │
+│     → Voir le nombre de médias téléchargés │
+│     → Réinitialiser DB si besoin           │
+└─────────────────────────────────────────────┘
+```
+
+**Mises à jour régulières :**
+1. Relancez l'export (Option 1) → met à jour `urls.txt`
+2. Téléchargez les nouveaux (Option 2) → seuls les nouveaux posts sont traités
+3. Profit ! 🎉
+
+---
+
+### ⚙️ Fonctionnalités avancées
+
+#### Mode Développement
+```
+Menu principal > Option 9 > Option 1 : Mode développement
+```
+
+**Utilité :** Tester avec une liste restreinte d'URLs sans modifier la base de données.
+
+**Comment faire :**
+1. Éditez `urls.txt` et ne gardez que quelques URLs de test
+2. Lancez le mode développement
+3. Les médias seront téléchargés mais la DB ne sera pas mise à jour
+4. Parfait pour tester ou retraiter des posts spécifiques
+
+#### Réinitialiser la base de données
+```
+Menu principal > Option 4 : Statistiques > R : Réinitialiser
+```
+
+**Quand l'utiliser :**
+- Vous voulez tout re-télécharger depuis zéro
+- La base de données est corrompue
+- Vous avez changé de configuration
+
+⚠️ **Attention :** Cette action ne supprime **pas** les fichiers déjà téléchargés.
+
+---
+
+## 🗂️ Structure du projet
 
 ```
 bsmb/
-├── bsmb.py                  # Interface principale ⭐
-├── config.py                # Configuration
-├── database.py              # Tracking SQLite
-├── export_bsky_bookmarks.py # Export bookmarks
-├── bsky_img_downloader.py   # Téléchargement images
-├── bsky_vid_downloader.py   # Téléchargement vidéos
-├── what.py                  # Orchestrateur
-├── Start.bat                # Lanceur Windows
-├── Instructions-token.md    # Guide token Bearer 📖
-├── config.json              # Config utilisateur (auto-créé)
-├── bsmb.db                  # Base de données (auto-créé)
-└── Token-Bearer.txt         # Votre token (à créer)
+├── bsmb.py                      # Interface principale ⭐
+├── Start.bat                    # Lanceur Windows
+├── Instructions-token.md        # Guide token Bearer 📖
+├── config.json                  # Config utilisateur (auto-créé)
+├── bsmb.db                      # Base de données (auto-créé)
+├── Token-Bearer.txt             # Votre token (à créer)
+├── urls.txt                     # Liste bookmarks (auto-créé)
+├── urls.txt.bak                 # Sauvegarde auto (auto-créé)
+│
+├── core/                        # 🎯 Logique métier
+│   ├── config.py               # Configuration multi-OS
+│   ├── database.py             # Tracking SQLite
+│   └── orchestrator.py         # Orchestrateur principal
+│
+├── api/                         # 🌐 API Bluesky
+│   ├── export_bookmarks.py     # Export bookmarks
+│   ├── post_analyzer.py        # Analyse posts
+│   └── repost_resolver.py      # Résolution reposts
+│
+├── downloaders/                 # ⬇️ Téléchargeurs
+│   ├── images.py               # Images
+│   ├── videos.py               # Vidéos
+│   └── text.py                 # Textes
+│
+└── tools/                       # 🛠️ Utilitaires
+    └── debug_post.py           # Debug posts
 ```
 
-## ⚙️ Configuration
+---
 
-Fichier `config.json` (créé automatiquement) :
-```json
-{
-  "img_dir": "%USERPROFILE%\\Downloads\\BSMB\\images",
-  "vid_dir": "%USERPROFILE%\\Downloads\\BSMB\\videos",
-  "token_file": "Token-Bearer.txt",
-  "urls_file": "urls.txt"
-}
-```
-
-Modifiable via Option 5 du menu ou directement dans le fichier.
-
-## 🔍 Fonctionnalités
+## 🌟 Fonctionnalités
 
 ### ✅ Export flexible
 - **urls.txt seul** : Option 1 crée seulement la liste des liens
+- **Sauvegarde auto** : `urls.txt.bak` créé avant chaque export
 - **Réutilisable** : Fichier compatible avec yt-dlp, wget, curl, etc.
 - **Pas de doublon** : Détection automatique des pages vides
 - **Interruptible** : Arrêt dès qu'il n'y a plus de nouveaux bookmarks
@@ -125,7 +202,8 @@ Modifiable via Option 5 du menu ou directement dans le fichier.
 - **Pas de doublons** : Base SQLite track tous les téléchargements
 - **Nouveaux uniquement** : Mode incrémental par défaut
 - **Force mode** : Option pour tout re-télécharger si besoin
-- **Statistiques** : Vue d'ensemble de votre collection
+- **Résolution des reposts** : Détecte et télécharge le post original
+- **Gestion des erreurs** : Posts supprimés, erreurs serveur, types inconnus
 
 ### 📦 Métadonnées complètes
 - **Images** : EXIF avec titre, auteur, date, copyright
@@ -137,33 +215,37 @@ Modifiable via Option 5 du menu ou directement dans le fichier.
 - Confirmation avant gros téléchargements
 - Logs des échecs
 - Reprise possible à tout moment
-- API native Bluesky + fallback yt-dlp si nécessaire
+- Multi-OS (Windows, macOS, Linux)
+
+---
 
 ## 🐛 Dépannage
 
-**"Token invalide"**
-→ Consultez `Instructions-token.md` pour la procédure complète
-→ Utilisez l'option "Coller depuis presse-papier" dans BSMB
+**"Token invalide"**  
+→ Consultez `Instructions-token.md` pour récupérer un nouveau token
 
-**"Aucun média trouvé"**
-→ Le post ne contient peut-être que du texte
+**"Aucun média trouvé"**  
+→ Le post ne contient peut-être que du texte  
 → Vérifiez l'URL dans votre navigateur
 
-**"Erreur téléchargement vidéo"**
-→ L'API Bluesky a peut-être changé
+**"Erreur téléchargement vidéo"**  
+→ L'API Bluesky a peut-être changé  
 → Ouvrez une issue sur GitHub avec l'URL problématique
 
-**"ffmpeg/exiftool introuvable"**
-→ Les médias seront téléchargés sans métadonnées
+**"ffmpeg/exiftool introuvable"**  
+→ Les médias seront téléchargés sans métadonnées  
+→ Installez-les pour bénéficier des métadonnées complètes
 
-**"Erreur SQLite"**
-→ Utilisez l'option 7 du menu pour réinitialiser la base
+**"Erreur SQLite"**  
+→ Menu > Option 4 (Statistiques) > R (Réinitialiser)  
 → Ou supprimez manuellement `bsmb.db`, il sera recréé
 
-**"Post marqué comme traité mais erreur"**
-→ La DB ne marque un post comme traité que si AU MOINS un média a été téléchargé avec succès
-→ Si erreur partielle (ex: image OK, vidéo KO), le post est considéré traité
-→ Utilisez l'option 3 (force) pour re-télécharger
+**"Post marqué comme traité mais erreur"**  
+→ La DB ne marque un post comme traité que si AU MOINS un média a été téléchargé avec succès  
+→ Si erreur partielle (ex: image OK, vidéo KO), le post est considéré traité  
+→ Utilisez Menu > Options avancées > Option 2 (Force) pour re-télécharger
+
+---
 
 ## 🔐 Éthique et Traçabilité
 
@@ -204,20 +286,36 @@ Si vous partagez un média téléchargé, **citez toujours l'auteur original** e
 
 ---
 
+## 📝 Notes importantes
+
 - Le token Bearer expire après quelques jours/déconnexion
 - Les URLs sont au format `bsky.app/profile/handle/post/id`
 - La base de données ne stocke PAS les médias, juste le tracking
-- Les anciens scripts `BSMB_*.bat` peuvent être supprimés
 - **urls.txt** peut être utilisé directement avec yt-dlp :
   ```bash
   yt-dlp -a urls.txt
   ```
+- **urls.txt.bak** est créé automatiquement à chaque export
+
+---
 
 ## 🔐 Sécurité
 
-⚠️ **NE PARTAGEZ JAMAIS votre token Bearer**
+⚠️ **NE PARTAGEZ JAMAIS votre token Bearer**  
 Il permet un accès complet à votre compte Bluesky.
+
+---
 
 ## 📄 Licence
 
 Projet personnel - Utilisation libre
+
+---
+
+## 🤝 Contribution
+
+Rapportez les bugs et suggestions sur le [dépôt GitHub](https://github.com/Gotcha26/Bluesky-Save-My-Bookmarks)
+
+---
+
+**Version 2.0** - Janvier 2025

@@ -27,11 +27,14 @@ import sys
 import json
 from pathlib import Path
 
+# Ajouter le répertoire parent au path pour les imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 # --- Récupère les arguments ---
 DEBUG_MODE = "--debug" in sys.argv
 
 # Charger config si disponible
-from config import get_default_paths
+from core.config import get_default_paths
 
 default_paths = get_default_paths()
 default_img = default_paths["img_dir"]
@@ -307,14 +310,6 @@ def download_image(url, handle, date_str, post_id, post_url, post_text, created_
 
 # -------------------- Main --------------------
 def main():
-    print(f"DEBUG IMG: sys.argv = {sys.argv}")
-    print(f"DEBUG IMG: IMG_DIR = {IMG_DIR}")
-    print(f"DEBUG IMG: url_input = {url_input}")
-    print(f"DEBUG IMG: len(sys.argv) = {len(sys.argv)}")
-    if len(sys.argv) > 2:
-        print("DEBUG IMG: Mode arguments")
-    else:
-        print("DEBUG IMG: Mode interactif")
     urls = []
     if os.path.isfile(url_input):
         with open(url_input, "r", encoding="utf-8") as f:
@@ -333,7 +328,6 @@ def main():
         try:
             result = extract_images_from_bsky(post_url)
             handle, date_str, post_id, images, post_text, created_at, is_repost = result
-            print(f"[DEBUG] type(images)={type(images)}, images={images}")
         except Exception as e:
             print(f"   [!] Erreur API : {e}")
             import traceback

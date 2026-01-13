@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-what.py - Version avec analyse préalable et résolution des reposts
+Orchestrateur principal de téléchargement
+Analyse, résout et télécharge les médias des posts Bluesky
 """
 import os
 import sys
@@ -10,10 +11,21 @@ import threading
 import json
 from datetime import datetime
 from pathlib import Path
-from config import load_config
-from database import Database
-from post_analyzer import PostAnalyzer, PostType
-from repost_resolver import RepostResolver
+
+# Ajouter le répertoire parent au path pour les imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+# Forcer l'encodage UTF-8 pour la console Windows
+if sys.platform == "win32":
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
+# Suite de l'entête
+from core.config import load_config, cleanup_old_logs
+from core.database import Database
+from api.post_analyzer import PostAnalyzer, PostType
+from api.repost_resolver import RepostResolver
 
 class Spinner:
     def __init__(self, message="Traitement"):
@@ -148,7 +160,7 @@ def process_post(url, IMG_DIR, VID_DIR, db, analyzer, resolver, logs_dir, log_fu
         spinner.start()
         
         img_proc = subprocess.run(
-            ["python", "bsky_img_downloader.py", IMG_DIR, url],
+            ["python", "downloaders/images.py", IMG_DIR, url],
             capture_output=True,
             text=True
         )
@@ -171,7 +183,7 @@ def process_post(url, IMG_DIR, VID_DIR, db, analyzer, resolver, logs_dir, log_fu
         spinner.start()
         
         vid_proc = subprocess.run(
-            ["python", "bsky_vid_downloader.py", VID_DIR, url],
+            ["python", "downloaders/videos.py", VID_DIR, url],
             capture_output=True,
             text=True
         )
@@ -194,7 +206,7 @@ def process_post(url, IMG_DIR, VID_DIR, db, analyzer, resolver, logs_dir, log_fu
         spinner.start()
         
         text_proc = subprocess.run(
-            ["python", "bsky_text_downloader.py", url],
+            ["python", "downloaders/text.py", url],
             capture_output=True,
             text=True
         )
