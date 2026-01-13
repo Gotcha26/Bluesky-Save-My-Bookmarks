@@ -18,7 +18,8 @@ class PostType(Enum):
 
 class PostAnalyzer:
     def __init__(self):
-        self.api_base = "https://public.api.bsky.app/xrpc/app.bsky.feed.getPostThread"
+        # Utiliser l'API getRecord comme bsky_post_media.py pour avoir la structure brute
+        self.api_base = "https://bsky.social/xrpc/com.atproto.repo.getRecord"
     
     def analyze(self, post_url):
         """
@@ -32,10 +33,14 @@ class PostAnalyzer:
         handle = parts[1]
         post_id = parts[-1]
         
-        # Appel API
+        # Appel API avec paramètres getRecord
         try:
-            api_url = f"{self.api_base}?uri=at://{handle}/app.bsky.feed.post/{post_id}"
-            resp = requests.get(api_url, timeout=15)
+            params = {
+                "repo": handle,
+                "collection": "app.bsky.feed.post",
+                "rkey": post_id
+            }
+            resp = requests.get(self.api_base, params=params, timeout=15)
             
             # Gestion erreurs HTTP
             if resp.status_code == 400:
@@ -49,18 +54,16 @@ class PostAnalyzer:
         except Exception as e:
             return PostType.UNKNOWN, {"handle": handle, "post_id": post_id}, {"error": str(e)}
         
-        # Analyse du contenu
-        post = data.get("thread", {}).get("post", {})
-        author = post.get("author", {})
-        record = post.get("record", {})
-        embed = post.get("embed", {})
+        # Analyse du contenu (structure brute)
+        value = data.get("value", {})
+        embed = value.get("embed", {})
         embed_type = embed.get("$type", "")
         
         result_data = {
-            "handle": author.get("handle", handle),
+            "handle": handle,
             "post_id": post_id,
-            "created_at": record.get("createdAt", ""),
-            "text": record.get("text", ""),
+            "created_at": value.get("createdAt", ""),
+            "text": value.get("text", ""),
             "embed_type": embed_type
         }
         
@@ -72,54 +75,54 @@ class PostAnalyzer:
         
         # Détection type - ORDRE IMPORTANT
         
-        # 1. Vidéo (vérifier AVANT images car prioritaire)
-        if "video" in embed_type.lower():
+        # 1. Vidéo (structure brute : app.bsky.embed.video)
+        if embed_type == "app.bsky.embed.video":
             video_blob = embed.get("video", {})
             cid = video_blob.get("ref", {}).get("$link")
             if cid:
-                uri = post.get("uri", "")
+                uri = data.get("uri", "")
                 did = uri.split("/")[2] if "/" in uri else None
                 if did:
                     result_data["video_url"] = f"https://bsky.social/xrpc/com.atproto.sync.getBlob?did={did}&cid={cid}"
                     result_data["video_cid"] = cid
+                    result_data["video_mime"] = video_blob.get("mimeType", "video/mp4")
+                    result_data["video_size"] = video_blob.get("size", 0)
                     return PostType.VIDEO, result_data, debug_info
         
-        # 2. Repost
-        if embed_type == "app.bsky.embed.record#view":
-            cited_record = embed.get("record", {})
-            cited_embeds = cited_record.get("embeds", [])
+        # 2. Images directes (structure brute : app.bsky.embed.images)
+        if embed_type == "app.bsky.embed.images":
+            images_list = embed.get("images", [])
+            # Dans la structure brute, les images ont "image.ref.$link" comme CID
+            images = []
+            for img in images_list:
+                img_ref = img.get("image", {}).get("ref", {}).get("$link")
+                if img_ref:
+                    # Reconstruction URL fullsize à partir du CID
+                    images.append(f"https://cdn.bsky.app/img/feed_fullsize/plain/{img_ref}@jpeg")
             
-            # Repost avec média cité
-            for emb in cited_embeds:
-                emb_type = emb.get("$type", "")
-                if "images" in emb_type.lower():
-                    result_data["repost_has_images"] = True
-                    return PostType.REPOST, result_data, debug_info
-                elif "video" in emb_type.lower():
-                    result_data["repost_has_video"] = True
-                    return PostType.REPOST, result_data, debug_info
-            
-            # Repost sans média accessible
+            if images:
+                result_data["images"] = images
+                result_data["image_count"] = len(images)
+                return PostType.IMAGES, result_data, debug_info
+        
+        # 3. Repost (structure brute : app.bsky.embed.record)
+        if embed_type == "app.bsky.embed.record":
+            # Dans la structure brute, on ne peut pas facilement accéder au contenu du repost
+            # Il faudrait faire une autre requête API
+            result_data["is_repost"] = True
             return PostType.REPOST, result_data, debug_info
         
-        # 3. Images directes
-        if embed_type == "app.bsky.embed.images#view":
-            images = [img.get("fullsize") for img in embed.get("images", []) if img.get("fullsize")]
-            result_data["images"] = images
-            result_data["image_count"] = len(images)
-            return PostType.IMAGES, result_data, debug_info
-        
-        # 4. Quote post avec média
-        if embed_type == "app.bsky.embed.recordWithMedia#view":
+        # 4. Quote post avec média (structure brute : app.bsky.embed.recordWithMedia)
+        if embed_type == "app.bsky.embed.recordWithMedia":
             media = embed.get("media", {})
             media_type = media.get("$type", "")
             
             # Vidéo dans recordWithMedia
-            if "video" in media_type.lower():
+            if media_type == "app.bsky.embed.video":
                 video_blob = media.get("video", {})
                 cid = video_blob.get("ref", {}).get("$link")
                 if cid:
-                    uri = post.get("uri", "")
+                    uri = data.get("uri", "")
                     did = uri.split("/")[2] if "/" in uri else None
                     if did:
                         result_data["video_url"] = f"https://bsky.social/xrpc/com.atproto.sync.getBlob?did={did}&cid={cid}"
@@ -127,14 +130,21 @@ class PostAnalyzer:
                         return PostType.VIDEO, result_data, debug_info
             
             # Images dans recordWithMedia
-            if media_type == "app.bsky.embed.images#view":
-                images = [img.get("fullsize") for img in media.get("images", []) if img.get("fullsize")]
-                result_data["images"] = images
-                result_data["image_count"] = len(images)
-                return PostType.IMAGES, result_data, debug_info
+            if media_type == "app.bsky.embed.images":
+                images_list = media.get("images", [])
+                images = []
+                for img in images_list:
+                    img_ref = img.get("image", {}).get("ref", {}).get("$link")
+                    if img_ref:
+                        images.append(f"https://cdn.bsky.app/img/feed_fullsize/plain/{img_ref}@jpeg")
+                
+                if images:
+                    result_data["images"] = images
+                    result_data["image_count"] = len(images)
+                    return PostType.IMAGES, result_data, debug_info
         
         # 5. Texte seul
-        if result_data["text"]:
+        if result_data["text"] and not embed:
             return PostType.TEXT_ONLY, result_data, debug_info
         
         # 6. Inconnu (cas edge)
