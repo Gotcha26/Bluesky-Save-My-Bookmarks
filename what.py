@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-what.py - Version avec analyse préalable
+what.py - Version avec analyse préalable et résolution des reposts
 """
 import os
 import sys
@@ -13,6 +13,7 @@ from pathlib import Path
 from config import load_config
 from database import Database
 from post_analyzer import PostAnalyzer, PostType
+from repost_resolver import RepostResolver
 
 class Spinner:
     def __init__(self, message="Traitement"):
@@ -78,6 +79,161 @@ def save_debug_info(post_id, debug_info, logs_dir):
         json.dump(debug_info, f, indent=2, ensure_ascii=False)
     return debug_file
 
+def process_post(url, IMG_DIR, VID_DIR, db, analyzer, resolver, logs_dir, log_func):
+    """
+    Traite un post unique et retourne les stats
+    Returns: (has_success, img_count, vid_count, text_count, status)
+    status: 'success', 'error_500', 'error_400', 'repost', 'unknown', 'failed'
+    """
+    post_id = url.rstrip("/").split("/")[-1]
+    
+    # === ANALYSE PRÉALABLE ===
+    spinner = Spinner("🔍 Analyse du post")
+    spinner.start()
+    post_type, data, debug_info = analyzer.analyze(url)
+    spinner.stop()
+    
+    print(f"   📋 Type détecté : {post_type.value}")
+    
+    # Tracking DB
+    if db:
+        handle = data.get("handle")
+        db.add_post(url, post_id, handle)
+    
+    has_success = False
+    img_count = 0
+    vid_count = 0
+    text_count = 0
+    
+    # === TRAITEMENT PAR TYPE ===
+    
+    # Erreur 500
+    if post_type == PostType.ERROR_500:
+        print("   ⚠️ Erreur serveur (500)")
+        log_func(f"   ERREUR 500: {url}", to_console=False)
+        if db:
+            db.update_last_check(url)
+        return False, 0, 0, 0, 'error_500'
+    
+    # Post supprimé
+    if post_type == PostType.ERROR_400:
+        print("   [!] Post supprimé ou inaccessible (400)")
+        log_func(f"   POST SUPPRIMÉ: {url}", to_console=False)
+        return False, 0, 0, 0, 'error_400'
+    
+    # Repost - RÉSOLUTION
+    if post_type == PostType.REPOST:
+        print("   [REPOST] Résolution du post d'origine...")
+        spinner = Spinner("🔄 Résolution du repost")
+        spinner.start()
+        original_url, original_handle, original_post_id = resolver.resolve(url)
+        spinner.stop()
+        
+        if original_url:
+            print(f"   ✓ Post original trouvé : {original_handle}/post/{original_post_id}")
+            print(f"   🔗 {original_url}")
+            print(f"   ↳ Traitement du post original...\n")
+            
+            # Traiter récursivement le post original
+            return process_post(original_url, IMG_DIR, VID_DIR, db, analyzer, resolver, logs_dir, log_func)
+        else:
+            print("   ⚠️ Impossible de résoudre le repost")
+            log_func(f"   REPOST NON RÉSOLU: {url}", to_console=False)
+            return False, 0, 0, 0, 'repost'
+    
+    # Images
+    if post_type == PostType.IMAGES:
+        print(f"   📸 {data['image_count']} image(s) détectée(s)")
+        spinner = Spinner("⬇️  Téléchargement des images")
+        spinner.start()
+        
+        img_proc = subprocess.run(
+            ["python", "bsky_img_downloader.py", IMG_DIR, url],
+            capture_output=True,
+            text=True
+        )
+        
+        spinner.stop()
+        
+        if img_proc.returncode == 0:
+            has_success = True
+            img_count = img_proc.stdout.count("[DL]")
+        
+        if img_proc.stdout:
+            for line in img_proc.stdout.strip().split("\n"):
+                if line and not line.startswith("SCRIPT") and not line.startswith("DEBUG"):
+                    print(f"   {line}")
+    
+    # Vidéo
+    elif post_type == PostType.VIDEO:
+        print("   🎬 Vidéo détectée")
+        spinner = Spinner("⬇️  Téléchargement de la vidéo")
+        spinner.start()
+        
+        vid_proc = subprocess.run(
+            ["python", "bsky_vid_downloader.py", VID_DIR, url],
+            capture_output=True,
+            text=True
+        )
+        
+        spinner.stop()
+        
+        if vid_proc.returncode == 0:
+            has_success = True
+            vid_count = vid_proc.stdout.count("[DL]")
+        
+        if vid_proc.stdout:
+            for line in vid_proc.stdout.strip().split("\n"):
+                if line and not line.startswith("SCRIPT") and not line.startswith("DEBUG"):
+                    print(f"   {line}")
+    
+    # Texte seul
+    elif post_type == PostType.TEXT_ONLY:
+        print("   📝 Texte seul détecté")
+        spinner = Spinner("💾 Sauvegarde du texte")
+        spinner.start()
+        
+        text_proc = subprocess.run(
+            ["python", "bsky_text_downloader.py", url],
+            capture_output=True,
+            text=True
+        )
+        
+        spinner.stop()
+        
+        if text_proc.returncode == 0:
+            has_success = True
+            text_count = text_proc.stdout.count("[TXT]")
+        
+        if text_proc.stdout:
+            for line in text_proc.stdout.strip().split("\n"):
+                if line:
+                    print(f"   {line}")
+    
+    # Cas inconnu - MODE DEBUG
+    elif post_type == PostType.UNKNOWN:
+        print("   ⚠️ Type de post non reconnu - MODE DEBUG activé")
+        debug_file = save_debug_info(post_id, debug_info, logs_dir)
+        print(f"   🐛 Debug sauvegardé : {debug_file.name}")
+        print("\n   === INFORMATIONS DE DEBUG ===")
+        print(f"   Embed type : {debug_info.get('embed_type', 'N/A')}")
+        print(f"   Has embed  : {debug_info.get('has_embed', False)}")
+        print(f"   Texte      : {data.get('text', '')[:100]}...")
+        print("   =============================\n")
+        
+        log_func(f"   TYPE INCONNU: {url} - Debug: {debug_file.name}", to_console=False)
+        return False, 0, 0, 0, 'unknown'
+    
+    # Bilan
+    if has_success:
+        if db:
+            db.update_last_check(url)
+        log_func(f"   SUCCÈS: {url}", to_console=False)
+        return True, img_count, vid_count, text_count, 'success'
+    else:
+        log_func(f"   ÉCHEC: {url}", to_console=False)
+        return False, 0, 0, 0, 'failed'
+
 def main():
     if len(sys.argv) < 4:
         print("Usage: python what.py <IMG_DIR> <VID_DIR> [--no-db] <URL1> [URL2] ...")
@@ -100,6 +256,7 @@ def main():
     
     db = None if no_db_mode else Database(config["db_file"])
     analyzer = PostAnalyzer()
+    resolver = RepostResolver()
     
     # Compteurs
     total_jobs = len(urls)
@@ -109,7 +266,7 @@ def main():
     text_count = 0
     failed_urls = []
     deleted_urls = []
-    repost_urls = []
+    repost_unresolved_urls = []
     error_500_urls = []
     unknown_urls = []
     
@@ -139,121 +296,29 @@ def main():
         
         log(f"Job {idx}/{total_jobs}: {url}", to_console=False)
         
-        # === ANALYSE PRÉALABLE ===
-        spinner = Spinner("🔍 Analyse du post")
-        spinner.start()
-        post_type, data, debug_info = analyzer.analyze(url)
-        spinner.stop()
+        # Traiter le post
+        has_success, imgs, vids, texts, status = process_post(
+            url, IMG_DIR, VID_DIR, db, analyzer, resolver, logs_dir, log
+        )
         
-        print(f"   📋 Type détecté : {post_type.value}")
-        
-        # Tracking DB
-        if db:
-            handle = data.get("handle")
-            db.add_post(url, post_id, handle)
-        
-        has_success = False
-        
-        # === TRAITEMENT PAR TYPE ===
-        
-        # Erreur 500
-        if post_type == PostType.ERROR_500:
-            print("   ⚠️ Erreur serveur (500)")
-            error_500_urls.append(url)
-            log(f"   ERREUR 500: {url}", to_console=False)
-            if db:
-                db.update_last_check(url)
-            continue
-        
-        # Post supprimé
-        if post_type == PostType.ERROR_400:
-            print("   [!] Post supprimé ou inaccessible (400)")
-            deleted_urls.append(url)
-            log(f"   POST SUPPRIMÉ: {url}", to_console=False)
-            continue
-        
-        # Repost
-        if post_type == PostType.REPOST:
-            print("   [REPOST] Post cité détecté - non traité")
-            repost_urls.append(url)
-            log(f"   REPOST: {url}", to_console=False)
-            continue
-        
-        # Images
-        if post_type == PostType.IMAGES:
-            print(f"   📸 {data['image_count']} image(s) détectée(s)")
-            img_proc = subprocess.run(
-                ["python", "bsky_img_downloader.py", IMG_DIR, url],
-                capture_output=True,
-                text=True
-            )
-            if img_proc.returncode == 0:
-                has_success = True
-                img_count += img_proc.stdout.count("[DL]")
-            
-            if img_proc.stdout:
-                for line in img_proc.stdout.strip().split("\n"):
-                    if line and not line.startswith("SCRIPT") and not line.startswith("DEBUG"):
-                        print(f"   {line}")
-        
-        # Vidéo
-        elif post_type == PostType.VIDEO:
-            print("   🎬 Vidéo détectée")
-            vid_proc = subprocess.run(
-                ["python", "bsky_vid_downloader.py", VID_DIR, url],
-                capture_output=True,
-                text=True
-            )
-            if vid_proc.returncode == 0:
-                has_success = True
-                vid_count += vid_proc.stdout.count("[DL]")
-            
-            if vid_proc.stdout:
-                for line in vid_proc.stdout.strip().split("\n"):
-                    if line and not line.startswith("SCRIPT") and not line.startswith("DEBUG"):
-                        print(f"   {line}")
-        
-        # Texte seul
-        elif post_type == PostType.TEXT_ONLY:
-            print("   📝 Texte seul détecté")
-            text_proc = subprocess.run(
-                ["python", "bsky_text_downloader.py", url],
-                capture_output=True,
-                text=True
-            )
-            if text_proc.returncode == 0:
-                has_success = True
-                text_count += text_proc.stdout.count("[TXT]")
-            
-            if text_proc.stdout:
-                for line in text_proc.stdout.strip().split("\n"):
-                    if line:
-                        print(f"   {line}")
-        
-        # Cas inconnu - MODE DEBUG
-        elif post_type == PostType.UNKNOWN:
-            print("   ⚠️ Type de post non reconnu - MODE DEBUG activé")
-            debug_file = save_debug_info(post_id, debug_info, logs_dir)
-            print(f"   🐛 Debug sauvegardé : {debug_file.name}")
-            print("\n   === INFORMATIONS DE DEBUG ===")
-            print(f"   Embed type : {debug_info.get('embed_type', 'N/A')}")
-            print(f"   Has embed  : {debug_info.get('has_embed', False)}")
-            print(f"   Texte      : {data.get('text', '')[:100]}...")
-            print("   =============================\n")
-            
-            unknown_urls.append(url)
-            log(f"   TYPE INCONNU: {url} - Debug: {debug_file.name}", to_console=False)
-            continue
-        
-        # Bilan
+        # Mise à jour compteurs
         if has_success:
-            if db:
-                db.update_last_check(url)
             success_count += 1
-            log(f"   SUCCÈS: {url}", to_console=False)
-        else:
+            img_count += imgs
+            vid_count += vids
+            text_count += texts
+        
+        # Catégorisation
+        if status == 'error_500':
+            error_500_urls.append(url)
+        elif status == 'error_400':
+            deleted_urls.append(url)
+        elif status == 'repost':
+            repost_unresolved_urls.append(url)
+        elif status == 'unknown':
+            unknown_urls.append(url)
+        elif status == 'failed':
             failed_urls.append(url)
-            log(f"   ÉCHEC: {url}", to_console=False)
     
     if db:
         db.close()
@@ -269,7 +334,7 @@ def main():
     print(f"Images téléchargées       : {img_count}")
     print(f"Vidéos téléchargées       : {vid_count}")
     print(f"Textes sauvegardés        : {text_count}")
-    print(f"Reposts détectés          : {len(repost_urls)}")
+    print(f"Reposts non résolus       : {len(repost_unresolved_urls)}")
     print(f"Posts supprimés (400)     : {len(deleted_urls)}")
     print(f"Erreurs serveur (500)     : {len(error_500_urls)}")
     print(f"Types inconnus            : {len(unknown_urls)}")
@@ -287,11 +352,11 @@ def main():
             f.write("\n".join(deleted_urls))
         print(f"\n⚠️ {len(deleted_urls)} posts supprimés → {deleted_file}")
     
-    if repost_urls:
-        repost_file = logs_dir / f"reposts_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+    if repost_unresolved_urls:
+        repost_file = logs_dir / f"reposts_unresolved_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
         with open(repost_file, "w", encoding="utf-8") as f:
-            f.write("\n".join(repost_urls))
-        print(f"\n📌 {len(repost_urls)} reposts → {repost_file}")
+            f.write("\n".join(repost_unresolved_urls))
+        print(f"\n📌 {len(repost_unresolved_urls)} reposts non résolus → {repost_file}")
     
     if error_500_urls:
         error_file = logs_dir / f"error_500_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
