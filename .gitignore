@@ -41,6 +41,7 @@ Thumbs.db
 .idea/
 *.sublime-*
 *.lnk
+*.code-workspace
 
 # Archives personnelles
 archives/

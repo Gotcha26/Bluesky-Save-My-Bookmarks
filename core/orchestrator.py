@@ -175,6 +175,10 @@ def process_post(url, IMG_DIR, VID_DIR, db, analyzer, resolver, logs_dir, log_fu
             for line in img_proc.stdout.strip().split("\n"):
                 if line and not line.startswith("SCRIPT") and not line.startswith("DEBUG"):
                     print(f"   {line}")
+
+        if db and img_count > 0:
+            for i in range(img_count):
+                db.add_media(url, 'image', f'image_{i}')
     
     # Vidéo
     elif post_type == PostType.VIDEO:
@@ -198,6 +202,10 @@ def process_post(url, IMG_DIR, VID_DIR, db, analyzer, resolver, logs_dir, log_fu
             for line in vid_proc.stdout.strip().split("\n"):
                 if line and not line.startswith("SCRIPT") and not line.startswith("DEBUG"):
                     print(f"   {line}")
+
+        if db and vid_count > 0:
+            for i in range(vid_count):
+                db.add_media(url, 'video', f'video_{i}')
     
     # Texte seul
     elif post_type == PostType.TEXT_ONLY:

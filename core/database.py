@@ -1,88 +1,129 @@
 #!/usr/bin/env python3
-"""Gestion de la base de données SQLite pour tracking"""
+"""
+Gestion de la base de données SQLite pour BSMB
+"""
 import sqlite3
+from pathlib import Path
 from datetime import datetime
 
 class Database:
-    def __init__(self, db_path):
-        self.conn = sqlite3.connect(db_path)
-        self.conn.row_factory = sqlite3.Row
-        self._init_schema()
+    def __init__(self, db_file):
+        self.db_file = db_file
+        self.conn = sqlite3.connect(db_file)
+        self._init_db()
     
-    def _init_schema(self):
-        """Création des tables"""
-        self.conn.executescript("""
+    def _init_db(self):
+        """Initialise les tables"""
+        cursor = self.conn.cursor()
+        
+        # Table des posts trackés
+        cursor.execute('''
             CREATE TABLE IF NOT EXISTS posts (
                 url TEXT PRIMARY KEY,
-                post_id TEXT NOT NULL,
+                post_id TEXT,
                 handle TEXT,
-                added_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                added_at TEXT,
                 last_check TEXT
-            );
-            
+            )
+        ''')
+        
+        # Table des médias téléchargés
+        cursor.execute('''
             CREATE TABLE IF NOT EXISTS media (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                post_url TEXT NOT NULL,
-                media_type TEXT NOT NULL,
-                filename TEXT NOT NULL,
-                downloaded_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (post_url) REFERENCES posts(url),
-                UNIQUE(post_url, filename)
-            );
-            
-            CREATE INDEX IF NOT EXISTS idx_posts_handle ON posts(handle);
-            CREATE INDEX IF NOT EXISTS idx_media_post ON media(post_url);
-        """)
+                post_url TEXT,
+                media_type TEXT,
+                filename TEXT,
+                downloaded_at TEXT,
+                FOREIGN KEY(post_url) REFERENCES posts(url)
+            )
+        ''')
+        
         self.conn.commit()
     
-    def add_post(self, url, post_id, handle=None):
-        """Ajoute un post (ignore si existe)"""
-        self.conn.execute(
-            "INSERT OR IGNORE INTO posts (url, post_id, handle) VALUES (?, ?, ?)",
-            (url, post_id, handle)
-        )
+    def add_post(self, url, post_id=None, handle=None):
+        """Ajoute un post à la DB"""
+        cursor = self.conn.cursor()
+        now = datetime.now().isoformat()
+        
+        cursor.execute('''
+            INSERT OR REPLACE INTO posts (url, post_id, handle, added_at, last_check)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (url, post_id, handle, now, now))
+        
+        self.conn.commit()
+    
+    def add_media(self, post_url, media_type, filename):
+        """Ajoute un média téléchargé à la DB
+        
+        Args:
+            post_url: URL du post
+            media_type: 'image' ou 'video'
+            filename: Nom du fichier téléchargé
+        """
+        cursor = self.conn.cursor()
+        now = datetime.now().isoformat()
+        
+        cursor.execute('''
+            INSERT INTO media (post_url, media_type, filename, downloaded_at)
+            VALUES (?, ?, ?, ?)
+        ''', (post_url, media_type, filename, now))
+        
+        self.conn.commit()
+
+    def update_last_check(self, url):
+        """Met à jour la date de dernière vérification d'un post"""
+        cursor = self.conn.cursor()
+        now = datetime.now().isoformat()
+        
+        cursor.execute('''
+            UPDATE posts SET last_check = ? WHERE url = ?
+        ''', (now, url))
+        
         self.conn.commit()
     
     def get_new_posts(self, urls):
-        """Retourne les URLs non présentes en DB"""
-        placeholders = ",".join("?" * len(urls))
-        cursor = self.conn.execute(
-            f"SELECT url FROM posts WHERE url IN ({placeholders})",
-            urls
-        )
-        existing = {row["url"] for row in cursor}
-        return [u for u in urls if u not in existing]
-    
-    def mark_media_downloaded(self, post_url, media_type, filename):
-        """Marque un média comme téléchargé"""
-        self.conn.execute(
-            "INSERT OR IGNORE INTO media (post_url, media_type, filename) VALUES (?, ?, ?)",
-            (post_url, media_type, filename)
-        )
-        self.conn.commit()
-    
-    def is_media_downloaded(self, post_url, filename):
-        """Vérifie si un média a déjà été téléchargé"""
-        cursor = self.conn.execute(
-            "SELECT 1 FROM media WHERE post_url = ? AND filename = ?",
-            (post_url, filename)
-        )
-        return cursor.fetchone() is not None
-    
-    def update_last_check(self, url):
-        """Met à jour la date de dernière vérification"""
-        self.conn.execute(
-            "UPDATE posts SET last_check = ? WHERE url = ?",
-            (datetime.now().isoformat(), url)
-        )
-        self.conn.commit()
+        """Retourne les URLs non trackées"""
+        cursor = self.conn.cursor()
+        new_posts = []
+        
+        for url in urls:
+            cursor.execute('SELECT url FROM posts WHERE url = ?', (url,))
+            if not cursor.fetchone():
+                new_posts.append(url)
+        
+        return new_posts
     
     def get_stats(self):
-        """Statistiques de la base"""
-        posts = self.conn.execute("SELECT COUNT(*) as c FROM posts").fetchone()["c"]
-        images = self.conn.execute("SELECT COUNT(*) as c FROM media WHERE media_type='image'").fetchone()["c"]
-        videos = self.conn.execute("SELECT COUNT(*) as c FROM media WHERE media_type='video'").fetchone()["c"]
-        return {"posts": posts, "images": images, "videos": videos}
+        """Retourne les statistiques
+        
+        Returns:
+            dict: {
+                'posts': nombre de posts trackés,
+                'images': nombre d'images téléchargées,
+                'videos': nombre de vidéos téléchargées
+            }
+        """
+        cursor = self.conn.cursor()
+        
+        # Nombre de posts trackés
+        cursor.execute('SELECT COUNT(*) FROM posts')
+        posts_count = cursor.fetchone()[0]
+        
+        # Nombre d'images téléchargées
+        cursor.execute("SELECT COUNT(*) FROM media WHERE media_type = 'image'")
+        images_count = cursor.fetchone()[0]
+        
+        # Nombre de vidéos téléchargées
+        cursor.execute("SELECT COUNT(*) FROM media WHERE media_type = 'video'")
+        videos_count = cursor.fetchone()[0]
+        
+        return {
+            'posts': posts_count,
+            'images': images_count,
+            'videos': videos_count
+        }
     
     def close(self):
+        """Ferme la connexion"""
         self.conn.close()
