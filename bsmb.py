@@ -124,7 +124,7 @@ def get_token_from_clipboard():
     try:
         import win32clipboard  # type: ignore
         win32clipboard.OpenClipboard()
-        token = win32clipboard.GetClipboardData()
+        token = win32clipboard.GetClipboardData(win32clipboard.CF_UNICODETEXT)
         win32clipboard.CloseClipboard()
         return token.strip() if token else None
     except Exception:
