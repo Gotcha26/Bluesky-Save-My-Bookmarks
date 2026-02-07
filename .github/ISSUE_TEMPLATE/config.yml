@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: ❓ Question générale
+    url: https://github.com/Gotcha26/Bluesky-Save-My-Bookmarks/discussions
+    about: Poser une question ou discuter d'un sujet
+  - name: 💬 Discussions
+    url: https://github.com/Gotcha26/Bluesky-Save-My-Bookmarks/discussions
+    about: Partager des idées, feedback, ou généralities
