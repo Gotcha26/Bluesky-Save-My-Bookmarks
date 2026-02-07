@@ -74,6 +74,8 @@ Menu Authentification > Option 2 : Coller depuis presse-papier
 3. Nommez-le (ex: « BSMB ») et copiez le mot de passe généré (xxxx-xxxx-xxxx-xxxx)
 4. Configurez-le dans BSMB
 
+📖 **Guide complet:** Consultez [Instructions-token.md](Instructions-token.md) pour les deux méthodes d'authentification
+
 > **Sécurité :** L'App Password est stocké dans `config.json` (fichier local, hors Git). Il ne doit jamais être partagé.
 
 ```mermaid
