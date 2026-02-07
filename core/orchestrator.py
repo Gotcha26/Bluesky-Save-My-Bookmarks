@@ -110,7 +110,7 @@ def process_post(url, IMG_DIR, VID_DIR, db, analyzer, resolver, logs_dir, log_fu
     post_type, data, debug_info = analyzer.analyze(url)
     spinner.stop()
 
-    print(f"  {c.KEY}Type detecte :{c.RESET} {c.VALUE}{post_type.value}{c.RESET}")
+    print(f"  {c.KEY}Type détecté :{c.RESET} {c.VALUE}{post_type.value}{c.RESET}")
 
     # Tracking DB
     if db:
@@ -134,14 +134,14 @@ def process_post(url, IMG_DIR, VID_DIR, db, analyzer, resolver, logs_dir, log_fu
 
     # Post supprimé
     if post_type == PostType.ERROR_400:
-        print(c.error("Post supprime ou inaccessible (400)"))
+        print(c.error("Post supprimé ou inaccessible (400)"))
         log_func(f"   POST SUPPRIMÉ: {url}", to_console=False)
         return False, 0, 0, 0, 'error_400'
 
     # Repost - RÉSOLUTION
     if post_type == PostType.REPOST:
-        print(c.info("Repost detecte, resolution du post d'origine..."))
-        spinner = Spinner("Resolution du repost")
+        print(c.info("Repost détecté, résolution du post d'origine..."))
+        spinner = Spinner("Résolution du repost")
         spinner.start()
         original_url, original_handle, original_post_id = resolver.resolve(url)
         spinner.stop()
@@ -154,14 +154,14 @@ def process_post(url, IMG_DIR, VID_DIR, db, analyzer, resolver, logs_dir, log_fu
             # Traiter récursivement le post original
             return process_post(original_url, IMG_DIR, VID_DIR, db, analyzer, resolver, logs_dir, log_func)
         else:
-            print(c.warning("Impossible de resoudre le repost"))
+            print(c.warning("Impossible de résoudre le repost"))
             log_func(f"   REPOST NON RÉSOLU: {url}", to_console=False)
             return False, 0, 0, 0, 'repost'
 
     # Images
     if post_type == PostType.IMAGES:
-        print(c.info(f"{data['image_count']} image(s) detectee(s)"))
-        spinner = Spinner("Telechargement des images")
+        print(c.info(f"{data['image_count']} image(s) détectée(s)"))
+        spinner = Spinner("Téléchargement des images")
         spinner.start()
 
         img_proc = subprocess.run(
@@ -187,8 +187,8 @@ def process_post(url, IMG_DIR, VID_DIR, db, analyzer, resolver, logs_dir, log_fu
 
     # Vidéo
     elif post_type == PostType.VIDEO:
-        print(c.info("Video detectee"))
-        spinner = Spinner("Telechargement de la video")
+        print(c.info("Vidéo détectée"))
+        spinner = Spinner("Téléchargement de la vidéo")
         spinner.start()
 
         vid_proc = subprocess.run(
@@ -214,7 +214,7 @@ def process_post(url, IMG_DIR, VID_DIR, db, analyzer, resolver, logs_dir, log_fu
 
     # Texte seul
     elif post_type == PostType.TEXT_ONLY:
-        print(c.info("Texte seul detecte"))
+        print(c.info("Texte seul détecté"))
         spinner = Spinner("Sauvegarde du texte")
         spinner.start()
 
@@ -239,7 +239,7 @@ def process_post(url, IMG_DIR, VID_DIR, db, analyzer, resolver, logs_dir, log_fu
     elif post_type == PostType.UNKNOWN:
         print(c.warning("Type de post non reconnu"))
         debug_file = save_debug_info(post_id, debug_info, logs_dir)
-        print(f"  {c.DIM}Debug sauvegarde : {debug_file.name}{c.RESET}")
+        print(f"  {c.DIM}Debug sauvegardé : {debug_file.name}{c.RESET}")
         print()
         print(c.config_line("Embed type", debug_info.get('embed_type', 'N/A')))
         print(c.config_line("Has embed", str(debug_info.get('has_embed', False))))
@@ -264,16 +264,16 @@ def print_report(stats, duration, total_size, no_db_mode, logs_dir, log_file):
     """Affiche le rapport final structuré."""
     border = "=" * 80
     print(f"\n  {c.HEADER}{border}{c.RESET}")
-    print(f"  {c.HEADER}{'RAPPORT DE TELECHARGEMENT':^80}{c.RESET}")
+    print(f"  {c.HEADER}{'RAPPORT DE TÉLÉCHARGEMENT':^80}{c.RESET}")
     print(f"  {c.HEADER}{border}{c.RESET}")
     print()
 
     # Résultats
-    print(c.title("  RESULTATS"))
+    print(c.title("  RÉSULTATS"))
     print(c.separator(width=78))
-    print(c.config_line("Posts traites", f"{stats['success']}/{stats['total']}", 28))
-    print(c.config_line("Images telechargees", str(stats['images']), 28))
-    print(c.config_line("Videos telechargees", str(stats['videos']), 28))
+    print(c.config_line("Posts traités", f"{stats['success']}/{stats['total']}", 28))
+    print(c.config_line("Images téléchargées", str(stats['images']), 28))
+    print(c.config_line("Vidéos téléchargées", str(stats['videos']), 28))
     print(c.config_line("Textes sauvegardes", str(stats['texts']), 28))
     print()
 
@@ -284,29 +284,29 @@ def print_report(stats, duration, total_size, no_db_mode, logs_dir, log_file):
     ])
 
     if has_problems:
-        print(c.title("  PROBLEMES"))
+        print(c.title("  PROBLÈMES"))
         print(c.separator(width=78))
         if stats['error_400']:
-            print(c.config_line("Posts supprimes (400)", str(len(stats['error_400'])), 28))
+            print(c.config_line("Posts supprimés (400)", str(len(stats['error_400'])), 28))
         if stats['error_500']:
             print(c.config_line("Erreurs serveur (500)", str(len(stats['error_500'])), 28))
         if stats['reposts']:
-            print(c.config_line("Reposts non resolus", str(len(stats['reposts'])), 28))
+            print(c.config_line("Reposts non résolus", str(len(stats['reposts'])), 28))
         if stats['unknown']:
             print(c.config_line("Types inconnus", str(len(stats['unknown'])), 28))
         if stats['failed']:
-            print(c.config_line("Echecs", str(len(stats['failed'])), 28))
+            print(c.config_line("Échecs", str(len(stats['failed'])), 28))
         print()
 
     # Métriques
-    print(c.title("  METRIQUES"))
+    print(c.title("  MÉTRIQUES"))
     print(c.separator(width=78))
-    print(c.config_line("Duree totale", format_duration(duration), 28))
+    print(c.config_line("Durée totale", format_duration(duration), 28))
     print(c.config_line("Poids total du dossier", format_size(total_size), 28))
 
     if no_db_mode:
         print()
-        print(c.warning("Mode dev : Base de donnees non mise a jour"))
+        print(c.warning("Mode dev : Base de données non mise à jour"))
 
     print()
     print(f"  {c.HEADER}{border}{c.RESET}")
@@ -321,11 +321,11 @@ def _save_and_report_logs(stats, logs_dir, log_file):
     generated = []
 
     entries = [
-        ("error_400", "deleted_posts", "posts supprimes"),
-        ("reposts", "reposts_unresolved", "reposts non resolus"),
+        ("error_400", "deleted_posts", "posts supprimés"),
+        ("reposts", "reposts_unresolved", "reposts non résolus"),
         ("error_500", "error_500", "erreurs 500"),
         ("unknown", "unknown_types", "types inconnus"),
-        ("failed", "failed_downloads", "echecs"),
+        ("failed", "failed_downloads", "échecs"),
     ]
 
     for key, prefix, label in entries:
@@ -338,12 +338,12 @@ def _save_and_report_logs(stats, logs_dir, log_file):
 
     if generated:
         print()
-        print(c.title("  FICHIERS GENERES"))
+        print(c.title("  FICHIERS GÉNÉRÉS"))
         print(c.separator(width=78))
         for name, detail in generated:
             print(f"  {c.YELLOW}>{c.RESET} {c.VALUE}{name}{c.RESET}  ({detail})")
 
-    print(f"\n  {c.DIM}Log detaille : {log_file}{c.RESET}")
+    print(f"\n  {c.DIM}Log détaillé : {log_file}{c.RESET}")
 
 
 def main():

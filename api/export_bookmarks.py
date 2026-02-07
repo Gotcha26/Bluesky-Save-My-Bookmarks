@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Export des bookmarks Bluesky"""
+import os
 import requests
 import time
 import sys
@@ -9,17 +10,23 @@ from pathlib import Path
 print("=== [API] Export des bookmarks Bluesky ===")
 
 API = "https://shiitake.us-east.host.bsky.network/xrpc/app.bsky.bookmark.getBookmarks"
-TOKEN_FILE = Path("Token-Bearer.txt")
 
 # --- Lecture du token ---
-if not TOKEN_FILE.exists():
-    print("❌ Fichier Token-Bearer.txt introuvable")
-    sys.exit(1)
+# Priorité 1 : variable d'environnement (passée par bsmb.py)
+TOKEN = os.environ.get("BSMB_TOKEN", "").strip()
 
-TOKEN = TOKEN_FILE.read_text(encoding="utf-8").strip()
+# Priorité 2 : fichier Token-Bearer.txt (rétrocompatibilité / mode standalone)
+if not TOKEN:
+    TOKEN_FILE = Path("Token-Bearer.txt")
+    if TOKEN_FILE.exists():
+        TOKEN = TOKEN_FILE.read_text(encoding="utf-8").strip()
+    else:
+        print("[ERREUR] Aucun token disponible")
+        print("  Variable BSMB_TOKEN non définie et Token-Bearer.txt introuvable")
+        sys.exit(1)
 
 if not TOKEN.startswith("Bearer "):
-    print("❌ Le token doit commencer par 'Bearer '")
+    print("[ERREUR] Le token doit commencer par 'Bearer '")
     sys.exit(1)
 
 cursor = None

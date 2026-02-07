@@ -31,11 +31,17 @@ def get_app_state(config):
 
     has_downloads = stats["images"] > 0 or stats["videos"] > 0
 
-    token_file = Path(config["token_file"])
-    token_ok = False
-    if token_file.exists():
-        content = token_file.read_text(encoding="utf-8").strip()
-        token_ok = content.startswith("Bearer ")
+    from core.auth import has_credentials
+    if has_credentials(config):
+        auth_mode = "auto"
+        token_ok = True
+    else:
+        auth_mode = "file"
+        token_ok = False
+        token_file = Path(config["token_file"])
+        if token_file.exists():
+            content = token_file.read_text(encoding="utf-8").strip()
+            token_ok = content.startswith("Bearer ")
 
     return {
         "stats": stats,
@@ -43,6 +49,7 @@ def get_app_state(config):
         "url_count": url_count,
         "has_downloads": has_downloads,
         "token_ok": token_ok,
+        "auth_mode": auth_mode,
     }
 
 
@@ -51,7 +58,12 @@ def print_header(config, state):
     print(c.box_header("BSMB - BSKY SAVE MY BOOKMARKS"))
 
     # Ligne de statut
-    token_status = f"{c.OK}OK{c.RESET}" if state["token_ok"] else f"{c.WARNING}manquant{c.RESET}"
+    if state["auth_mode"] == "auto":
+        token_status = f"{c.OK}auto{c.RESET}"
+    elif state["token_ok"]:
+        token_status = f"{c.OK}fichier{c.RESET}"
+    else:
+        token_status = f"{c.WARNING}manquant{c.RESET}"
     urls_status = (
         f"{c.VALUE}{state['url_count']}{c.RESET} liens"
         if state["has_urls"]
@@ -65,9 +77,9 @@ def print_header(config, state):
     )
 
     print(
-        f"  Token: [{token_status}] | "
+        f"  Auth: [{token_status}] | "
         f"Bookmarks: {urls_status} | "
-        f"Medias: {media_status}"
+        f"Médias: {media_status}"
     )
     print(f"  Destination: {c.VALUE}{config['download_dir']}{c.RESET}")
     print()
@@ -80,26 +92,26 @@ def show_main_menu(state):
     print(c.menu_option("1", "Exporter       - Sauvegarder les liens depuis Bluesky"))
 
     if state["has_urls"]:
-        print(c.menu_option("2", "Telecharger    - Recuperer les nouveaux medias"))
+        print(c.menu_option("2", "Télécharger    - Récupérer les nouveaux médias"))
     else:
         print(
-            f"  {c.DIM}2. Telecharger    - "
+            f"  {c.DIM}2. Télécharger    - "
             f"(exportez d'abord vos bookmarks){c.RESET}"
         )
 
     print()
     print(c.title("OUTILS"))
     print(c.separator())
-    print(c.menu_option("3", "Statistiques   - Voir l'etat de la base"))
+    print(c.menu_option("3", "Statistiques   - Voir l'état de la base"))
 
     if state["has_downloads"]:
-        print(c.menu_option("4", "Ouvrir dossier - Explorer les telechargements"))
+        print(c.menu_option("4", "Ouvrir dossier - Explorer les téléchargements"))
 
     print()
     print(c.title("CONFIGURATION"))
     print(c.separator())
-    print(c.menu_option("5", "Configuration  - Modifier les parametres"))
-    print(c.menu_option("9", "Avance         - Options developpeur"))
+    print(c.menu_option("5", "Configuration  - Modifier les paramètres"))
+    print(c.menu_option("9", "Avancé         - Options développeur"))
     print()
     print(c.menu_option("0", f"{c.DIM}Quitter{c.RESET}"))
     print()
@@ -127,66 +139,91 @@ def get_token_from_clipboard():
 
 
 def check_token(config):
-    """Vérifie la présence du token Bearer."""
-    token_file = Path(config["token_file"])
+    """
+    Obtient un token Bearer valide.
+    Returns: str (token) ou None si échec.
+    """
+    from core.auth import get_token, has_credentials, AuthError
 
-    if token_file.exists():
-        content = token_file.read_text(encoding="utf-8").strip()
-        if content and content.startswith("Bearer "):
-            return True
+    # Tentative automatique si credentials configures
+    if has_credentials(config):
+        try:
+            token = get_token(config)
+            if token:
+                print(c.success("Authentification automatique réussie"))
+                return token
+        except AuthError as e:
+            print(c.error(f"Échec de l'authentification : {e}"))
+            print(f"  {c.DIM}Vérifiez vos identifiants dans Configuration > Identifiants Bluesky{c.RESET}")
+            input(f"\n{c.DIM}  Appuyez sur Entree...{c.RESET}")
+            return None
 
+    # Pas de credentials -> menu interactif
     clear_screen()
-    print(c.box_header("TOKEN BEARER"))
+    print(c.box_header("AUTHENTIFICATION"))
     print()
-    print(c.warning("Token manquant ou invalide"))
-    print()
-    print(
-        f"  {c.KEY}Pour recuperer votre token :{c.RESET}\n"
-        f"  Consultez {c.VALUE}Instructions-token.md{c.RESET}"
-    )
+    print(c.warning("Aucune méthode d'authentification configurée"))
     print()
     print(c.separator())
-    print(c.menu_option("1", "Coller depuis le presse-papier"))
-    print(c.menu_option("2", "Lire depuis Token-Bearer.txt"))
+    print(c.menu_option("1", "Configurer identifiants  - Handle + App Password (recommandé)"))
+    print(c.menu_option("2", "Coller token depuis le presse-papier"))
+    print(c.menu_option("3", "Lire token depuis Token-Bearer.txt"))
     print(c.menu_option("0", f"{c.DIM}Annuler{c.RESET}"))
     print()
 
-    choice = input(c.prompt("  Votre choix (0-2): ")).strip()
+    choice = input(c.prompt("  Votre choix (0-3): ")).strip()
 
     if choice == "1":
-        token = get_token_from_clipboard()
-        if token and token.startswith("Bearer "):
-            token_file.write_text(token, encoding="utf-8")
-            print(c.success("Token enregistre depuis le presse-papier"))
-            return True
+        configure_credentials(config)
+        # Retenter après configuration
+        if has_credentials(config):
+            try:
+                token = get_token(config)
+                if token:
+                    print(c.success("Authentification réussie"))
+                    return token
+            except AuthError as e:
+                print(c.error(f"Échec : {e}"))
+                return None
+        return None
+
+    elif choice == "2":
+        raw_token = get_token_from_clipboard()
+        if raw_token and raw_token.startswith("Bearer "):
+            Path(config["token_file"]).write_text(raw_token, encoding="utf-8")
+            print(c.success("Token enregistré depuis le presse-papier"))
+            return raw_token
         else:
             print(c.error("Token invalide (doit commencer par 'Bearer ')"))
-            return False
-    elif choice == "2":
+            return None
+
+    elif choice == "3":
+        token_file = Path(config["token_file"])
         if token_file.exists():
             content = token_file.read_text(encoding="utf-8").strip()
             if content.startswith("Bearer "):
-                print(c.success("Token valide trouve dans Token-Bearer.txt"))
-                return True
+                print(c.success("Token valide trouvé dans Token-Bearer.txt"))
+                return content
         print(c.error("Token invalide dans Token-Bearer.txt"))
-        return False
+        return None
 
-    return False
+    return None
 
 
 # ─── Actions principales ──────────────────────────────────────
 
 def export_bookmarks(config):
     """Exporte les bookmarks."""
-    if not check_token(config):
+    token = check_token(config)
+    if not token:
         return False
 
     clear_screen()
     print(c.box_header("EXPORT DES BOOKMARKS"))
     print()
-    print(f"  {c.KEY}Cette operation va :{c.RESET}")
-    print(f"    {c.DIM}-{c.RESET} Recuperer la liste complete de vos bookmarks Bluesky")
-    print(f"    {c.DIM}-{c.RESET} Creer/mettre a jour le fichier urls.txt")
+    print(f"  {c.KEY}Cette opération va :{c.RESET}")
+    print(f"    {c.DIM}-{c.RESET} Récupérer la liste complète de vos bookmarks Bluesky")
+    print(f"    {c.DIM}-{c.RESET} Créer/mettre à jour le fichier urls.txt")
     print(f"    {c.DIM}-{c.RESET} Sauvegarder l'ancien urls.txt en urls.txt.bak")
     print()
     print(c.separator())
@@ -197,14 +234,18 @@ def export_bookmarks(config):
         return False
 
     print()
+    env = os.environ.copy()
+    env["BSMB_TOKEN"] = token
+
     result = subprocess.run(
         ["python", "api/export_bookmarks.py"],
         capture_output=False,
         encoding="utf-8",
         errors="replace",
+        env=env,
     )
     if result.returncode == 0:
-        print(c.success("Export termine"))
+        print(c.success("Export terminé"))
     return result.returncode == 0
 
 
@@ -232,7 +273,7 @@ def download_media(config, force=False, skip_token_check=False):
         print(c.warning("Traitement direct depuis urls.txt"))
         print(c.config_line("Token", f"{c.DIM}non verifie{c.RESET}"))
         print(c.config_line("Base de donnees", f"{c.DIM}non mise a jour{c.RESET}"))
-        print(c.config_line("Posts a traiter", f"{c.VALUE}{len(urls)}{c.RESET}"))
+        print(c.config_line("Posts à traiter", f"{c.VALUE}{len(urls)}{c.RESET}"))
         print()
         print(c.separator())
         print()
@@ -251,7 +292,7 @@ def download_media(config, force=False, skip_token_check=False):
     if force:
         urls_to_process = urls
         print()
-        print(c.warning(f"Mode FORCE : {len(urls)} posts seront tous traites"))
+        print(c.warning(f"Mode FORCE : {len(urls)} posts seront tous traités"))
     else:
         urls_to_process = db.get_new_posts(urls)
         new = len(urls_to_process)
@@ -260,7 +301,7 @@ def download_media(config, force=False, skip_token_check=False):
         print(c.info(f"{total} URLs au total, {c.VALUE}{new}{c.RESET} nouvelles"))
 
     if not urls_to_process:
-        print(c.success("Tous les posts sont deja traites"))
+        print(c.success("Tous les posts sont déjà traités"))
         db.close()
         return True
 
@@ -271,7 +312,7 @@ def download_media(config, force=False, skip_token_check=False):
         return False
 
     print()
-    print(c.info("Lancement du telechargement..."))
+    print(c.info("Lancement du téléchargement..."))
     print()
 
     result = subprocess.run(
@@ -298,14 +339,14 @@ def show_stats(config):
         print()
 
         total_media = stats["images"] + stats["videos"]
-        print(c.config_line("Posts trackes", str(stats["posts"])))
-        print(c.config_line("Images telechargees", str(stats["images"])))
-        print(c.config_line("Videos telechargees", str(stats["videos"])))
-        print(c.config_line("Total medias", str(total_media)))
+        print(c.config_line("Posts trackés", str(stats["posts"])))
+        print(c.config_line("Images téléchargées", str(stats["images"])))
+        print(c.config_line("Vidéos téléchargées", str(stats["videos"])))
+        print(c.config_line("Total médias", str(total_media)))
         print()
         print(c.separator())
         print()
-        print(c.menu_option("R", f"{c.WARNING}Reinitialiser la base de donnees{c.RESET}"))
+        print(c.menu_option("R", f"{c.WARNING}Réinitialiser la base de données{c.RESET}"))
         print(c.menu_option("0", f"{c.DIM}Retour{c.RESET}"))
         print()
 
@@ -321,7 +362,7 @@ def show_stats(config):
             db.close()
         else:
             print(c.error(f"Choix invalide : \"{choice}\""))
-            input(f"\n{c.DIM}  Appuyez sur Entree...{c.RESET}")
+            input(f"\n{c.DIM}  Appuyez sur Entrée...{c.RESET}")
 
 
 def reset_database(config):
@@ -330,9 +371,9 @@ def reset_database(config):
     print(c.box_header("REINITIALISATION"))
     print()
     print(c.warning("Cette action va :"))
-    print(f"    {c.DIM}-{c.RESET} Supprimer l'historique des posts traites")
-    print(f"    {c.DIM}-{c.RESET} Supprimer l'historique des medias telecharges")
-    print(f"    {c.DIM}-{c.RESET} {c.OK}NE PAS{c.RESET} supprimer les fichiers deja telecharges")
+    print(f"    {c.DIM}-{c.RESET} Supprimer l'historique des posts traités")
+    print(f"    {c.DIM}-{c.RESET} Supprimer l'historique des médias téléchargés")
+    print(f"    {c.DIM}-{c.RESET} {c.OK}NE PAS{c.RESET} supprimer les fichiers déjà téléchargés")
     print()
     print(c.separator())
     print()
@@ -342,16 +383,75 @@ def reset_database(config):
         db_file = Path(config["db_file"])
         if db_file.exists():
             db_file.unlink()
-            print(c.success("Base de donnees reinitialisee"))
+            print(c.success("Base de données réinitialisée"))
         else:
-            print(c.warning("Aucune base de donnees a reinitialiser"))
+            print(c.warning("Aucune base de données à réinitialiser"))
     else:
-        print(f"\n  {c.DIM}Reinitialisation annulee{c.RESET}")
+        print(f"\n  {c.DIM}Réinitialisation annulée{c.RESET}")
 
-    input(f"\n{c.DIM}  Appuyez sur Entree...{c.RESET}")
+    input(f"\n{c.DIM}  Appuyez sur Entrée...{c.RESET}")
 
 
 # ─── Configuration ────────────────────────────────────────────
+
+def configure_credentials(config):
+    """Menu de configuration des identifiants Bluesky."""
+    clear_screen()
+    print(c.box_header("IDENTIFIANTS BLUESKY"))
+    print()
+
+    current_handle = config.get("bsky_handle", "")
+    has_pwd = bool(config.get("bsky_app_password", ""))
+
+    print(c.config_line("Handle actuel", current_handle or f"{c.DIM}non configuré{c.RESET}"))
+    print(c.config_line("App Password", f"{c.OK}configuré{c.RESET}" if has_pwd else f"{c.DIM}non configuré{c.RESET}"))
+    print()
+    print(c.separator())
+    print()
+    print(f"  {c.KEY}Pour créer un App Password :{c.RESET}")
+    print(f"    {c.DIM}1.{c.RESET} Allez sur {c.VALUE}bsky.app > Settings > App Passwords{c.RESET}")
+    print(f"    {c.DIM}2.{c.RESET} Cliquez sur {c.VALUE}Add App Password{c.RESET}")
+    print(f"    {c.DIM}3.{c.RESET} Nommez-le (ex: 'BSMB') et copiez le mot de passe généré")
+    print()
+    print(f"  {c.DIM}L'App Password sera stocké dans config.json (fichier local, hors Git){c.RESET}")
+    print()
+    print(c.separator())
+    print()
+
+    handle = input(c.prompt(f"  Handle Bluesky (ENTRÉE pour garder): ")).strip()
+    if not handle and not current_handle:
+        print(f"\n  {c.DIM}Configuration annulée{c.RESET}")
+        input(f"\n{c.DIM}  Appuyez sur Entrée...{c.RESET}")
+        return
+    if not handle:
+        handle = current_handle
+
+    app_password = input(c.prompt(f"  App Password (xxxx-xxxx-xxxx-xxxx): ")).strip()
+    if not app_password:
+        print(f"\n  {c.DIM}Configuration annulée{c.RESET}")
+        input(f"\n{c.DIM}  Appuyez sur Entrée...{c.RESET}")
+        return
+
+    # Test immédiat
+    print()
+    print(c.info("Test de connexion..."))
+
+    from core.auth import create_session, AuthError
+    try:
+        create_session(handle, app_password)
+        print(c.success("Connexion réussie !"))
+
+        config["bsky_handle"] = handle
+        config["bsky_app_password"] = app_password
+        save_config(config)
+        print(c.success("Identifiants sauvegardés"))
+
+    except AuthError as e:
+        print(c.error(f"Échec : {e}"))
+        print(f"  {c.DIM}Identifiants non sauvegardés{c.RESET}")
+
+    input(f"\n{c.DIM}  Appuyez sur Entrée...{c.RESET}")
+
 
 def configure(config):
     """Menu de configuration avec paramètres éditables."""
@@ -359,46 +459,53 @@ def configure(config):
         clear_screen()
         print(c.box_header("CONFIGURATION"))
         print()
-        print(c.title("Parametres actuels:"))
+
+        from core.auth import has_credentials
+        auth_status = f"{c.OK}configuré{c.RESET}" if has_credentials(config) else f"{c.DIM}non configuré{c.RESET}"
+
+        print(c.title("Paramètres actuels:"))
         print()
-        print(c.config_line("1. Dossier telechargements", config["download_dir"]))
-        print(c.config_line("2. Fichier token", config["token_file"]))
-        print(c.config_line("3. Fichier URLs", config["urls_file"]))
+        print(c.config_line("1. Identifiants Bluesky", auth_status))
+        print(c.config_line("2. Dossier téléchargements", config["download_dir"]))
+        print(c.config_line("3. Fichier token (fallback)", config["token_file"]))
+        print(c.config_line("4. Fichier URLs", config["urls_file"]))
         print()
         print(c.separator())
         print(
-            f"  {c.DIM}Entrez le numero d'un parametre pour le modifier, "
+            f"  {c.DIM}Entrez le numéro d'un paramètre pour le modifier, "
             f"ou 0 pour revenir{c.RESET}"
         )
         print()
         print(c.menu_option("0", f"{c.DIM}Retour{c.RESET}"))
         print()
 
-        choice = input(c.prompt("  Votre choix (0-3): ")).strip()
+        choice = input(c.prompt("  Votre choix (0-4): ")).strip()
 
         if choice == "0":
             break
         elif choice == "1":
+            configure_credentials(config)
+        elif choice == "2":
             _edit_config_value(
                 config,
                 "download_dir",
-                "Dossier de telechargements",
+                "Dossier de téléchargements",
                 after_save=lambda: ensure_dirs(config),
             )
-        elif choice == "2":
-            _edit_config_value(config, "token_file", "Fichier token")
         elif choice == "3":
+            _edit_config_value(config, "token_file", "Fichier token")
+        elif choice == "4":
             _edit_config_value(config, "urls_file", "Fichier URLs")
         else:
             print(c.error(f"Choix invalide : \"{choice}\""))
-            input(f"\n{c.DIM}  Appuyez sur Entree...{c.RESET}")
+            input(f"\n{c.DIM}  Appuyez sur Entrée...{c.RESET}")
 
 
 def _edit_config_value(config, key, label, after_save=None):
     """Édite une valeur de configuration."""
     print()
     print(f"  {c.KEY}Actuel:{c.RESET} {c.VALUE}{config[key]}{c.RESET}")
-    new_val = input(c.prompt(f"  Nouveau {label} (ENTREE pour garder): ")).strip()
+    new_val = input(c.prompt(f"  Nouveau {label} (ENTRÉE pour garder): ")).strip()
 
     if new_val:
         config[key] = new_val
@@ -407,9 +514,9 @@ def _edit_config_value(config, key, label, after_save=None):
             after_save()
         print(c.success("Sauvegarde"))
     else:
-        print(c.success("Valeur inchangee"))
+        print(c.success("Valeur inchangée"))
 
-    input(f"\n{c.DIM}  Appuyez sur Entree...{c.RESET}")
+    input(f"\n{c.DIM}  Appuyez sur Entrée...{c.RESET}")
 
 
 # ─── Options avancées ─────────────────────────────────────────
@@ -426,16 +533,16 @@ def advanced_menu(config):
         print()
 
         if has_urls:
-            print(c.title("DEVELOPPEMENT"))
+            print(c.title("DÉVELOPPEMENT"))
             print(c.separator())
             print(c.menu_option("1", "Mode dev       - Depuis urls.txt, sans token"))
-            print(c.menu_option("2", f"{c.WARNING}Force DL{c.RESET}       - Re-telecharger tous les medias"))
+            print(c.menu_option("2", f"{c.WARNING}Force DL{c.RESET}       - Re-télécharger tous les médias"))
             print()
 
         print(c.title("MAINTENANCE"))
         print(c.separator())
         print(c.menu_option("3", "Supprimer logs - Nettoyer les fichiers log"))
-        print(c.menu_option("4", "Ouvrir dossier - Explorer les telechargements"))
+        print(c.menu_option("4", "Ouvrir dossier - Explorer les téléchargements"))
         print()
         print(c.menu_option("0", f"{c.DIM}Retour{c.RESET}"))
         print()
@@ -447,22 +554,22 @@ def advanced_menu(config):
         elif choice == "1":
             if not has_urls:
                 print(c.warning("Aucune URL disponible dans urls.txt"))
-                input(f"\n{c.DIM}  Appuyez sur Entree...{c.RESET}")
+                input(f"\n{c.DIM}  Appuyez sur Entrée...{c.RESET}")
             else:
                 download_media(config, force=True, skip_token_check=True)
-                input(f"\n{c.DIM}  Appuyez sur Entree...{c.RESET}")
+                input(f"\n{c.DIM}  Appuyez sur Entrée...{c.RESET}")
         elif choice == "2":
             if not has_urls:
                 print(c.warning("Aucune URL disponible dans urls.txt"))
-                input(f"\n{c.DIM}  Appuyez sur Entree...{c.RESET}")
+                input(f"\n{c.DIM}  Appuyez sur Entrée...{c.RESET}")
             else:
                 download_media(config, force=True)
-                input(f"\n{c.DIM}  Appuyez sur Entree...{c.RESET}")
+                input(f"\n{c.DIM}  Appuyez sur Entrée...{c.RESET}")
         elif choice == "3":
             from core.config import cleanup_logs
             deleted = cleanup_logs(config)
-            print(c.success(f"{deleted} fichier(s) log supprime(s)"))
-            input(f"\n{c.DIM}  Appuyez sur Entree...{c.RESET}")
+            print(c.success(f"{deleted} fichier(s) log supprimé(s)"))
+            input(f"\n{c.DIM}  Appuyez sur Entrée...{c.RESET}")
         elif choice == "4":
             download_dir = config["download_dir"]
             if sys.platform == "win32":
@@ -471,7 +578,7 @@ def advanced_menu(config):
                 subprocess.run(["xdg-open", download_dir])
         else:
             print(c.error(f"Choix invalide : \"{choice}\""))
-            input(f"\n{c.DIM}  Appuyez sur Entree...{c.RESET}")
+            input(f"\n{c.DIM}  Appuyez sur Entrée...{c.RESET}")
 
 
 # ─── Boucle principale ───────────────────────────────────────
@@ -504,30 +611,30 @@ def main():
             break
         elif choice == "1":
             export_bookmarks(config)
-            input(f"\n{c.DIM}  Appuyez sur Entree...{c.RESET}")
+            input(f"\n{c.DIM}  Appuyez sur Entrée...{c.RESET}")
         elif choice == "2":
             if not state["has_urls"]:
                 print(c.warning("Aucune URL disponible"))
                 print(f"  {c.DIM}Lancez d'abord l'export des bookmarks (option 1){c.RESET}")
-                input(f"\n{c.DIM}  Appuyez sur Entree...{c.RESET}")
+                input(f"\n{c.DIM}  Appuyez sur Entrée...{c.RESET}")
             else:
                 download_media(config, force=False)
-                input(f"\n{c.DIM}  Appuyez sur Entree...{c.RESET}")
+                input(f"\n{c.DIM}  Appuyez sur Entrée...{c.RESET}")
         elif choice == "3":
             show_stats(config)
         elif choice == "4":
             if state["has_downloads"]:
                 open_download_folder(config)
             else:
-                print(c.warning("Aucun media telecharge"))
-                input(f"\n{c.DIM}  Appuyez sur Entree...{c.RESET}")
+                print(c.warning("Aucun média téléchargé"))
+                input(f"\n{c.DIM}  Appuyez sur Entrée...{c.RESET}")
         elif choice == "5":
             configure(config)
         elif choice == "9":
             advanced_menu(config)
         else:
             print(c.error(f"Choix invalide : \"{choice}\""))
-            input(f"\n{c.DIM}  Appuyez sur Entree...{c.RESET}")
+            input(f"\n{c.DIM}  Appuyez sur Entrée...{c.RESET}")
 
 
 if __name__ == "__main__":

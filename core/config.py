@@ -16,7 +16,9 @@ DEFAULT_CONFIG = {
     "max_logs": 5,
     "max_filename_len": 64,
     "min_postid_short": 4,
-    "index_digits": 1
+    "index_digits": 1,
+    "bsky_handle": "",
+    "bsky_app_password": ""
 }
 
 def get_default_paths():
