@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-print("SCRIPT IMG DEMARRE")
 """
 bsky_img_downloader.py
 Télécharge les images d'un post Bluesky et les renomme:
@@ -204,74 +203,6 @@ def extract_images_from_bsky(post_url: str):
                     full_url = img.get("fullsize")
                     if full_url:
                         images.append(full_url)
-
-    return handle, date_str, post_id, images, post_text, created_at, is_repost
-    parsed = urlparse(post_url)
-    parts = parsed.path.strip("/").split("/")
-    
-    if len(parts) < 3 or parts[0] != "profile":
-        return "_unknown_", datetime.now().strftime("%Y%m%d"), "_unknown_", [], "", "", False
-    
-    handle_from_url = parts[1]
-    post_id = parts[-1]
-    
-    try:
-        data = fetch_post_json(handle_from_url, post_id)
-        print_debug(data)
-    except Exception as e:
-        error_msg = str(e)
-        if "400 Client Error: Bad Request" in error_msg:
-            print("   [!] Post supprimé ou inaccessible")
-            return handle_from_url, datetime.now().strftime("%Y%m%d"), post_id, [], "", "", False
-        print(f"   [!] Impossible de récupérer le post via API : {e}")
-        return handle_from_url, datetime.now().strftime("%Y%m%d"), post_id, [], "", "", False
-
-    post = data.get("thread", {}).get("post", {})
-    
-    author = post.get("author", {})
-    handle = author.get("handle", handle_from_url)
-    created_at = post.get("record", {}).get("createdAt", "")
-    date_str = datetime.now().strftime("%Y%m%d")
-    if created_at:
-        try:
-            date_str = datetime.fromisoformat(created_at.replace("Z", "")).strftime("%Y%m%d")
-        except:
-            date_str = created_at[:10].replace("-", "")
-
-    # Texte du post
-    post_text = post.get("record", {}).get("text", "")
-
-    # Récupère les images du post principal
-    images = []
-    embed = post.get("embed", {})
-    embed_type = embed.get("$type", "None")
-    
-    # Vérifier si c'est un repost
-    is_repost = False
-    if embed.get("$type") == "app.bsky.embed.record#view":
-        is_repost = True
-        record = embed.get("record", {})
-        # Tenter de récupérer les médias du post cité
-        embeds = record.get("embeds", [])
-        for emb in embeds:
-            if emb.get("$type") == "app.bsky.embed.images#view":
-                for img in emb.get("images", []):
-                    full_url = img.get("fullsize")
-                    if full_url and full_url not in images:
-                        images.append(full_url)
-    
-    if embed.get("$type") == "app.bsky.embed.images#view":
-        for img in embed.get("images", []):
-            full_url = img.get("fullsize")
-            if full_url and full_url not in images:
-                images.append(full_url)
-    elif embed.get("$type") == "app.bsky.embed.recordWithMedia#view":
-        media = embed.get("media", {})
-        if media.get("$type") == "app.bsky.embed.images#view":
-            for img in media.get("images", []):
-                full_url = img.get("fullsize")
-                if full_url and full_url not in images:
-                    images.append(full_url)
 
     return handle, date_str, post_id, images, post_text, created_at, is_repost
 

@@ -18,7 +18,8 @@ DEFAULT_CONFIG = {
     "min_postid_short": 4,
     "index_digits": 1,
     "bsky_handle": "",
-    "bsky_app_password": ""
+    "bsky_app_password": "",
+    "max_workers": 4
 }
 
 def get_default_paths():

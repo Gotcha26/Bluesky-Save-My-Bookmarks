@@ -24,6 +24,7 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+.pytest_cache/
 
 # Node.js (si besoin futur)
 node_modules/

@@ -469,6 +469,7 @@ def configure(config):
         print(c.config_line("2. Dossier téléchargements", config["download_dir"]))
         print(c.config_line("3. Fichier token (fallback)", config["token_file"]))
         print(c.config_line("4. Fichier URLs", config["urls_file"]))
+        print(c.config_line("5. Workers parallèles", str(config.get("max_workers", 4))))
         print()
         print(c.separator())
         print(
@@ -479,7 +480,7 @@ def configure(config):
         print(c.menu_option("0", f"{c.DIM}Retour{c.RESET}"))
         print()
 
-        choice = input(c.prompt("  Votre choix (0-4): ")).strip()
+        choice = input(c.prompt("  Votre choix (0-5): ")).strip()
 
         if choice == "0":
             break
@@ -496,6 +497,8 @@ def configure(config):
             _edit_config_value(config, "token_file", "Fichier token")
         elif choice == "4":
             _edit_config_value(config, "urls_file", "Fichier URLs")
+        elif choice == "5":
+            _edit_workers(config)
         else:
             print(c.error(f"Choix invalide : \"{choice}\""))
             input(f"\n{c.DIM}  Appuyez sur Entrée...{c.RESET}")
@@ -513,6 +516,33 @@ def _edit_config_value(config, key, label, after_save=None):
         if after_save:
             after_save()
         print(c.success("Sauvegarde"))
+    else:
+        print(c.success("Valeur inchangée"))
+
+    input(f"\n{c.DIM}  Appuyez sur Entrée...{c.RESET}")
+
+
+def _edit_workers(config):
+    """Édite le nombre de workers parallèles."""
+    current = config.get("max_workers", 4)
+    print()
+    print(f"  {c.KEY}Actuel:{c.RESET} {c.VALUE}{current}{c.RESET} workers")
+    print(f"  {c.DIM}Plage recommandée : 1 (séquentiel) à 8 (rapide){c.RESET}")
+    new_val = input(c.prompt("  Nombre de workers (ENTRÉE pour garder): ")).strip()
+
+    if new_val:
+        try:
+            n = int(new_val)
+            if n < 1:
+                n = 1
+            elif n > 16:
+                n = 16
+                print(c.warning(f"Limité à {n} workers maximum"))
+            config["max_workers"] = n
+            save_config(config)
+            print(c.success(f"Workers mis à jour : {n}"))
+        except ValueError:
+            print(c.error("Valeur invalide (nombre entier attendu)"))
     else:
         print(c.success("Valeur inchangée"))
 
