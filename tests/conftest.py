@@ -24,6 +24,9 @@ def tmp_config(tmp_path):
         "index_digits": 1,
         "bsky_handle": "",
         "bsky_app_password": "",
+        "max_workers": 4,
+        "last_sync": "",
+        "advanced_mode": False,
     }
 
 

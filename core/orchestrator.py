@@ -110,12 +110,15 @@ def process_post(url, IMG_DIR, VID_DIR, db, analyzer, resolver, logs_dir, log_fu
         log_func(f"   ERREUR 500: {url}", to_console=False)
         if db:
             db.update_last_check(url)
+            db.mark_post_status(url, 'error_500')
         return False, 0, 0, 0, 'error_500', output
 
     # Post supprimé
     if post_type == PostType.ERROR_400:
         buf_print(c.error("Post supprimé ou inaccessible (400)"))
         log_func(f"   POST SUPPRIMÉ: {url}", to_console=False)
+        if db:
+            db.mark_post_status(url, 'deleted')
         return False, 0, 0, 0, 'error_400', output
 
     # Repost - RÉSOLUTION

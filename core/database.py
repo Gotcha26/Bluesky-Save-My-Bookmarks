@@ -15,9 +15,9 @@ class Database:
         self._init_db()
     
     def _init_db(self):
-        """Initialise les tables"""
+        """Initialise les tables et applique les migrations."""
         cursor = self.conn.cursor()
-        
+
         # Table des posts trackés
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS posts (
@@ -25,10 +25,11 @@ class Database:
                 post_id TEXT,
                 handle TEXT,
                 added_at TEXT,
-                last_check TEXT
+                last_check TEXT,
+                status TEXT DEFAULT 'ok'
             )
         ''')
-        
+
         # Table des médias téléchargés
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS media (
@@ -40,8 +41,14 @@ class Database:
                 FOREIGN KEY(post_url) REFERENCES posts(url)
             )
         ''')
-        
+
         self.conn.commit()
+
+        # Migration : ajouter colonne status si absente (DB existantes)
+        columns = [row[1] for row in cursor.execute('PRAGMA table_info(posts)').fetchall()]
+        if 'status' not in columns:
+            cursor.execute("ALTER TABLE posts ADD COLUMN status TEXT DEFAULT 'ok'")
+            self.conn.commit()
     
     def add_post(self, url, post_id=None, handle=None):
         """Ajoute un post à la DB (thread-safe)."""
@@ -99,7 +106,9 @@ class Database:
             dict: {
                 'posts': nombre de posts trackés,
                 'images': nombre d'images téléchargées,
-                'videos': nombre de vidéos téléchargées
+                'videos': nombre de vidéos téléchargées,
+                'texts': nombre de textes sauvegardés,
+                'dead': nombre de liens morts (status != 'ok')
             }
         """
         with self._lock:
@@ -110,11 +119,58 @@ class Database:
             images_count = cursor.fetchone()[0]
             cursor.execute("SELECT COUNT(*) FROM media WHERE media_type = 'video'")
             videos_count = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(*) FROM media WHERE media_type = 'text'")
+            texts_count = cursor.fetchone()[0]
+            cursor.execute("SELECT COUNT(*) FROM posts WHERE status != 'ok'")
+            dead_count = cursor.fetchone()[0]
             return {
                 'posts': posts_count,
                 'images': images_count,
-                'videos': videos_count
+                'videos': videos_count,
+                'texts': texts_count,
+                'dead': dead_count,
             }
+
+    def mark_post_status(self, url, status):
+        """Met à jour le statut d'un post (thread-safe).
+
+        Args:
+            url: URL du post
+            status: 'ok', 'deleted', 'error_500', 'unknown'
+        """
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute('UPDATE posts SET status = ? WHERE url = ?', (status, url))
+            self.conn.commit()
+
+    def get_dead_count(self):
+        """Retourne le nombre de liens morts (thread-safe)."""
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM posts WHERE status != 'ok'")
+            return cursor.fetchone()[0]
+
+    def get_dead_posts(self):
+        """Retourne la liste des URLs avec un statut non-ok (thread-safe)."""
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT url, status FROM posts WHERE status != 'ok'")
+            return cursor.fetchall()
+
+    def cleanup_dead_posts(self):
+        """Supprime les posts marqués 'deleted' de la DB (thread-safe).
+
+        Returns:
+            int: nombre de posts supprimés
+        """
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM posts WHERE status = 'deleted'")
+            count = cursor.fetchone()[0]
+            cursor.execute("DELETE FROM media WHERE post_url IN (SELECT url FROM posts WHERE status = 'deleted')")
+            cursor.execute("DELETE FROM posts WHERE status = 'deleted'")
+            self.conn.commit()
+            return count
 
     def close(self):
         """Ferme la connexion."""

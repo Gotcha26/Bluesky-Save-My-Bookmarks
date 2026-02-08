@@ -19,7 +19,9 @@ DEFAULT_CONFIG = {
     "index_digits": 1,
     "bsky_handle": "",
     "bsky_app_password": "",
-    "max_workers": 4
+    "max_workers": 4,
+    "last_sync": "",
+    "advanced_mode": False
 }
 
 def get_default_paths():
