@@ -7,7 +7,7 @@ name = "bsmb"
 dynamic = ["version"]
 description = "Bsky Save My Bookmarks : archive localement les médias et textes de vos bookmarks Bluesky."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "requests>=2.28.0",
 ]
@@ -30,3 +30,6 @@ testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 110
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
