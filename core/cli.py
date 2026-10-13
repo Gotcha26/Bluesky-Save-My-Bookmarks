@@ -11,12 +11,13 @@ Interface en ligne de commande non interactive de BSMB.
     python bsmb.py --lang en ...       # langue de l'interface (fr, en, auto), prioritaire sur la config
 
 Codes de retour : 0 succès, 1 erreur d'authentification, 2 erreur réseau,
-3 téléchargements en échec.
+3 téléchargements en échec, 4 erreur interne (exception inattendue).
 """
 
 import argparse
 import json
 import sys
+import traceback
 
 from core import i18n, orchestrator, ui
 from core.auth import AuthError, NetworkError, get_session, has_credentials
@@ -39,6 +40,7 @@ EXIT_OK = 0
 EXIT_AUTH = 1
 EXIT_NETWORK = 2
 EXIT_DOWNLOAD = 3
+EXIT_INTERNAL = 4
 
 LANGUES_CLI = ("fr", "en", "auto")  # valeurs acceptées par --lang
 
@@ -273,7 +275,14 @@ def main(argv=None):
     if args.command is None:
         build_parser().print_help()
         return EXIT_OK
-    config = _preparer_config(args.lang)
-    i18n.init(args.lang or config.get("language") or None)  # idem si _preparer_config est remplacée (tests)
-    # Résolution à l'appel (et non au chargement du module) pour rester mockable
-    return globals()["cmd_" + args.command](config, args)
+    try:
+        config = _preparer_config(args.lang)
+        # idem si _preparer_config est remplacée (tests)
+        i18n.init(args.lang or config.get("language") or None)
+        # Résolution à l'appel (et non au chargement du module) pour rester mockable
+        return globals()["cmd_" + args.command](config, args)
+    except Exception as e:
+        # Exception inattendue : message lisible, trace sur stderr, code dédié (tâches planifiées)
+        print(c.error(_("Erreur interne : {erreur}").format(erreur=f"{type(e).__name__}: {e}")))
+        traceback.print_exc(file=sys.stderr)
+        return EXIT_INTERNAL

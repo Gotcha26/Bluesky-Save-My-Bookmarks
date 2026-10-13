@@ -16,6 +16,7 @@ import subprocess
 import sys
 import threading
 import time
+import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime
@@ -853,26 +854,49 @@ def _run(urls, config, media_dirs, no_db=False, on_progress=None, quiet=False, p
     db = None if no_db else Database(resolve_path(config, "db_file"))
 
     def worker(idx, url):
-        """Worker qui traite un post et retourne le résultat."""
+        """Worker qui traite un post et retourne le résultat.
+
+        Toute exception (analyseur, base, bogue) est isolée au post : statut `failed`,
+        trace complète dans le log fichier, une ligne « [ERR] erreur interne » en console.
+        """
         log(f"Job {idx}/{total_jobs}: {url}", to_console=False)
         compteurs = {}
-        has_success, imgs, vids, texts, status, output_lines = process_post(
-            url,
-            IMG_DIR,
-            VID_DIR,
-            TEXT_DIR,
-            db,
-            analyzer,
-            resolver,
-            logs_dir,
-            log,
-            config,
-            quotes_unresolved=quotes_unresolved_urls,
-            post_view=post_views.get(url),
-            compteurs=compteurs,
-            session=session,
-        )
-        return idx, url, has_success, imgs, vids, texts, status, output_lines, compteurs["sidecars"]
+        try:
+            has_success, imgs, vids, texts, status, output_lines = process_post(
+                url,
+                IMG_DIR,
+                VID_DIR,
+                TEXT_DIR,
+                db,
+                analyzer,
+                resolver,
+                logs_dir,
+                log,
+                config,
+                quotes_unresolved=quotes_unresolved_urls,
+                post_view=post_views.get(url),
+                compteurs=compteurs,
+                session=session,
+            )
+        except Exception as e:
+            log(
+                f"   ERREUR INTERNE: {url} - {type(e).__name__}: {e}\n{traceback.format_exc().rstrip()}",
+                to_console=False,
+            )
+            if db:
+                try:
+                    db.mark_post_status(url, "failed")
+                except Exception as e_db:
+                    log(f"   ERREUR INTERNE: statut non enregistré pour {url} - {e_db}", to_console=False)
+            ligne = f"  {c.RED}[ERR]{c.RESET} " + _("erreur interne ({url}), détail dans le log").format(
+                url=url
+            )
+            if not quiet:
+                with _print_lock:
+                    # Efface d'abord la barre de progression éventuelle (même ligne)
+                    print("\r" + " " * 100 + "\r" + ligne)
+            return idx, url, False, 0, 0, 0, "failed", [ligne], 0
+        return idx, url, has_success, imgs, vids, texts, status, output_lines, compteurs.get("sidecars", 0)
 
     # === EXÉCUTION PARALLÈLE ===
     try:

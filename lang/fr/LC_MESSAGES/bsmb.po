@@ -8,23 +8,23 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n > 1);\n"
 
-#: bsmb.py:54 core/orchestrator.py:72
+#: bsmb.py:54 core/orchestrator.py:73
 msgid "o"
 msgstr "o"
 
-#: bsmb.py:54 core/orchestrator.py:72
+#: bsmb.py:54 core/orchestrator.py:73
 msgid "Ko"
 msgstr "Ko"
 
-#: bsmb.py:54 core/orchestrator.py:72
+#: bsmb.py:54 core/orchestrator.py:73
 msgid "Mo"
 msgstr "Mo"
 
-#: bsmb.py:54 core/orchestrator.py:72
+#: bsmb.py:54 core/orchestrator.py:73
 msgid "Go"
 msgstr "Go"
 
-#: bsmb.py:58 core/orchestrator.py:76
+#: bsmb.py:58 core/orchestrator.py:77
 msgid "To"
 msgstr "To"
 
@@ -46,7 +46,7 @@ msgid_plural "il y a {n} jours"
 msgstr[0] "il y a {n} jour"
 msgstr[1] "il y a {n} jours"
 
-#: bsmb.py:132 bsmb.py:569 core/cli.py:247
+#: bsmb.py:132 bsmb.py:548 core/cli.py:251
 msgid "non connecté"
 msgstr "non connecté"
 
@@ -98,661 +98,665 @@ msgstr "4. Télécharger    - (synchronisez d'abord via Mon compte)"
 msgid "Quitter"
 msgstr "Quitter"
 
-#: bsmb.py:243
+#: bsmb.py:222
 msgid "Votre choix"
 msgstr "Votre choix"
 
-#: bsmb.py:248
+#: bsmb.py:227
 msgid "Choix invalide : \"{choix}\""
 msgstr "Choix invalide : \"{choix}\""
 
-#: bsmb.py:258
+#: bsmb.py:237
 msgid "MON COMPTE"
 msgstr "MON COMPTE"
 
-#: bsmb.py:263 bsmb.py:826
+#: bsmb.py:242 bsmb.py:805
 msgid "Aucun compte Bluesky connecté"
 msgstr "Aucun compte Bluesky connecté"
 
-#: bsmb.py:265
+#: bsmb.py:244
 msgid "Pour sauvegarder vos bookmarks, connectez votre compte :"
 msgstr "Pour sauvegarder vos bookmarks, connectez votre compte :"
 
-#: bsmb.py:267
+#: bsmb.py:246
 msgid "Connecter mon compte Bluesky"
 msgstr "Connecter mon compte Bluesky"
 
-#: bsmb.py:269 bsmb.py:309 bsmb.py:461 bsmb.py:599
+#: bsmb.py:248 bsmb.py:288 bsmb.py:440 bsmb.py:578
 msgid "Retour"
 msgstr "Retour"
 
-#: bsmb.py:282 core/cli.py:247
+#: bsmb.py:261 core/cli.py:251
 msgid "Compte"
 msgstr "Compte"
 
-#: bsmb.py:286
+#: bsmb.py:265
 msgid "Dernière sync"
 msgstr "Dernière sync"
 
-#: bsmb.py:291 bsmb.py:402 core/cli.py:167 core/cli.py:249
+#: bsmb.py:270 bsmb.py:381 core/cli.py:171 core/cli.py:253
 msgid "Bookmarks en ligne"
 msgstr "Bookmarks en ligne"
 
-#: bsmb.py:292 bsmb.py:429 core/cli.py:250 core/orchestrator.py:655
+#: bsmb.py:271 bsmb.py:408 core/cli.py:254 core/orchestrator.py:664
 msgid "Posts traités"
 msgstr "Posts traités"
 
-#: bsmb.py:294 bsmb.py:296 bsmb.py:405 bsmb.py:407 core/cli.py:169 core/cli.py:251
+#: bsmb.py:273 bsmb.py:275 bsmb.py:384 bsmb.py:386 core/cli.py:173 core/cli.py:255
 msgid "Nouveaux"
 msgstr "Nouveaux"
 
-#: bsmb.py:296 bsmb.py:407
+#: bsmb.py:275 bsmb.py:386
 msgid "0 - tout est à jour"
 msgstr "0 - tout est à jour"
 
-#: bsmb.py:299 bsmb.py:838
+#: bsmb.py:278 bsmb.py:817
 msgid "Aucune synchronisation effectuée"
 msgstr "Aucune synchronisation effectuée"
 
-#: bsmb.py:302 core/cli.py:252
+#: bsmb.py:281 core/cli.py:256
 msgid "Liens morts"
 msgstr "Liens morts"
 
-#: bsmb.py:307
+#: bsmb.py:286
 msgid "Synchroniser les bookmarks"
 msgstr "Synchroniser les bookmarks"
 
-#: bsmb.py:308
+#: bsmb.py:287
 msgid "Déconnecter mon compte"
 msgstr "Déconnecter mon compte"
 
-#: bsmb.py:336
+#: bsmb.py:315
 msgid "Le compte {handle} sera déconnecté (App Password supprimé de cet ordinateur)."
 msgstr "Le compte {handle} sera déconnecté (App Password supprimé de cet ordinateur)."
 
-#: bsmb.py:341
+#: bsmb.py:320
 msgid "Vos fichiers téléchargés et la base ne sont pas touchés."
 msgstr "Vos fichiers téléchargés et la base ne sont pas touchés."
 
-#: bsmb.py:342
+#: bsmb.py:321
 msgid "Confirmer ?"
 msgstr "Confirmer ?"
 
-#: bsmb.py:350
+#: bsmb.py:329
 msgid "Compte déconnecté"
 msgstr "Compte déconnecté"
 
-#: bsmb.py:354
+#: bsmb.py:333
 msgid "Compte déconnecté, mais le trousseau n'a pas pu être nettoyé : supprimez l'entrée « bsmb » à la main."
 msgstr "Compte déconnecté, mais le trousseau n'a pas pu être nettoyé : supprimez l'entrée « bsmb » à la main."
 
-#: bsmb.py:367 core/cli.py:129
+#: bsmb.py:346 core/cli.py:133
 msgid "Connexion à Bluesky..."
 msgstr "Connexion à Bluesky..."
 
-#: bsmb.py:371
+#: bsmb.py:350
 msgid "Impossible d'obtenir un token d'authentification"
 msgstr "Impossible d'obtenir un token d'authentification"
 
-#: bsmb.py:372
+#: bsmb.py:351
 msgid "Vérifiez vos identifiants dans Paramètres"
 msgstr "Vérifiez vos identifiants dans Paramètres"
 
-#: bsmb.py:379
+#: bsmb.py:358
 msgid "Authentification réussie"
 msgstr "Authentification réussie"
 
-#: bsmb.py:380
+#: bsmb.py:359
 msgid "Récupération des bookmarks..."
 msgstr "Récupération des bookmarks..."
 
-#: bsmb.py:388 core/cli.py:152
+#: bsmb.py:367 core/cli.py:156
 msgid "Page {page}... {count} bookmarks"
 msgstr "Page {page}... {count} bookmarks"
 
-#: bsmb.py:396 core/cli.py:161
+#: bsmb.py:375 core/cli.py:165
 msgid "Token expiré — reconnectez votre compte"
 msgstr "Token expiré — reconnectez votre compte"
 
-#: bsmb.py:398
+#: bsmb.py:377
 msgid "Erreur : {erreur}"
 msgstr "Erreur : {erreur}"
 
-#: bsmb.py:401 core/cli.py:166
+#: bsmb.py:380 core/cli.py:170
 msgid "Synchronisation terminée"
 msgstr "Synchronisation terminée"
 
-#: bsmb.py:403 core/cli.py:168
+#: bsmb.py:382 core/cli.py:172
 msgid "Déjà traités"
 msgstr "Déjà traités"
 
-#: bsmb.py:410 core/cli.py:171
+#: bsmb.py:389 core/cli.py:175
 msgid "Cache des bookmarks non écrit : {erreur}"
 msgstr "Cache des bookmarks non écrit : {erreur}"
 
-#: bsmb.py:423
+#: bsmb.py:402
 msgid "STOCKAGE LOCAL"
 msgstr "STOCKAGE LOCAL"
 
-#: bsmb.py:430 core/orchestrator.py:656
+#: bsmb.py:409 core/orchestrator.py:665
 msgid "Images téléchargées"
 msgstr "Images téléchargées"
 
-#: bsmb.py:431 core/orchestrator.py:657
+#: bsmb.py:410 core/orchestrator.py:666
 msgid "Vidéos téléchargées"
 msgstr "Vidéos téléchargées"
 
-#: bsmb.py:432 core/orchestrator.py:658
+#: bsmb.py:411 core/orchestrator.py:667
 msgid "Textes sauvegardés"
 msgstr "Textes sauvegardés"
 
-#: bsmb.py:433
+#: bsmb.py:412
 msgid "Total médias"
 msgstr "Total médias"
 
-#: bsmb.py:439
+#: bsmb.py:418
 msgid "Taille du dossier"
 msgstr "Taille du dossier"
 
-#: bsmb.py:441 core/cli.py:259
+#: bsmb.py:420 core/cli.py:263
 msgid "Destination"
 msgstr "Destination"
 
-#: bsmb.py:453
+#: bsmb.py:432
 msgid "Ouvrir le dossier de téléchargements"
 msgstr "Ouvrir le dossier de téléchargements"
 
-#: bsmb.py:457
+#: bsmb.py:436
 msgid "Nettoyer les liens morts ({n})"
 msgstr "Nettoyer les liens morts ({n})"
 
-#: bsmb.py:460
+#: bsmb.py:439
 msgid "Réinitialiser la base de données"
 msgstr "Réinitialiser la base de données"
 
-#: bsmb.py:483
+#: bsmb.py:462
 msgid "{n} lien mort détecté"
 msgid_plural "{n} liens morts détectés"
 msgstr[0] "{n} lien mort détecté"
 msgstr[1] "{n} liens morts détectés"
 
-#: bsmb.py:492
+#: bsmb.py:471
 msgid "NETTOYAGE DES LIENS MORTS"
 msgstr "NETTOYAGE DES LIENS MORTS"
 
-#: bsmb.py:495
+#: bsmb.py:474
 msgid "{n} lien mort détecté :"
 msgid_plural "{n} liens morts détectés :"
 msgstr[0] "{n} lien mort détecté :"
 msgstr[1] "{n} liens morts détectés :"
 
-#: bsmb.py:499 core/orchestrator.py:155
+#: bsmb.py:478 core/orchestrator.py:159
 msgid "supprimé"
 msgstr "supprimé"
 
-#: bsmb.py:503
+#: bsmb.py:482
 msgid "... et {n} autres"
 msgstr "... et {n} autres"
 
-#: bsmb.py:509
+#: bsmb.py:488
 msgid "Cette action va supprimer ces entrées de la base."
 msgstr "Cette action va supprimer ces entrées de la base."
 
-#: bsmb.py:510
+#: bsmb.py:489
 msgid "Les fichiers déjà téléchargés ne seront pas supprimés."
 msgstr "Les fichiers déjà téléchargés ne seront pas supprimés."
 
-#: bsmb.py:513
+#: bsmb.py:492
 msgid "Confirmer le nettoyage ?"
 msgstr "Confirmer le nettoyage ?"
 
-#: bsmb.py:515
+#: bsmb.py:494
 msgid "{n} entrée supprimée"
 msgid_plural "{n} entrées supprimées"
 msgstr[0] "{n} entrée supprimée"
 msgstr[1] "{n} entrées supprimées"
 
-#: bsmb.py:517
+#: bsmb.py:496
 msgid "Nettoyage annulé"
 msgstr "Nettoyage annulé"
 
-#: bsmb.py:526
+#: bsmb.py:505
 msgid "RÉINITIALISATION"
 msgstr "RÉINITIALISATION"
 
-#: bsmb.py:528
+#: bsmb.py:507
 msgid "Cette action va :"
 msgstr "Cette action va :"
 
-#: bsmb.py:529
+#: bsmb.py:508
 msgid "Supprimer l'historique des posts traités"
 msgstr "Supprimer l'historique des posts traités"
 
-#: bsmb.py:530
+#: bsmb.py:509
 msgid "Supprimer l'historique des médias téléchargés"
 msgstr "Supprimer l'historique des médias téléchargés"
 
-#: bsmb.py:534
+#: bsmb.py:513
 msgid "{ne_pas} supprimer les fichiers déjà téléchargés"
 msgstr "{ne_pas} supprimer les fichiers déjà téléchargés"
 
-#: bsmb.py:534
+#: bsmb.py:513
 msgid "NE PAS"
 msgstr "NE PAS"
 
-#: bsmb.py:540
+#: bsmb.py:519
 msgid "Confirmer ? (tapez 'RESET'):"
 msgstr "Confirmer ? (tapez 'RESET'):"
 
-#: bsmb.py:545
+#: bsmb.py:524
 msgid "Base de données réinitialisée"
 msgstr "Base de données réinitialisée"
 
-#: bsmb.py:547
+#: bsmb.py:526
 msgid "Aucune base de données à réinitialiser"
 msgstr "Aucune base de données à réinitialiser"
 
-#: bsmb.py:549
+#: bsmb.py:528
 msgid "Réinitialisation annulée"
 msgstr "Réinitialisation annulée"
 
-#: bsmb.py:561
+#: bsmb.py:540
 msgid "PARAMÈTRES"
 msgstr "PARAMÈTRES"
 
-#: bsmb.py:567
+#: bsmb.py:546
 msgid "connecté"
 msgstr "connecté"
 
-#: bsmb.py:572
+#: bsmb.py:551
 msgid "1. Identifiants Bluesky"
 msgstr "1. Identifiants Bluesky"
 
-#: bsmb.py:573
+#: bsmb.py:552
 msgid "2. Dossier téléchargements"
 msgstr "2. Dossier téléchargements"
 
-#: bsmb.py:574
+#: bsmb.py:553
 msgid "3. Workers parallèles"
 msgstr "3. Workers parallèles"
 
-#: bsmb.py:577 bsmb.py:579
+#: bsmb.py:556 bsmb.py:558
 msgid "4. Mode avancé"
 msgstr "4. Mode avancé"
 
-#: bsmb.py:577
+#: bsmb.py:556
 msgid "activé"
 msgstr "activé"
 
-#: bsmb.py:579
+#: bsmb.py:558
 msgid "désactivé"
 msgstr "désactivé"
 
-#: bsmb.py:580
+#: bsmb.py:559
 msgid "L. Langue"
 msgstr "L. Langue"
 
-#: bsmb.py:584
+#: bsmb.py:563
 msgid "OPTIONS AVANCÉES"
 msgstr "OPTIONS AVANCÉES"
 
-#: bsmb.py:586
+#: bsmb.py:565
 msgid "5. Fichier token (fallback)"
 msgstr "5. Fichier token (fallback)"
 
-#: bsmb.py:587
+#: bsmb.py:566
 msgid "6. Fichier URLs"
 msgstr "6. Fichier URLs"
 
-#: bsmb.py:588
+#: bsmb.py:567
 msgid "Supprimer les logs"
 msgstr "Supprimer les logs"
 
-#: bsmb.py:589
+#: bsmb.py:568
 msgid "Mode dev - Depuis urls.txt, sans token"
 msgstr "Mode dev - Depuis urls.txt, sans token"
 
-#: bsmb.py:590
+#: bsmb.py:569
 msgid "{force_dl} - Re-télécharger tous les médias"
 msgstr "{force_dl} - Re-télécharger tous les médias"
 
-#: bsmb.py:597
+#: bsmb.py:576
 msgid "Entrez le numéro pour modifier, ou 0 pour revenir"
 msgstr "Entrez le numéro pour modifier, ou 0 pour revenir"
 
-#: bsmb.py:616
+#: bsmb.py:595
 msgid "Dossier de téléchargements"
 msgstr "Dossier de téléchargements"
 
-#: bsmb.py:625
+#: bsmb.py:604
 msgid "Mode avancé activé"
 msgstr "Mode avancé activé"
 
-#: bsmb.py:627
+#: bsmb.py:606
 msgid "Mode avancé désactivé"
 msgstr "Mode avancé désactivé"
 
-#: bsmb.py:630
+#: bsmb.py:609
 msgid "Fichier token"
 msgstr "Fichier token"
 
-#: bsmb.py:632
+#: bsmb.py:611
 msgid "Fichier URLs"
 msgstr "Fichier URLs"
 
-#: bsmb.py:639
+#: bsmb.py:618
 msgid "{n} fichier log supprimé"
 msgid_plural "{n} fichiers log supprimés"
 msgstr[0] "{n} fichier log supprimé"
 msgstr[1] "{n} fichiers log supprimés"
 
-#: bsmb.py:657
+#: bsmb.py:636
 msgid "IDENTIFIANTS BLUESKY"
 msgstr "IDENTIFIANTS BLUESKY"
 
-#: bsmb.py:663
+#: bsmb.py:642
 msgid "non configuré"
 msgstr "non configuré"
 
-#: bsmb.py:664
+#: bsmb.py:643
 msgid "Handle actuel"
 msgstr "Handle actuel"
 
-#: bsmb.py:665
+#: bsmb.py:644
 msgid "App Password"
 msgstr "App Password"
 
-#: bsmb.py:665
+#: bsmb.py:644
 msgid "configuré"
 msgstr "configuré"
 
-#: bsmb.py:669
+#: bsmb.py:648
 msgid "Pour créer un App Password :"
 msgstr "Pour créer un App Password :"
 
-#: bsmb.py:671
+#: bsmb.py:650
 msgid "Allez sur {chemin}"
 msgstr "Allez sur {chemin}"
 
-#: bsmb.py:673
+#: bsmb.py:652
 msgid "Cliquez sur {bouton}"
 msgstr "Cliquez sur {bouton}"
 
-#: bsmb.py:674
+#: bsmb.py:653
 msgid "Nommez-le (ex: 'BSMB') et copiez le mot de passe généré"
 msgstr "Nommez-le (ex: 'BSMB') et copiez le mot de passe généré"
 
-#: bsmb.py:677
+#: bsmb.py:656
 msgid "L'App Password sera stocké dans le trousseau du système (keyring)"
 msgstr "L'App Password sera stocké dans le trousseau du système (keyring)"
 
-#: bsmb.py:679
+#: bsmb.py:658
 msgid "L'App Password sera stocké dans config.json (fichier local, hors Git)"
 msgstr "L'App Password sera stocké dans config.json (fichier local, hors Git)"
 
-#: bsmb.py:681
+#: bsmb.py:660
 msgid "Conseil : créez un App Password dédié à BSMB et révoquez-le en cas de doute."
 msgstr "Conseil : créez un App Password dédié à BSMB et révoquez-le en cas de doute."
 
-#: bsmb.py:687
+#: bsmb.py:666
 msgid "Handle Bluesky (ENTRÉE pour garder):"
 msgstr "Handle Bluesky (ENTRÉE pour garder):"
 
-#: bsmb.py:689 bsmb.py:697
+#: bsmb.py:668 bsmb.py:676
 msgid "Configuration annulée"
 msgstr "Configuration annulée"
 
-#: bsmb.py:695
+#: bsmb.py:674
 msgid "App Password (xxxx-xxxx-xxxx-xxxx):"
 msgstr "App Password (xxxx-xxxx-xxxx-xxxx):"
 
-#: bsmb.py:703
+#: bsmb.py:682
 msgid "Test de connexion..."
 msgstr "Test de connexion..."
 
-#: bsmb.py:709
+#: bsmb.py:688
 msgid "Connexion réussie !"
 msgstr "Connexion réussie !"
 
-#: bsmb.py:717
+#: bsmb.py:696
 msgid "AVERTISSEMENT : l'App Password est stocké en clair dans config.json."
 msgstr "AVERTISSEMENT : l'App Password est stocké en clair dans config.json."
 
-#: bsmb.py:718
+#: bsmb.py:697
 msgid "Installez keyring (pip install keyring) pour le placer dans le trousseau du système."
 msgstr "Installez keyring (pip install keyring) pour le placer dans le trousseau du système."
 
-#: bsmb.py:725
+#: bsmb.py:704
 msgid "Identifiants sauvegardés (trousseau du système)"
 msgstr "Identifiants sauvegardés (trousseau du système)"
 
-#: bsmb.py:727
+#: bsmb.py:706
 msgid "Identifiants sauvegardés"
 msgstr "Identifiants sauvegardés"
 
-#: bsmb.py:730
+#: bsmb.py:709
 msgid "Échec : {erreur}"
 msgstr "Échec : {erreur}"
 
-#: bsmb.py:731
+#: bsmb.py:710
 msgid "Identifiants non sauvegardés"
 msgstr "Identifiants non sauvegardés"
 
-#: bsmb.py:739 bsmb.py:769 bsmb.py:794
+#: bsmb.py:718 bsmb.py:748 bsmb.py:773
 msgid "Actuel:"
 msgstr "Actuel:"
 
-#: bsmb.py:740
+#: bsmb.py:719
 msgid "Nouveau {label} (ENTRÉE pour garder):"
 msgstr "Nouveau {label} (ENTRÉE pour garder):"
 
-#: bsmb.py:748
+#: bsmb.py:727
 msgid "Sauvegardé"
 msgstr "Sauvegardé"
 
-#: bsmb.py:750 bsmb.py:778 bsmb.py:812
+#: bsmb.py:729 bsmb.py:757 bsmb.py:791
 msgid "Valeur inchangée"
 msgstr "Valeur inchangée"
 
-#: bsmb.py:763
+#: bsmb.py:742
 msgid "Automatique ({langue})"
 msgstr "Automatique ({langue})"
 
-#: bsmb.py:773
+#: bsmb.py:752
 msgid "Automatique (langue du système)"
 msgstr "Automatique (langue du système)"
 
-#: bsmb.py:775
+#: bsmb.py:754
 msgid "Votre choix (ENTRÉE pour garder):"
 msgstr "Votre choix (ENTRÉE pour garder):"
 
-#: bsmb.py:783
+#: bsmb.py:762
 msgid "Langue mise à jour : {langue}"
 msgstr "Langue mise à jour : {langue}"
 
-#: bsmb.py:794
+#: bsmb.py:773
 msgid "{n} workers"
 msgstr "{n} workers"
 
-#: bsmb.py:795
+#: bsmb.py:774
 msgid "Plage recommandée : 1 (séquentiel) à 8 (rapide)"
 msgstr "Plage recommandée : 1 (séquentiel) à 8 (rapide)"
 
-#: bsmb.py:796
+#: bsmb.py:775
 msgid "Nombre de workers (ENTRÉE pour garder):"
 msgstr "Nombre de workers (ENTRÉE pour garder):"
 
-#: bsmb.py:805
+#: bsmb.py:784
 msgid "Limité à {n} workers maximum"
 msgstr "Limité à {n} workers maximum"
 
-#: bsmb.py:808
+#: bsmb.py:787
 msgid "Workers mis à jour : {n}"
 msgstr "Workers mis à jour : {n}"
 
-#: bsmb.py:810
+#: bsmb.py:789
 msgid "Valeur invalide (nombre entier attendu)"
 msgstr "Valeur invalide (nombre entier attendu)"
 
-#: bsmb.py:824 bsmb.py:836
+#: bsmb.py:803 bsmb.py:815
 msgid "TÉLÉCHARGER"
 msgstr "TÉLÉCHARGER"
 
-#: bsmb.py:828
+#: bsmb.py:807
 msgid "Connectez d'abord votre compte :"
 msgstr "Connectez d'abord votre compte :"
 
-#: bsmb.py:829
+#: bsmb.py:808
 msgid "Menu principal > 1. Mon compte"
 msgstr "Menu principal > 1. Mon compte"
 
-#: bsmb.py:840
+#: bsmb.py:819
 msgid "Synchroniser les bookmarks maintenant ?"
 msgstr "Synchroniser les bookmarks maintenant ?"
 
-#: bsmb.py:847
+#: bsmb.py:826
 msgid "Tout est à jour — aucun nouveau bookmark à télécharger"
 msgstr "Tout est à jour — aucun nouveau bookmark à télécharger"
 
-#: bsmb.py:859
+#: bsmb.py:838
 msgid "Fichier {fichier} introuvable"
 msgstr "Fichier {fichier} introuvable"
 
-#: bsmb.py:866 bsmb.py:925
+#: bsmb.py:845 bsmb.py:904
 msgid "Aucune URL à traiter"
 msgstr "Aucune URL à traiter"
 
-#: bsmb.py:874
+#: bsmb.py:853
 msgid "Mode FORCE : {n} posts seront tous traités"
 msgstr "Mode FORCE : {n} posts seront tous traités"
 
-#: bsmb.py:882
+#: bsmb.py:861
 msgid "{total} URLs au total, {new} nouvelles"
 msgstr "{total} URLs au total, {new} nouvelles"
 
-#: bsmb.py:889 core/cli.py:193
+#: bsmb.py:868 core/cli.py:197
 msgid "Tous les posts sont déjà traités"
 msgstr "Tous les posts sont déjà traités"
 
-#: bsmb.py:894 core/cli.py:196
+#: bsmb.py:873 core/cli.py:200
 msgid "Traiter {n} posts ?"
 msgstr "Traiter {n} posts ?"
 
-#: bsmb.py:901
+#: bsmb.py:880
 msgid "Lancement du téléchargement..."
 msgstr "Lancement du téléchargement..."
 
-#: bsmb.py:918
+#: bsmb.py:897
 msgid "Aucune URL disponible dans urls.txt"
 msgstr "Aucune URL disponible dans urls.txt"
 
-#: bsmb.py:929
+#: bsmb.py:908
 msgid "MODE DÉVELOPPEMENT"
 msgstr "MODE DÉVELOPPEMENT"
 
-#: bsmb.py:931
+#: bsmb.py:910
 msgid "Traitement direct depuis urls.txt"
 msgstr "Traitement direct depuis urls.txt"
 
-#: bsmb.py:932
+#: bsmb.py:911
 msgid "non vérifié"
 msgstr "non vérifié"
 
-#: bsmb.py:933
+#: bsmb.py:912
 msgid "Base de données"
 msgstr "Base de données"
 
-#: bsmb.py:933
+#: bsmb.py:912
 msgid "non mise à jour"
 msgstr "non mise à jour"
 
-#: bsmb.py:934
+#: bsmb.py:913
 msgid "Posts à traiter"
 msgstr "Posts à traiter"
 
-#: bsmb.py:939
+#: bsmb.py:918
 msgid "Traiter {n} posts en mode dev ?"
 msgstr "Traiter {n} posts en mode dev ?"
 
-#: bsmb.py:951
+#: bsmb.py:930
 msgid "Ouvrir le dossier de téléchargements ?"
 msgstr "Ouvrir le dossier de téléchargements ?"
 
-#: bsmb.py:996
+#: bsmb.py:975
 msgid "Entrée interrompue — fin du programme"
 msgstr "Entrée interrompue — fin du programme"
 
-#: bsmb.py:1011
+#: bsmb.py:990
 msgid "Au revoir !"
 msgstr "Au revoir !"
 
-#: core/cli.py:67
+#: core/cli.py:69
 msgid "BSMB - Bsky Save My Bookmarks. Sans sous-commande : menu interactif."
 msgstr "BSMB - Bsky Save My Bookmarks. Sans sous-commande : menu interactif."
 
-#: core/cli.py:71 core/cli.py:87
+#: core/cli.py:73 core/cli.py:89
 msgid "mode non interactif : accepte les valeurs par défaut"
 msgstr "mode non interactif : accepte les valeurs par défaut"
 
-#: core/cli.py:77 core/cli.py:94
+#: core/cli.py:79 core/cli.py:96
 msgid "langue de l'interface (prioritaire sur la configuration)"
 msgstr "langue de l'interface (prioritaire sur la configuration)"
 
-#: core/cli.py:98
+#: core/cli.py:100
 msgid "synchronise les bookmarks en ligne"
 msgstr "synchronise les bookmarks en ligne"
 
-#: core/cli.py:99
+#: core/cli.py:101
 msgid "télécharge les posts pas encore traités"
 msgstr "télécharge les posts pas encore traités"
 
-#: core/cli.py:100
+#: core/cli.py:102
 msgid "retraite tous les posts de urls.txt"
 msgstr "retraite tous les posts de urls.txt"
 
-#: core/cli.py:101
+#: core/cli.py:103
 msgid "synchronise puis télécharge (pour la planification)"
 msgstr "synchronise puis télécharge (pour la planification)"
 
-#: core/cli.py:102
+#: core/cli.py:104
 msgid "affiche l'état du compte et les compteurs"
 msgstr "affiche l'état du compte et les compteurs"
 
-#: core/cli.py:103
+#: core/cli.py:105
 msgid "sortie JSON"
 msgstr "sortie JSON"
 
-#: core/cli.py:133
+#: core/cli.py:137
 msgid "Erreur réseau pendant l'authentification : {erreur}"
 msgstr "Erreur réseau pendant l'authentification : {erreur}"
 
-#: core/cli.py:136
+#: core/cli.py:140
 msgid "Authentification impossible : {erreur}"
 msgstr "Authentification impossible : {erreur}"
 
-#: core/cli.py:139
+#: core/cli.py:143
 msgid "Aucun moyen d'authentification : configurez un compte (menu > Mon compte)"
 msgstr "Aucun moyen d'authentification : configurez un compte (menu > Mon compte)"
 
-#: core/cli.py:163
+#: core/cli.py:167
 msgid "Erreur réseau : {erreur}"
 msgstr "Erreur réseau : {erreur}"
 
-#: core/cli.py:180
+#: core/cli.py:184
 msgid "Aucune URL à traiter (lancez d'abord « sync »)"
 msgstr "Aucune URL à traiter (lancez d'abord « sync »)"
 
-#: core/cli.py:248
+#: core/cli.py:252
 msgid "Dernière synchronisation"
 msgstr "Dernière synchronisation"
 
-#: core/cli.py:248
+#: core/cli.py:252
 msgid "jamais"
 msgstr "jamais"
 
-#: core/cli.py:256
+#: core/cli.py:260
 msgid "Images / vidéos / textes"
 msgstr "Images / vidéos / textes"
+
+#: core/cli.py:285
+msgid "Erreur interne : {erreur}"
+msgstr "Erreur interne : {erreur}"
 
 #: core/colors.py:121 core/colors.py:135
 msgid "[OK]"
@@ -770,267 +774,271 @@ msgstr "[ATTENTION]"
 msgid "[INFO]"
 msgstr "[INFO]"
 
-#: core/orchestrator.py:117
+#: core/orchestrator.py:121
 msgid "Erreur inattendue : {erreur}"
 msgstr "Erreur inattendue : {erreur}"
 
-#: core/orchestrator.py:123
+#: core/orchestrator.py:127
 msgid "Aucun média trouvé"
 msgstr "Aucun média trouvé"
 
-#: core/orchestrator.py:156
+#: core/orchestrator.py:160
 msgid "bloqué"
 msgstr "bloqué"
 
-#: core/orchestrator.py:157
+#: core/orchestrator.py:161
 msgid "détaché"
 msgstr "détaché"
 
-#: core/orchestrator.py:198
+#: core/orchestrator.py:202
 msgid "{n} image détectée"
 msgid_plural "{n} images détectées"
 msgstr[0] "{n} image détectée"
 msgstr[1] "{n} images détectées"
 
-#: core/orchestrator.py:211
+#: core/orchestrator.py:215
 msgid "Vidéo détectée"
 msgstr "Vidéo détectée"
 
-#: core/orchestrator.py:227
+#: core/orchestrator.py:231
 msgid "Lien externe détecté"
 msgstr "Lien externe détecté"
 
-#: core/orchestrator.py:239
+#: core/orchestrator.py:243
 msgid "Citation : carte de lien non archivée (texte seul)"
 msgstr "Citation : carte de lien non archivée (texte seul)"
 
-#: core/orchestrator.py:244
+#: core/orchestrator.py:248
 msgid "Texte seul détecté"
 msgstr "Texte seul détecté"
 
-#: core/orchestrator.py:244
+#: core/orchestrator.py:248
 msgid "Texte du post détecté"
 msgstr "Texte du post détecté"
 
-#: core/orchestrator.py:334
+#: core/orchestrator.py:338
 msgid "Citation non résolue"
 msgstr "Citation non résolue"
 
-#: core/orchestrator.py:339
+#: core/orchestrator.py:343
 msgid "Le record cité n'est pas un post ({collection}) : ignoré"
 msgstr "Le record cité n'est pas un post ({collection}) : ignoré"
 
-#: core/orchestrator.py:351
+#: core/orchestrator.py:355
 msgid "Post cité {etat}"
 msgstr "Post cité {etat}"
 
-#: core/orchestrator.py:357
+#: core/orchestrator.py:361
 msgid "Post cité :"
 msgstr "Post cité :"
 
-#: core/orchestrator.py:361
+#: core/orchestrator.py:365
 msgid "Post cité supprimé"
 msgstr "Post cité supprimé"
 
-#: core/orchestrator.py:367
+#: core/orchestrator.py:371
 msgid "Post cité inaccessible"
 msgstr "Post cité inaccessible"
 
-#: core/orchestrator.py:371
+#: core/orchestrator.py:375
 msgid "Contenu du post cité non reconnu : ignoré"
 msgstr "Contenu du post cité non reconnu : ignoré"
 
-#: core/orchestrator.py:455
+#: core/orchestrator.py:459
 msgid "Type détecté :"
 msgstr "Type détecté :"
 
-#: core/orchestrator.py:466
+#: core/orchestrator.py:470
 msgid "Erreur serveur (500)"
 msgstr "Erreur serveur (500)"
 
-#: core/orchestrator.py:475 core/orchestrator.py:683
+#: core/orchestrator.py:479 core/orchestrator.py:692
 msgid "Limite de débit (429)"
 msgstr "Limite de débit (429)"
 
-#: core/orchestrator.py:484
+#: core/orchestrator.py:488
 msgid "Post supprimé ou inaccessible (400)"
 msgstr "Post supprimé ou inaccessible (400)"
 
-#: core/orchestrator.py:492
+#: core/orchestrator.py:496
 msgid "Type de post non reconnu"
 msgstr "Type de post non reconnu"
 
-#: core/orchestrator.py:494
+#: core/orchestrator.py:498
 msgid "Debug sauvegardé : {fichier}"
 msgstr "Debug sauvegardé : {fichier}"
 
-#: core/orchestrator.py:498
+#: core/orchestrator.py:502
 msgid "Texte"
 msgstr "Texte"
 
-#: core/orchestrator.py:519
+#: core/orchestrator.py:523
 msgid "Citation détectée, résolution du post cité..."
 msgstr "Citation détectée, résolution du post cité..."
 
-#: core/orchestrator.py:574
+#: core/orchestrator.py:579
 msgid "Post cité supprimé ou inaccessible"
 msgstr "Post cité supprimé ou inaccessible"
 
-#: core/orchestrator.py:595
+#: core/orchestrator.py:604
 msgid "{n} image"
 msgid_plural "{n} images"
 msgstr[0] "{n} image"
 msgstr[1] "{n} images"
 
-#: core/orchestrator.py:597
+#: core/orchestrator.py:606
 msgid "{n} vidéo"
 msgid_plural "{n} vidéos"
 msgstr[0] "{n} vidéo"
 msgstr[1] "{n} vidéos"
 
-#: core/orchestrator.py:599
+#: core/orchestrator.py:608
 msgid "{n} texte"
 msgid_plural "{n} textes"
 msgstr[0] "{n} texte"
 msgstr[1] "{n} textes"
 
-#: core/orchestrator.py:606
+#: core/orchestrator.py:615
 msgid "post supprimé (400)"
 msgstr "post supprimé (400)"
 
-#: core/orchestrator.py:609
+#: core/orchestrator.py:618
 msgid "erreur serveur (500)"
 msgstr "erreur serveur (500)"
 
-#: core/orchestrator.py:612
+#: core/orchestrator.py:621
 msgid "limite de débit (429)"
 msgstr "limite de débit (429)"
 
-#: core/orchestrator.py:615
+#: core/orchestrator.py:624
 msgid "type inconnu"
 msgstr "type inconnu"
 
-#: core/orchestrator.py:618
+#: core/orchestrator.py:627
 msgid "échec"
 msgstr "échec"
 
-#: core/orchestrator.py:631
+#: core/orchestrator.py:640
 msgid "{n} img"
 msgstr "{n} img"
 
-#: core/orchestrator.py:633
+#: core/orchestrator.py:642
 msgid "{n} vid"
 msgstr "{n} vid"
 
-#: core/orchestrator.py:635
+#: core/orchestrator.py:644
 msgid "{n} txt"
 msgstr "{n} txt"
 
-#: core/orchestrator.py:638
+#: core/orchestrator.py:647
 msgid "Progression :"
 msgstr "Progression :"
 
-#: core/orchestrator.py:648
+#: core/orchestrator.py:657
 msgid "RAPPORT DE TÉLÉCHARGEMENT"
 msgstr "RAPPORT DE TÉLÉCHARGEMENT"
 
-#: core/orchestrator.py:653
+#: core/orchestrator.py:662
 msgid "RÉSULTATS"
 msgstr "RÉSULTATS"
 
-#: core/orchestrator.py:659
+#: core/orchestrator.py:668
 msgid "Fiches JSON"
 msgstr "Fiches JSON"
 
-#: core/orchestrator.py:676
+#: core/orchestrator.py:685
 msgid "PROBLÈMES"
 msgstr "PROBLÈMES"
 
-#: core/orchestrator.py:679
+#: core/orchestrator.py:688
 msgid "Posts supprimés (400)"
 msgstr "Posts supprimés (400)"
 
-#: core/orchestrator.py:681
+#: core/orchestrator.py:690
 msgid "Erreurs serveur (500)"
 msgstr "Erreurs serveur (500)"
 
-#: core/orchestrator.py:685
+#: core/orchestrator.py:694
 msgid "Citations non archivées"
 msgstr "Citations non archivées"
 
-#: core/orchestrator.py:687
+#: core/orchestrator.py:696
 msgid "Types inconnus"
 msgstr "Types inconnus"
 
-#: core/orchestrator.py:689
+#: core/orchestrator.py:698
 msgid "Échecs"
 msgstr "Échecs"
 
-#: core/orchestrator.py:693
+#: core/orchestrator.py:702
 msgid "MÉTRIQUES"
 msgstr "MÉTRIQUES"
 
-#: core/orchestrator.py:695
+#: core/orchestrator.py:704
 msgid "Durée totale"
 msgstr "Durée totale"
 
-#: core/orchestrator.py:696
+#: core/orchestrator.py:705
 msgid "Workers parallèles"
 msgstr "Workers parallèles"
 
-#: core/orchestrator.py:697
+#: core/orchestrator.py:706
 msgid "Poids total du dossier"
 msgstr "Poids total du dossier"
 
-#: core/orchestrator.py:701
+#: core/orchestrator.py:710
 msgid "Mode dev : Base de données non mise à jour"
 msgstr "Mode dev : Base de données non mise à jour"
 
-#: core/orchestrator.py:709
+#: core/orchestrator.py:718
 msgid "FICHIERS GÉNÉRÉS"
 msgstr "FICHIERS GÉNÉRÉS"
 
-#: core/orchestrator.py:714
+#: core/orchestrator.py:723
 msgid "Log détaillé : {fichier}"
 msgstr "Log détaillé : {fichier}"
 
-#: core/orchestrator.py:724
+#: core/orchestrator.py:733
 msgid "posts supprimés"
 msgstr "posts supprimés"
 
-#: core/orchestrator.py:725
+#: core/orchestrator.py:734
 msgid "citations non archivées"
 msgstr "citations non archivées"
 
-#: core/orchestrator.py:726
+#: core/orchestrator.py:735
 msgid "erreurs 500"
 msgstr "erreurs 500"
 
-#: core/orchestrator.py:727
+#: core/orchestrator.py:736
 msgid "limites de débit (429)"
 msgstr "limites de débit (429)"
 
-#: core/orchestrator.py:728
+#: core/orchestrator.py:737
 msgid "types inconnus"
 msgstr "types inconnus"
 
-#: core/orchestrator.py:729
+#: core/orchestrator.py:738
 msgid "échecs"
 msgstr "échecs"
 
-#: core/orchestrator.py:826
+#: core/orchestrator.py:835
 msgid "=== Début du téléchargement : {n} posts à traiter ({workers} workers) ==="
 msgstr "=== Début du téléchargement : {n} posts à traiter ({workers} workers) ==="
 
-#: core/orchestrator.py:839
+#: core/orchestrator.py:848
 msgid "{n} post à traiter"
 msgid_plural "{n} posts à traiter"
 msgstr[0] "{n} post à traiter"
 msgstr[1] "{n} posts à traiter"
 
-#: core/orchestrator.py:840
+#: core/orchestrator.py:849
 msgid "({workers} workers parallèles)"
 msgstr "({workers} workers parallèles)"
+
+#: core/orchestrator.py:891
+msgid "erreur interne ({url}), détail dans le log"
+msgstr "erreur interne ({url}), détail dans le log"
 
 #: core/ui.py:36
 msgid "Appuyez sur Entrée..."
@@ -1044,26 +1052,26 @@ msgstr "[O/n]"
 msgid "[o/N]"
 msgstr "[o/N]"
 
-#: downloaders/__init__.py:36
+#: downloaders/__init__.py:44
 msgid "[DL] Téléchargé ->"
 msgstr "[DL] Téléchargé ->"
 
-#: downloaders/__init__.py:37
+#: downloaders/__init__.py:45
 msgid "[OK] Fichier enregistré :"
 msgstr "[OK] Fichier enregistré :"
 
-#: downloaders/__init__.py:38
+#: downloaders/__init__.py:46
 msgid "[TXT]"
 msgstr "[TXT]"
 
-#: downloaders/__init__.py:39
+#: downloaders/__init__.py:47
 msgid "[SUB] Sous-titres ->"
 msgstr "[SUB] Sous-titres ->"
 
-#: downloaders/__init__.py:40
+#: downloaders/__init__.py:48
 msgid "[JSON]"
 msgstr "[JSON]"
 
-#: downloaders/__init__.py:51
+#: downloaders/__init__.py:59
 msgid "[SKIP] {cid} déjà présent : {filename}"
 msgstr "[SKIP] {cid} déjà présent : {filename}"

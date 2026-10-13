@@ -18,7 +18,7 @@ Chantier issu de l'audit d'octobre 2026 (issues #1 à #18). Un point par issue.
 - **Vidéos** (#6) : vidéos de 10 minutes et 300 Mo, GIF du client (suffixe `_gif` ou dossier `videos/gifs/`), sous-titres `.vtt`, texte alternatif, extension d'après le `mimeType`, écriture en `.part` et repli HLS par ffmpeg.
 - **Images en qualité d'origine** (#18) : téléchargement du blob d'origine (`getBlob`) avec repli sur le CDN, saut des images déjà archivées (`skip_existing_cid`), option `image_quality`.
 - **Cache des bookmarks** (#3) : la réponse complète de `getBookmarks` est conservée dans `bookmarks.json`. Les posts supprimés ou bloqués sont repérés dès la synchronisation et l'analyse se fait sans `getRecord` par post.
-- **Ligne de commande** (#13) : `bsmb sync`, `download [--force]`, `run`, `status [--json]`, `--version` et `--yes`, codes de retour 0 à 3, mode non interactif automatique quand l'entrée n'est pas un terminal (planification Windows et cron documentées).
+- **Ligne de commande** (#13) : `bsmb sync`, `download [--force]`, `run`, `status [--json]`, `--version` et `--yes`, codes de retour 0 à 4, mode non interactif automatique quand l'entrée n'est pas un terminal (planification Windows et cron documentées).
 - **Robustesse réseau** (#11) : session HTTP partagée (User-Agent BSMB, reprises avec délai croissant sur 429 et 5xx, limiteur de débit), statut `error_429`, renouvellement automatique du token expiré (`refreshSession`).
 - **Version affichée** (#15) : `core/version.py` est la source unique ; l'en-tête du menu affiche `BSMB v3.1.0`, `bsmb --version` et les fiches JSON la reprennent.
 

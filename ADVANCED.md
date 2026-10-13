@@ -281,6 +281,7 @@ Codes de retour :
 | `1` | Erreur d'authentification (aucun identifiant, identifiants refusés, token expiré) |
 | `2` | Erreur réseau (connexion, timeout, HTTP 5xx) à l'authentification ou pendant la synchronisation. C'est aussi le code d'`argparse` pour un argument invalide |
 | `3` | Au moins un téléchargement en échec (ou erreur 500) |
+| `4` | Erreur interne (exception inattendue) : message en console, trace complète sur la sortie d'erreur |
 
 `run` s'arrête au premier code non nul. Prérequis : un compte déjà configuré via le menu (App Password).
 
