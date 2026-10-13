@@ -189,6 +189,11 @@ class TestDownload:
         with patch("core.cli.orchestrator.run", return_value=_stats(error_500=["u"])):
             assert cli.main(["download"]) == 3
 
+    def test_limite_de_debit_code_3(self, cfg, non_interactif):
+        self._urls(cfg)
+        with patch("core.cli.orchestrator.run", return_value=_stats(error_429=["u"])):
+            assert cli.main(["download"]) == 3
+
     def test_force_retraite_tout(self, cfg, tmp_db, non_interactif):
         urls = ["https://bsky.app/profile/a/post/1", "https://bsky.app/profile/a/post/2"]
         self._urls(cfg, urls)

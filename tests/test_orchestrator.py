@@ -109,6 +109,18 @@ class TestProcessPostExternal:
         assert _medias(tmp_db) == []
 
 
+class TestProcessPostErreur429:
+    def test_statut_error_429_et_aucun_telechargement(self, tmp_db, tmp_path):
+        resultat, mocks = _lancer(tmp_db, tmp_path, PostType.ERROR_429)
+        assert resultat[:5] == (False, 0, 0, 0, "error_429")
+        assert tmp_db.conn.execute("SELECT status FROM posts WHERE url = ?", (URL,)).fetchone()[0] == "error_429"
+        assert not any(m.called for m in mocks.values())
+
+    def test_message_dans_la_sortie(self, tmp_db, tmp_path):
+        resultat, _ = _lancer(tmp_db, tmp_path, PostType.ERROR_429)
+        assert any("429" in ligne for ligne in resultat[5])
+
+
 class TestProcessPostMedias:
     def test_images_comptees_depuis_les_resultats(self, tmp_db, tmp_path):
         res = [_res("a_1.jpg", "image"), _res("a_2.png", "image")]
@@ -212,7 +224,7 @@ class TestRun:
         stats = run([URL, URL2], config, quiet=True)
         assert stats == {
             "total": 2, "success": 1, "images": 1, "videos": 0, "texts": 0, "sidecars": 0,
-            "error_500": [], "error_400": [URL2], "quotes_unresolved": [], "reposts": [],
+            "error_500": [], "error_429": [], "error_400": [URL2], "quotes_unresolved": [], "reposts": [],
             "unknown": [], "failed": [],
         }
         assert capsys.readouterr().out == ""
@@ -252,6 +264,28 @@ class TestRun:
         assert len(list(logs.glob("download_*.log"))) == 1
         (fichier,) = logs.glob("error_500_*.txt")
         assert fichier.read_text(encoding="utf-8") == URL
+
+    def test_429_compte_a_part_et_ecrit_rate_limited(self, env_run):
+        config, analyzer, _ = env_run
+        _types(analyzer, {URL: PostType.ERROR_429, URL2: PostType.ERROR_500})
+        stats = run([URL, URL2], config, quiet=True)
+        assert stats["error_429"] == [URL]
+        assert stats["error_500"] == [URL2]
+        logs = Path(config["logs_dir"])
+        (fichier,) = logs.glob("rate_limited_*.txt")
+        assert fichier.read_text(encoding="utf-8") == URL
+        db = Database(config["db_file"])
+        try:
+            statut = db.conn.execute("SELECT status FROM posts WHERE url = ?", (URL,)).fetchone()[0]
+            assert statut == "error_429"
+        finally:
+            db.close()
+
+    def test_rapport_mentionne_la_limite_de_debit(self, env_run, capsys):
+        config, analyzer, _ = env_run
+        _types(analyzer, {URL: PostType.ERROR_429})
+        run([URL], config)
+        assert "Limite de débit (429)" in capsys.readouterr().out
 
     def test_on_progress(self, env_run):
         config, analyzer, _ = env_run

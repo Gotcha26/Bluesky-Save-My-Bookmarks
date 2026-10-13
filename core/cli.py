@@ -159,7 +159,7 @@ def cmd_download(config, args=None):
         stats = orchestrator.run(a_traiter, config, post_views=post_views)
     else:
         stats = orchestrator.run(a_traiter, config)
-    if stats.get("failed") or stats.get("error_500"):
+    if stats.get("failed") or stats.get("error_500") or stats.get("error_429"):
         return EXIT_DOWNLOAD
     return EXIT_OK
 

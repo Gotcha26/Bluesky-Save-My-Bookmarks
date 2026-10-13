@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 SCHEMA_VERSION = 2
 
 # Statuts d'un post qui méritent une nouvelle tentative après un délai
-STATUTS_A_RETENTER = ('error_500', 'unknown', 'repost')
+STATUTS_A_RETENTER = ('error_500', 'error_429', 'unknown', 'repost')
 
 
 class Database:
@@ -298,7 +298,7 @@ class Database:
     def get_pending_posts(self, urls, retry_after_days=7):
         """Retourne les URLs à traiter : non trackées, ou en erreur à retenter (thread-safe).
 
-        Un post est à retenter si son statut est `error_500`, `unknown` ou `repost`
+        Un post est à retenter si son statut est `error_500`, `error_429`, `unknown` ou `repost`
         et que sa dernière vérification date de plus de `retry_after_days` jours.
         `ok` et `deleted` ne sont jamais retentés.
         """
@@ -363,7 +363,7 @@ class Database:
 
         Args:
             url: URL du post
-            status: 'ok', 'deleted', 'blocked', 'error_500', 'unknown'
+            status: 'ok', 'deleted', 'blocked', 'error_500', 'error_429', 'unknown'
                 ('repost' n'est plus écrit, hérité)
         """
         with self._lock:
