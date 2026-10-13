@@ -11,10 +11,10 @@ BSMB (Bsky Save My Bookmarks) : outil Python en ligne de commande (menu TUI) qui
 ```bash
 pip install -r requirements.txt          # dépendances
 python bsmb.py                           # lance le menu (depuis la racine du dépôt, obligatoire)
-python -m pytest tests/ -q               # suite complète (154 tests, aucun accès réseau)
+python -m pytest tests/ -q               # suite complète (aucun accès réseau)
 python -m pytest tests/test_database.py -v
 python -m pytest tests/test_auth.py -k "expired"   # un test / un motif
-python -m py_compile bsmb.py             # seul « lint » de la CI (.github/workflows/ci.yml)
+python -m compileall -q -x '[/\\]\.git[/\\]' .     # « lint » de la CI (.github/workflows/ci.yml)
 ```
 
 `pytest` n'est pas dans `requirements.txt` : `pip install pytest` au préalable. Sur ce poste, `python` est la 3.14 ; la CI tourne sur 3.10 / 3.12 / 3.13 (Ubuntu + Windows).
@@ -24,6 +24,7 @@ Scripts utilisables seuls pour déboguer un post :
 ```bash
 python downloaders/images.py <dossier> <url_post>
 python downloaders/videos.py <dossier> <url_post>
+python downloaders/text.py <dossier> <url_post>
 python core/orchestrator.py <img_dir> <vid_dir> <text_dir> [--no-db] <url1> [url2...]
 python api/export_bookmarks.py           # lit BSMB_TOKEN ou Token-Bearer.txt, écrit urls.txt
 ```
@@ -33,18 +34,19 @@ python api/export_bookmarks.py           # lit BSMB_TOKEN ou Token-Bearer.txt, �
 Le flux est en deux temps, piloté par le menu de `bsmb.py` :
 
 1. **Synchronisation** (`core/bookmarks.py` → `api/export_bookmarks.py`) : `createSession` donne un token (`core/auth.py`), `getBookmarks` est paginé, les URLs `https://bsky.app/profile/<handle>/post/<rkey>` sont écrites dans `urls.txt` et comparées à la table `posts` pour compter les « nouveaux ».
-2. **Téléchargement** : `bsmb.py` lance `core/orchestrator.py` **en sous-processus** avec les URLs nouvelles en arguments. L'orchestrateur utilise un `ThreadPoolExecutor` (`max_workers` de la config) ; chaque worker appelle `PostAnalyzer.analyze()` (`api/post_analyzer.py`, un `getRecord` par post) qui renvoie un `PostType`, puis lance **un nouveau sous-processus** `python downloaders/{images,videos,text}.py`. Le résultat est déduit du code retour et du comptage de `[DL]` / `[TXT]` dans stdout.
+2. **Téléchargement** : `bsmb.py` appelle directement `core.orchestrator.run(urls, config, no_db=False, on_progress=None, quiet=False)`, qui renvoie un dict de statistiques et écrit les logs. L'orchestrateur utilise un `ThreadPoolExecutor` (`max_workers` de la config) ; chaque worker appelle `PostAnalyzer.analyze()` (`api/post_analyzer.py`, un `getRecord` par post) qui renvoie un `PostType`, puis la fonction du downloader : `download_images()`, `download_video()` ou `save_text()` (signature `(post_url, dest_dir, config, session=None)`). Chacune renvoie une `list[DownloadResult]` (`downloaders/__init__.py` : `filename`, `path`, `media_type`, `size`, `cid`) ; liste vide = aucun média, `DownloadError` = erreur technique (statut `failed`). Comptage et `add_media` viennent de ces résultats ; les downloaders n'impriment rien, les lignes `[DL]`/`[OK]`/`[TXT]` sont produites par `lignes_console()`.
 
 Points qui ne se voient pas en lisant un seul fichier :
 
-- **Tout est relatif au répertoire courant** : `config.json`, `bsmb.db`, `urls.txt`, `logs/` et les chemins `downloaders/x.py` passés à `subprocess`. Lancer depuis un autre dossier casse l'application. Les sous-processus sont lancés avec la chaîne `"python"`, pas `sys.executable`.
-- **Les downloaders exécutent du code au niveau module** (lecture de `sys.argv`, `input()` si argument manquant, `os.makedirs`). Les importer dans un test exige de patcher `sys.argv` avant l'import (voir `tests/test_images_utils.py`). `videos.py` et `text.py` ne sont pas importables tels quels.
+- **Chemins ancrés sur `PROJECT_ROOT`** (`core/paths.py`, dossier de `bsmb.py`) : `CONFIG_FILE` y est fixé, et `resolve_path(config, key)` résout `db_file`, `urls_file`, `logs_dir`, `token_file` quand ils sont relatifs. Toujours passer par `resolve_path`, jamais `Path(config["…"])`. `config.json` garde les valeurs relatives. Les dossiers médias viennent de `get_media_dirs(config)` (`download_dir`).
+- **Aucun code au niveau module** dans les downloaders et l'orchestrateur : `tests/test_imports.py` importe chaque module dans un interpréteur neuf et échoue sur toute sortie, `input()` ou fichier créé. Le `sys.path.insert` des scripts n'a lieu qu'en exécution directe (`__package__` vide). Seuls `exiftool` et `ffmpeg` sont lancés en sous-processus.
 - **Le token ne sert qu'à `getBookmarks`**. Il est passé à `export_bookmarks.py` par la variable d'environnement `BSMB_TOKEN`. Tous les autres appels (`getRecord`, `getPostThread`, `getBlob`, `getProfile`) sont publics, sans authentification.
 - **Deux lectures API par post** : l'analyseur lit `com.atproto.repo.getRecord` sur `bsky.social` (record brut, embeds `app.bsky.embed.*`), les downloaders relisent `app.bsky.feed.getPostThread` sur `public.api.bsky.app` (vue hydratée, embeds `*#view`). Les deux formats d'embed coexistent donc dans le code ; ne pas les confondre.
 - **`PostType.REPOST` désigne en réalité un quote post** (`app.bsky.embed.record`). `process_post()` résout alors le post cité via `api/repost_resolver.py` et **s'appelle récursivement** sur lui ; le post citant n'est pas archivé.
 - **Base SQLite** (`core/database.py`) : `posts.url` est la clé primaire, `posts.status` vaut `ok` / `deleted` (HTTP 400) / `error_500` / `unknown` / `repost`. `get_pending_posts()` / `get_pending_refs()` retournent les nouvelles URLs plus les posts `error_500` / `unknown` / `repost` vérifiés il y a plus de `retry_after_days` jours (config, défaut 7) ; `add_post()` conserve `added_at` et `status`. `media.filename` est le vrai nom de fichier (unique par post, `INSERT OR IGNORE`). Schéma versionné (`meta.schema_version`, migrations `_migrate_vN`), clés étrangères activées. La connexion est partagée entre threads (`check_same_thread=False` + `threading.Lock`).
-- **Deux modes « avancés »** dans `bsmb.py` : `download_media_dev()` passe `--no-db` à l'orchestrateur (traite `urls.txt` sans écrire en base) ; `download_media(force=True)` retraite toutes les URLs de `urls.txt`.
-- **Console Windows** : `core/orchestrator.py` ré-encapsule stdout en UTF-8 uniquement sous `__name__ == "__main__"` (sinon conflit avec la capture pytest). `core/colors.py` expose l'instance globale `c` (détection ANSI, `NO_COLOR` / `FORCE_COLOR`).
+- **Deux modes « avancés »** dans `bsmb.py` : `download_media_dev()` appelle `run(…, no_db=True)` (traite `urls.txt` sans écrire en base) ; `download_media(force=True)` retraite toutes les URLs de `urls.txt`.
+- **Console Windows** : `bsmb.py` (et `core/orchestrator.py` en usage CLI) ré-encapsule stdout en UTF-8 uniquement sous `__name__ == "__main__"` (sinon conflit avec la capture pytest). `core/colors.py` expose l'instance globale `c` (détection ANSI, `NO_COLOR` / `FORCE_COLOR`).
+- **Logs** : `cleanup_old_logs()` supprime les logs de plus de 10 jours et ne garde que `max_logs` fichiers `download_*.log`.
 - `core/logger.py` est vide, `lang/` est vide, `tools/debug_post.py` est un vestige : ne pas s'y appuyer.
 
 ## Conventions

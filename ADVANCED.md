@@ -123,17 +123,19 @@ bsmb/
 │   ├── colors.py               # Couleurs ANSI cross-platform
 │   ├── config.py               # Configuration JSON + migration
 │   ├── database.py             # SQLite (posts + media tracking)
-│   └── orchestrator.py         # Orchestrateur (ThreadPoolExecutor)
+│   ├── paths.py                # PROJECT_ROOT (racine des chemins relatifs)
+│   └── orchestrator.py         # Orchestrateur : run() (ThreadPoolExecutor)
 │
 ├── api/                         # Interactions API Bluesky
 │   ├── export_bookmarks.py     # fetch_bookmarks() + mode standalone
 │   ├── post_analyzer.py        # Détection type post (image/vidéo/repost)
 │   └── repost_resolver.py      # Résolution DID → handle
 │
-├── downloaders/                 # Téléchargeurs (subprocess)
-│   ├── images.py               # Images avec EXIF
-│   ├── videos.py               # Vidéos avec ffmpeg
-│   └── text.py                 # Texte seul
+├── downloaders/                 # Téléchargeurs (fonctions importables)
+│   ├── __init__.py             # DownloadResult, DownloadError
+│   ├── images.py               # download_images() : images avec EXIF
+│   ├── videos.py               # download_video() : vidéos avec ffmpeg
+│   └── text.py                 # save_text() : texte seul
 │
 ├── tests/                       # Tests unitaires (pytest)
 └── logs/                        # Fichiers de log (auto-créé)
@@ -145,19 +147,22 @@ bsmb/
 bsmb.py (menu)
   → core/auth.py (createSession → Bearer token)
   → core/bookmarks.py (sync: API → urls.txt → compare DB)
-  → core/orchestrator.py (ThreadPoolExecutor)
+  → core/orchestrator.run() (appel direct, ThreadPoolExecutor)
     → api/post_analyzer.py (détecte type)
     → api/repost_resolver.py (résout reposts)
-    → downloaders/*.py (subprocess: télécharge)
+    → downloaders/*.py (fonctions appelées dans les threads : télécharge,
+                        renvoie des DownloadResult)
     → core/database.py (tracking SQLite)
 ```
+
+Aucun sous-processus Python n'est lancé : seuls `exiftool` et `ffmpeg` sont exécutés en externe. Les downloaders restent utilisables seuls pour déboguer un post : `python downloaders/images.py <dossier> <url>`.
 
 ### Parallélisation
 
 L'orchestrateur utilise `concurrent.futures.ThreadPoolExecutor` avec un nombre configurable de workers (1-16, défaut 4).
 
 **Pourquoi ThreadPool plutôt que ProcessPool :**
-- Le travail est I/O-bound (réseau + subprocess), pas CPU-bound
+- Le travail est I/O-bound (réseau, exiftool/ffmpeg), pas CPU-bound
 - Mémoire partagée pour les compteurs et la DB
 - Le GIL est relâché pendant les opérations I/O
 
@@ -165,7 +170,7 @@ L'orchestrateur utilise `concurrent.futures.ThreadPoolExecutor` avec un nombre c
 - `Database` : `threading.Lock` sur chaque méthode + `check_same_thread=False`
 - Console : `_print_lock` empêche l'entrelacement des lignes
 - Logs : `log_lock` protège l'écriture fichier
-- Stats : `stats_lock` protège les compteurs
+- Stats : compteurs mis à jour par le seul thread principal (`as_completed`)
 
 ---
 
@@ -204,6 +209,11 @@ L'orchestrateur utilise `concurrent.futures.ThreadPoolExecutor` avec un nombre c
 | `last_sync` | Date de dernière synchronisation | `""` |
 | `advanced_mode` | Mode avancé activé | `false` |
 | `max_filename_len` | Longueur max des noms de fichiers | `64` |
+| `min_postid_short` | Longueur min de l'ID du post dans un nom d'image tronqué | `4` |
+| `index_digits` | Nombre de chiffres de l'index d'image (`_1`, `_01`…) | `1` |
+| `max_logs` | Nombre max de logs `download_*.log` conservés | `5` |
+
+Les chemins relatifs (`token_file`, `urls_file`, `db_file`, `logs_dir`) sont résolus depuis le dossier d'installation de BSMB (celui de `bsmb.py`), pas depuis le dossier courant.
 
 ---
 
