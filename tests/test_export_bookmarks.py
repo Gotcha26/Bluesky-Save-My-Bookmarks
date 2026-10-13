@@ -108,7 +108,7 @@ class TestFetchBookmarksSuccess:
         session.get.return_value = response
 
         calls = []
-        result = fetch_bookmarks("Bearer test", on_progress=lambda p, c: calls.append((p, c)))
+        fetch_bookmarks("Bearer test", on_progress=lambda p, c: calls.append((p, c)))
         assert len(calls) == 1
         assert calls[0] == (1, 1)
 

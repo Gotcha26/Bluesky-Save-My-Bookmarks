@@ -125,7 +125,9 @@ class TestModeOriginal:
         assert f"-Copyright={URL}" in cmd
 
     def test_vue_a_2_images_pour_un_record_a_3_apparie_par_cid(self, tmp_path):
-        cdn = lambda cid: f"https://cdn.bsky.app/img/feed_fullsize/plain/{DID}/{cid}@jpeg"
+        def cdn(cid):
+            return f"https://cdn.bsky.app/img/feed_fullsize/plain/{DID}/{cid}@jpeg"
+
         record = {"embed": {"images": [_img(CID1, "image/png"), _img("bafkreicid3", "image/webp"),
                                          _img(CID2, "image/jpeg")]}}
         embed = {"$type": "app.bsky.embed.images#view",

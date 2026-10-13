@@ -546,7 +546,7 @@ def menu_settings(config, state):
             break
         elif choice == "1":
             configure_credentials(config)
-            state = get_app_state(config)
+            get_app_state(config)
         elif choice == "2":
             _edit_config_value(
                 config, "download_dir", "Dossier de téléchargements",
