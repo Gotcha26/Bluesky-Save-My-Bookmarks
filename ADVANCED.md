@@ -200,6 +200,7 @@ L'orchestrateur utilise `concurrent.futures.ThreadPoolExecutor` avec un nombre c
 | `logs_dir` | Dossier des logs | `logs` |
 | `pds_url` | PDS du compte, détecté à la connexion (`""` = inconnu, `https://bsky.social` utilisé) | `""` |
 | `max_workers` | Workers parallèles | `4` |
+| `retry_after_days` | Délai avant de retenter un post en erreur (`error_500`, `unknown`, `repost`) | `7` |
 | `last_sync` | Date de dernière synchronisation | `""` |
 | `advanced_mode` | Mode avancé activé | `false` |
 | `max_filename_len` | Longueur max des noms de fichiers | `64` |
@@ -217,7 +218,7 @@ L'orchestrateur utilise `concurrent.futures.ThreadPoolExecutor` avec un nombre c
 | `handle` | TEXT | Handle de l'auteur |
 | `added_at` | TEXT | Date d'ajout (ISO) |
 | `last_check` | TEXT | Dernière vérification (ISO) |
-| `status` | TEXT | `ok`, `deleted`, `error_500`, `unknown` |
+| `status` | TEXT | `ok`, `deleted`, `error_500`, `unknown`, `repost` |
 | `at_uri` | TEXT (UNIQUE) | Identité canonique `at://<did>/app.bsky.feed.post/<rkey>` (NULL pour les anciennes lignes, complété au prochain traitement) |
 | `did` | TEXT | DID de l'auteur |
 | `rkey` | TEXT | Clé du post |
@@ -227,14 +228,19 @@ L'orchestrateur utilise `concurrent.futures.ThreadPoolExecutor` avec un nombre c
 | Colonne | Type | Description |
 |---------|------|-------------|
 | `id` | INTEGER (PK) | Auto-incrémenté |
-| `post_url` | TEXT (FK) | Référence vers posts.url |
+| `post_url` | TEXT (FK) | Référence vers posts.url (`ON DELETE CASCADE`) |
 | `media_type` | TEXT | `image`, `video`, `text` |
-| `filename` | TEXT | Nom du fichier téléchargé |
+| `filename` | TEXT | Nom réel du fichier téléchargé (unique par post) |
 | `downloaded_at` | TEXT | Date de téléchargement (ISO) |
+| `cid` | TEXT | CID du blob AT Protocol (NULL si inconnu) |
+
+### Table `meta`
+
+Paires `key` / `value`. La clé `schema_version` porte la version du schéma (actuellement `2`).
 
 ### Migration automatique
 
-Lors du premier lancement après une mise à jour, BSMB ajoute automatiquement la colonne `status` aux bases existantes via `ALTER TABLE`.
+Au lancement, BSMB applique les migrations numérotées manquantes aux bases existantes (v1 : colonnes `status` et AT-URI ; v2 : table `media` recréée avec contrainte d'unicité, doublons retirés, table `meta`).
 
 ---
 

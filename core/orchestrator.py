@@ -74,6 +74,17 @@ def save_debug_info(post_id, debug_info, logs_dir):
     return debug_file
 
 
+def extraire_noms_fichiers(stdout, marqueur):
+    """Noms de fichiers annoncés par un downloader sur les lignes contenant `marqueur`."""
+    noms = []
+    for line in stdout.splitlines():
+        if marqueur in line:
+            nom = line.split(marqueur, 1)[1].strip()
+            if nom:
+                noms.append(nom)
+    return noms
+
+
 def process_post(url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_dir, log_func):
     """
     Traite un post unique et retourne les stats.
@@ -130,11 +141,17 @@ def process_post(url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_d
             buf_print(f"  {c.OK}>{c.RESET} Post original : {c.VALUE}{original_handle}/post/{original_post_id}{c.RESET}")
             buf_print(f"  {c.DIM}{original_url}{c.RESET}")
 
+            # Le post citant est traité par sa résolution : il ne sera plus retenté
+            if db:
+                db.mark_post_status(url, 'ok')
+
             # Traiter récursivement le post original
             return process_post(original_url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_dir, log_func)
         else:
             buf_print(c.warning("Impossible de résoudre le repost"))
             log_func(f"   REPOST NON RÉSOLU: {url}", to_console=False)
+            if db:
+                db.mark_post_status(url, 'repost')
             return False, 0, 0, 0, 'repost', output
 
     # Images
@@ -156,9 +173,9 @@ def process_post(url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_d
                 if line and not line.startswith("SCRIPT") and not line.startswith("DEBUG"):
                     buf_print(f"    {line}")
 
-        if db and img_count > 0:
-            for i in range(img_count):
-                db.add_media(url, 'image', f'image_{i}')
+        if db and img_proc.returncode == 0:
+            for filename in extraire_noms_fichiers(img_proc.stdout, "[DL] Téléchargé ->"):
+                db.add_media(url, 'image', filename)
 
     # Vidéo
     elif post_type == PostType.VIDEO:
@@ -179,9 +196,9 @@ def process_post(url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_d
                 if line and not line.startswith("SCRIPT") and not line.startswith("DEBUG"):
                     buf_print(f"    {line}")
 
-        if db and vid_count > 0:
-            for i in range(vid_count):
-                db.add_media(url, 'video', f'video_{i}')
+        if db and vid_proc.returncode == 0:
+            for filename in extraire_noms_fichiers(vid_proc.stdout, "[OK] Fichier enregistré :"):
+                db.add_media(url, 'video', filename)
 
     # Texte seul
     elif post_type == PostType.TEXT_ONLY:
@@ -203,11 +220,8 @@ def process_post(url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_d
                     buf_print(f"    {line}")
 
         if db and text_proc.returncode == 0:
-            for line in text_proc.stdout.splitlines():
-                if "[TXT]" in line:
-                    filename = line.split("[TXT]", 1)[1].strip()
-                    if filename:
-                        db.add_media(url, 'text', filename)
+            for filename in extraire_noms_fichiers(text_proc.stdout, "[TXT]"):
+                db.add_media(url, 'text', filename)
 
     # Cas inconnu - MODE DEBUG
     elif post_type == PostType.UNKNOWN:
@@ -219,12 +233,16 @@ def process_post(url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_d
         buf_print(c.config_line("Texte", data.get('text', '')[:80] + "..."))
 
         log_func(f"   TYPE INCONNU: {url} - Debug: {debug_file.name}", to_console=False)
+        if db:
+            db.mark_post_status(url, 'unknown')
         return False, 0, 0, 0, 'unknown', output
 
     # Bilan
     if has_success:
         if db:
             db.update_last_check(url)
+            # Un post retenté avec succès ne doit plus rester en erreur
+            db.mark_post_status(url, 'ok')
         log_func(f"   SUCCÈS: {url}", to_console=False)
         return True, img_count, vid_count, text_count, 'success', output
     else:
