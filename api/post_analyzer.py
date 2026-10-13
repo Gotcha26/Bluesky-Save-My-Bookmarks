@@ -2,11 +2,12 @@
 """
 Analyse préalable d'un post Bluesky pour déterminer son type et sa disponibilité
 """
-from core import http as bsmb_http
-from urllib.parse import urlparse
 from enum import Enum
+from urllib.parse import urlparse
 
+from core import http as bsmb_http
 from core.post_ref import PostRef, _is_valid_handle
+
 
 class PostType(Enum):
     ERROR_500 = "error_500"

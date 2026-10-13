@@ -1,6 +1,7 @@
 """Tests pour api/post_analyzer.py"""
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
 from api.post_analyzer import PostAnalyzer, PostType
 

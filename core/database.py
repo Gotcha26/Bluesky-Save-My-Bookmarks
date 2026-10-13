@@ -4,8 +4,8 @@ Gestion de la base de données SQLite pour BSMB
 """
 import sqlite3
 import threading
-from pathlib import Path
 from datetime import datetime, timedelta
+from pathlib import Path
 
 # Version courante du schéma (table `meta`, clé `schema_version`).
 # Chaque version N > 0 correspond à une méthode `_migrate_vN`.

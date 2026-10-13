@@ -4,16 +4,16 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from core.config import (
+    CONFIG_FILE,
     DEFAULT_CONFIG,
-    load_config,
-    save_config,
+    cleanup_logs,
+    cleanup_old_logs,
     ensure_dirs,
     get_default_paths,
     get_media_dirs,
-    cleanup_logs,
-    cleanup_old_logs,
+    load_config,
     resolve_path,
-    CONFIG_FILE,
+    save_config,
 )
 from core.paths import PROJECT_ROOT
 

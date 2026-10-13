@@ -73,6 +73,7 @@ class TestAddPostConserveLeStatut:
 
     def test_plus_aucun_insert_or_replace(self):
         import inspect
+
         import core.database
         assert "INSERT OR REPLACE" not in inspect.getsource(core.database).upper()
 

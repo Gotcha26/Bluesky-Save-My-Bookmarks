@@ -7,7 +7,9 @@ import requests
 from core.config import DEFAULT_CONFIG
 from downloaders import DownloadError, DownloadResult
 from downloaders.external import (
-    download_external, est_media_direct, extension_media_direct,
+    download_external,
+    est_media_direct,
+    extension_media_direct,
 )
 
 URL = "https://bsky.app/profile/auteur.test/post/3ktest000001"

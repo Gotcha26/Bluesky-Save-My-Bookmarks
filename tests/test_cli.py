@@ -1,6 +1,6 @@
 """Tests de la CLI non interactive (core/cli.py, core/ui.py, bsmb.main)."""
 import json
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 

@@ -1,7 +1,9 @@
-import requests
 import json
 import re
 import sys
+
+import requests
+
 
 def extract_post_info(url):
     """Extrait le handle et le postId depuis une URL Bsky"""

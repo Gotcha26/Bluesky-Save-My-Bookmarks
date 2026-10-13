@@ -1,8 +1,8 @@
 """Tests pour les utilitaires de downloaders/images.py"""
 from downloaders.images import (
-    safe_part,
-    guess_ext_from_ct,
     build_filename,
+    guess_ext_from_ct,
+    safe_part,
 )
 
 

@@ -9,12 +9,12 @@ ThreadPoolExecutor ; aucun sous-processus Python n'est lancé.
 
 Usage manuel : python core/orchestrator.py <IMG_DIR> <VID_DIR> <TEXT_DIR> [--no-db] <URL1> [URL2] ...
 """
-import os
-import sys
-import subprocess
-import time
-import threading
 import json
+import os
+import subprocess
+import sys
+import threading
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime
@@ -24,21 +24,25 @@ if __package__ in (None, ""):
     # Exécution directe (python core/orchestrator.py) : rendre la racine importable
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from core.config import (  # noqa: E402
-    DEFAULT_CONFIG, cleanup_old_logs, get_media_dirs, load_config, resolve_path,
-)
-from core.database import Database  # noqa: E402
-from core.colors import c  # noqa: E402
-from core import ui  # noqa: E402
-from core import http as bsmb_http  # noqa: E402
 from api.post_analyzer import PostAnalyzer, PostType  # noqa: E402
 from api.quote_resolver import QuoteResolver  # noqa: E402
+from core import http as bsmb_http  # noqa: E402
+from core import ui  # noqa: E402
+from core.colors import c  # noqa: E402
+from core.config import (  # noqa: E402
+    DEFAULT_CONFIG,
+    cleanup_old_logs,
+    get_media_dirs,
+    load_config,
+    resolve_path,
+)
+from core.database import Database  # noqa: E402
 from downloaders import DownloadError, lignes_console  # noqa: E402
-from downloaders.images import download_images  # noqa: E402
-from downloaders.videos import download_video  # noqa: E402
-from downloaders.text import nom_base_texte, save_text  # noqa: E402
-from downloaders.external import download_external  # noqa: E402
 from downloaders.archive import write_sidecar, write_text  # noqa: E402
+from downloaders.external import download_external  # noqa: E402
+from downloaders.images import download_images  # noqa: E402
+from downloaders.text import nom_base_texte, save_text  # noqa: E402
+from downloaders.videos import download_video  # noqa: E402
 
 # Lock global pour l'affichage console (évite les lignes entrelacées)
 _print_lock = threading.Lock()

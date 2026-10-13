@@ -5,7 +5,7 @@ Pont entre l'API (export_bookmarks) et la base de données locale.
 """
 from datetime import datetime
 
-from api.export_bookmarks import fetch_bookmarks, DEFAULT_PDS_URL
+from api.export_bookmarks import DEFAULT_PDS_URL, fetch_bookmarks
 from core.auth import AuthError, NetworkError, refresh_session
 from core.bookmarks_cache import load_cache, save_cache
 from core.config import resolve_path, save_config

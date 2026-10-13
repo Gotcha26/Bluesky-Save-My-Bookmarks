@@ -21,7 +21,11 @@ from core.bookmarks import BookmarkSync
 from core.bookmarks_cache import post_views_from_config
 from core.colors import c
 from core.config import (
-    cleanup_old_logs, ensure_dirs, load_config, resolve_path, save_config,
+    cleanup_old_logs,
+    ensure_dirs,
+    load_config,
+    resolve_path,
+    save_config,
 )
 from core.database import Database
 from core.secret_store import migrate_secret_to_keyring

@@ -11,13 +11,12 @@ from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse
 
-
 if __package__ in (None, ""):
     # Exécution directe (python downloaders/text.py) : rendre la racine importable
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from core.config import get_default_paths, load_config  # noqa: E402
 from core import http as bsmb_http  # noqa: E402
+from core.config import get_default_paths, load_config  # noqa: E402
 from downloaders import DownloadError, DownloadResult, lignes_console  # noqa: E402
 
 

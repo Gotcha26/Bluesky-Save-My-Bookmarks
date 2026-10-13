@@ -6,8 +6,7 @@ import pytest
 import requests
 
 from core.config import DEFAULT_CONFIG
-from downloaders import DownloadError, DownloadResult, lignes_console
-from downloaders import images
+from downloaders import DownloadError, DownloadResult, images, lignes_console
 from downloaders.images import download_images
 
 URL = "https://bsky.app/profile/user.bsky.social/post/3abc"
