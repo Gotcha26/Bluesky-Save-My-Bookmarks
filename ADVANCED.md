@@ -187,6 +187,7 @@ bsmb/
 │   ├── config.py               # Configuration JSON + migration + resolve_path
 │   ├── database.py             # SQLite (posts + media + meta, migrations)
 │   ├── http.py                 # Session HTTP partagée (reprises, limiteur de débit)
+│   ├── i18n.py                 # _(), _n(), init() : traductions gettext (catalogues dans lang/)
 │   ├── orchestrator.py         # run() : ThreadPoolExecutor, logs, rapport
 │   ├── paths.py                # PROJECT_ROOT (racine des chemins relatifs)
 │   ├── post_ref.py             # Identité d'un post : AT-URI (DID + rkey)
@@ -269,7 +270,7 @@ python bsmb.py run --yes            # sync puis download, sans aucune question
 python bsmb.py status [--json]      # état du compte et compteurs
 ```
 
-Sans sous-commande, le menu interactif s'ouvre. Quand l'entrée standard n'est pas un terminal (tâche planifiée, cron, pipe) ou avec `--yes`, BSMB ne pose aucune question : les confirmations prennent leur valeur par défaut, « Appuyez sur Entrée » disparaît, et la sortie est sans couleur si elle est redirigée. `--yes` s'écrit avant ou après la sous-commande.
+Sans sous-commande, le menu interactif s'ouvre. Quand l'entrée standard n'est pas un terminal (tâche planifiée, cron, pipe) ou avec `--yes`, BSMB ne pose aucune question : les confirmations prennent leur valeur par défaut, « Appuyez sur Entrée » disparaît, et la sortie est sans couleur si elle est redirigée. `--yes` s'écrit avant ou après la sous-commande. `--lang {fr,en,auto}` (aussi avant ou après) choisit la langue de l'interface et l'emporte sur `language` de `config.json`.
 
 Codes de retour :
 
@@ -316,7 +317,8 @@ schtasks /Create /SC DAILY /TN BSMB /TR "\"C:\chemin\bsmb\.venv\Scripts\python.e
   "pds_url": "https://morel.us-east.host.bsky.network",
   "max_workers": 4,
   "last_sync": "2026-02-08T14:30:00",
-  "advanced_mode": false
+  "advanced_mode": false,
+  "language": ""
 }
 ```
 
@@ -338,6 +340,7 @@ schtasks /Create /SC DAILY /TN BSMB /TR "\"C:\chemin\bsmb\.venv\Scripts\python.e
 | `min_postid_short` | Longueur min de l'ID du post dans un nom d'image tronqué | `4` |
 | `index_digits` | Nombre de chiffres de l'index d'image (`_1`, `_01`…). Les fichiers déjà téléchargés ne sont pas renommés | `2` |
 | `save_sidecar` | Écrit `texts/<nom>.json` (fiche JSON, voir « Archive d'un post ») pour chaque post archivé | `true` |
+| `language` | Langue de l'interface : `"fr"`, `"en"` ou `""` (automatique, d'après la locale du système). Modifiable dans **Paramètres** > **L. Langue** ; l'option `--lang` de la ligne de commande l'emporte. Voir `lang/README.md` | `""` |
 | `max_logs` | Nombre max de logs `download_*.log` conservés | `5` |
 | `image_quality` | `"original"` : blob d'origine (`com.atproto.sync.getBlob` via `https://bsky.social`, qui redirige vers le PDS de l'auteur ; repli automatique sur le CDN en cas d'échec) ; `"cdn"` : image `fullsize` du CDN Bluesky (recompressée) | `"original"` |
 | `skip_existing_cid` | Ne pas retélécharger une image dont le `cid` est déjà en base avec un fichier présent sur disque (ligne `[SKIP]`) | `true` |

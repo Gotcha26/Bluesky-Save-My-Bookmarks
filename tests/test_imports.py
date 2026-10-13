@@ -62,7 +62,7 @@ def test_import_sans_effet_de_bord(module, tmp_path):
     home.mkdir()
     env = {
         **os.environ,
-        "PYTHONPATH": str(PROJECT_ROOT),
+        "PYTHONPATH": os.pathsep.join([str(PROJECT_ROOT), str(PROJECT_ROOT / "tools")]),
         "PYTHONIOENCODING": "utf-8",
         "HOME": str(home),
         "USERPROFILE": str(home),

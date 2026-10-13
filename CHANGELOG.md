@@ -8,7 +8,7 @@ Format: [Semantic Versioning](https://semver.org/) (MAJOR.MINOR.PATCH)
 
 ## [3.1] - 2026-10-13 - Audit d'octobre 2026 : fiabilité, archive fidèle, installation
 
-Chantier issu de l'audit d'octobre 2026 (issues #1 à #18, hors #17 en cours : internationalisation). Un point par issue.
+Chantier issu de l'audit d'octobre 2026 (issues #1 à #18). Un point par issue.
 
 ### ✨ Nouvelles fonctionnalités
 
@@ -38,6 +38,7 @@ Chantier issu de l'audit d'octobre 2026 (issues #1 à #18, hors #17 en cours : i
 - **Plus de sous-processus** (#10) : les téléchargeurs sont des fonctions importables appelées directement par l'orchestrateur ; seuls `exiftool` et `ffmpeg` sont exécutés en externe. Les chemins relatifs sont ancrés sur le dossier d'installation (`PROJECT_ROOT`), `max_logs` est appliqué.
 - **Installation** (#14) : `Start.bat` réécrit (détection réelle de Python, `winget` puis Chocolatey, ffmpeg et exiftool facultatifs, plus de `yt-dlp`), `start.sh` pour Linux et macOS, `pyproject.toml` (installation par `pipx`, commande `bsmb`), `requirements-optional.txt`.
 - **CI et tests** (#16) : ruff (analyse et formatage), couverture minimale de 70 %, matrice Python 3.11 à 3.14 sur Ubuntu et Windows, Dependabot, fixtures d'API réelles et tests de `process_post` et des téléchargeurs (plus de 770 tests contre 154).
+- **Internationalisation** (#17) : interface en français et en anglais (`gettext`, `core/i18n.py`). Catalogues `lang/fr` et `lang/en` (`.mo` compilés au démarrage), clé de config `language` (`""` = langue du système), option **L. Langue** du menu Paramètres, option globale `--lang {fr,en,auto}`, `README.en.md`. Procédure de traduction : `lang/README.md`. Le log fichier reste en français.
 - **Documentation et code mort** (#15) : `FAQ.md` et `Instructions-token.md` fusionnés dans `README.md` et `ADVANCED.md` ; `DEVELOPMENT.md` et `CONTRIBUTING.md` réécrits, un seul schéma d'architecture (`ADVANCED.md`) ; ce changelog complété ; `core/logger.py`, `tools/debug_post.py` et `get_token_from_clipboard()` supprimés.
 
 ### ⚠️ Breaking changes
@@ -255,7 +256,6 @@ Fonctionnalités de base :
 ## 🔮 Roadmap future
 
 ### Prochaine version (3.2)
-- [ ] Internationalisation (gettext) et `README.en.md` (#17, en cours)
 - [ ] Dossier de données utilisateur (`platformdirs`) : `config.json`, `bsmb.db` et `logs/` survivraient à `pipx upgrade` au lieu d'être stockés dans le dossier d'installation
 - [ ] Statut `failed` persistant : un post dont le téléchargement a échoué serait retenté automatiquement, au lieu de rester marqué « traité » jusqu'à un Force DL
 - [ ] Contexte de fil : archiver le post parent d'une réponse (aujourd'hui seule la ligne `Réponse à:` est écrite)

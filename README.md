@@ -1,3 +1,5 @@
+🇬🇧 [English version](README.en.md)
+
 # BSMB - Bsky Save My Bookmarks
 
 Sauvegardez automatiquement les images, vidéos et textes de vos bookmarks Bluesky.
@@ -132,7 +134,7 @@ Sans menu, par exemple pour une tâche planifiée (voir [ADVANCED.md](ADVANCED.m
 |--------|-------------|
 | **1. Mon compte** | Connexion Bluesky, synchronisation, déconnexion, compteurs en ligne et en local |
 | **2. Stockage local** | Statistiques, taille du dossier, ouverture du dossier, nettoyage des liens morts, réinitialisation de la base |
-| **3. Paramètres** | Identifiants, dossier de destination, workers parallèles, mode avancé |
+| **3. Paramètres** | Identifiants, dossier de destination, workers parallèles, mode avancé, langue |
 | **4. Télécharger** | Lance le téléchargement des nouveaux bookmarks |
 
 ---
