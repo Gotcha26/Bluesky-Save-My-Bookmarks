@@ -39,6 +39,17 @@ class TestSaveText:
         )
         assert r.size == r.path.stat().st_size
 
+    def test_format_commun_facets_resolues_et_langue(self, tmp_path):
+        record = {"text": "Voir ici", "createdAt": "2026-01-02T10:00:00.000Z", "langs": ["fr"],
+                  "facets": [{"index": {"byteStart": 5, "byteEnd": 8},
+                              "features": [{"$type": "app.bsky.richtext.facet#link", "uri": "https://x.test"}]}]}
+        session = MagicMock()
+        session.get.return_value.json.return_value = {"thread": {"post": {"record": record}}}
+        res = save_text(URL, tmp_path, DEFAULT_CONFIG, session=session)
+        assert res[0].path.read_text(encoding="utf-8") == (
+            f"Post: {URL}\nDate: 2026-01-02T10:00:00.000Z\nAuteur: user.bsky.social\nLangue: fr\n\n"
+            "Voir ici (https://x.test)\n")
+
     def test_name_prefix_remplace_la_base_du_nom(self, tmp_path):
         res = save_text(URL, tmp_path, DEFAULT_CONFIG, session=_session(), name_prefix="citant_20260210_3kq_quote")
         assert [r.filename for r in res] == ["citant_20260210_3kq_quote.txt"]

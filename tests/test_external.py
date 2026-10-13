@@ -51,6 +51,16 @@ def _session(reponses=None, erreur=None):
     return session
 
 
+class TestTexteDuRecord:
+    def test_le_record_fourni_prime_sur_data(self, dirs):
+        record = {"text": "Voir ici", "createdAt": "2026-01-05T17:24:26.493Z", "langs": ["fr"],
+                  "facets": [{"index": {"byteStart": 5, "byteEnd": 8},
+                              "features": [{"$type": "app.bsky.richtext.facet#link", "uri": "https://x.test"}]}]}
+        res = download_external(URL, _data(record=record), dirs, DEFAULT_CONFIG, session=_session())
+        contenu = res[0].path.read_text(encoding="utf-8")
+        assert "Langue: fr\n" in contenu and "Voir ici (https://x.test)" in contenu
+
+
 class TestDetectionMediaDirect:
     @pytest.mark.parametrize("uri", [
         "https://media.tenor.com/abc/tenor.gif",

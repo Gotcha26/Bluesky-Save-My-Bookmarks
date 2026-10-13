@@ -78,19 +78,9 @@ def save_text(post_url, dest_dir, config, session=None, name_prefix=None):
     if not text:
         return []
 
-    filename = f"{name_prefix}.txt" if name_prefix else nom_fichier_texte(handle, post_id, created_at)
-    dest_dir = Path(dest_dir)
-    dest_dir.mkdir(parents=True, exist_ok=True)
-    filepath = dest_dir / filename
-
-    # Sauvegarde
-    with open(filepath, "w", encoding="utf-8") as f:
-        f.write(f"Post: {post_url}\n")
-        f.write(f"Date: {created_at}\n")
-        f.write(f"Auteur: {handle}\n")
-        f.write(f"\n{text}\n")
-
-    return [DownloadResult(filename, filepath, "text", filepath.stat().st_size)]
+    # Format commun à tous les posts (facets résolues, alt, citation…) : voir downloaders/archive.py
+    from downloaders.archive import write_text  # import tardif : archive importe nom_base_texte d'ici
+    return write_text(post_url, record, dest_dir, config, name_prefix=name_prefix)
 
 # -------------------- Usage manuel --------------------
 def main(argv=None):

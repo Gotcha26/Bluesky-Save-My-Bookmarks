@@ -2,7 +2,7 @@
 """
 Archivage d'un post dont l'embed est `app.bsky.embed.external` (carte de lien,
 GIF Tenor, lien tiers). Écrit, dans les dossiers médias :
-  texts/<handle>_<YYYYMMDD>_<postid>.txt         texte du post + lien, titre, description
+  texts/<handle>_<YYYYMMDD>_<postid>.txt         texte du post + lien, titre, description (archive.write_text)
   images/<handle>_<YYYYMMDD>_<postid>_thumb.jpg  vignette de la carte (si elle existe)
   images|videos/<…>_01.<ext>                     média lui-même, si l'URI cible
                                                  media.tenor.com ou un .gif / .mp4 / .webp
@@ -18,6 +18,7 @@ from urllib.parse import urlparse
 import requests
 
 from downloaders import DownloadError, DownloadResult
+from downloaders.archive import write_text
 from downloaders.text import nom_base_texte
 
 log = logging.getLogger(__name__)
@@ -81,15 +82,14 @@ def _telecharger_fichier(http, url, choisir_cible):
             part.unlink()
 
 
-def _ecrire_texte(post_url, data, external, filepath):
-    with open(filepath, "w", encoding="utf-8") as f:
-        f.write(f"Post: {post_url}\n")
-        f.write(f"Date: {data.get('created_at', '')}\n")
-        f.write(f"Auteur: {data.get('handle', '')}\n")
-        f.write(f"\n{data.get('text', '')}\n")
-        f.write(f"\nLien: {external.get('uri', '')}\n")
-        f.write(f"Titre: {external.get('title', '')}\n")
-        f.write(f"Description: {external.get('description', '')}\n")
+def _record_de(data, external):
+    """Record brut fourni par l'orchestrateur (data["record"]), sinon reconstitué depuis `data`."""
+    if data.get("record"):
+        return data["record"]
+    return {"text": data.get("text", ""), "createdAt": data.get("created_at", ""),
+            "embed": {"$type": "app.bsky.embed.external",
+                      "external": {"uri": external.get("uri", ""), "title": external.get("title", ""),
+                                   "description": external.get("description", "")}}}
 
 
 def _resultat(filepath, media_type, cid=None):
@@ -119,14 +119,8 @@ def download_external(post_url, data, dirs, config, session=None):
     base = nom_base_texte(data.get("handle", ""), data.get("post_id", ""), data.get("created_at", ""))
     resultats = []
 
-    try:
-        text_dir = Path(dirs["text_dir"])
-        text_dir.mkdir(parents=True, exist_ok=True)
-        txt = text_dir / f"{base}.txt"
-        _ecrire_texte(post_url, data, external, txt)
-        resultats.append(_resultat(txt, "text"))
-    except OSError as e:
-        raise DownloadError(f"Écriture du texte impossible : {e}") from e
+    # write_text lève DownloadError si l'écriture est impossible
+    resultats += write_text(post_url, _record_de(data, external), dirs["text_dir"], config, name_prefix=base)
 
     # Vignette : blob Bluesky servi par le CDN
     cid, did = external.get("thumb_cid"), data.get("did")
