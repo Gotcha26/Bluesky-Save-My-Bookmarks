@@ -9,9 +9,10 @@ import subprocess
 from pathlib import Path
 from datetime import datetime
 
-from core.config import load_config, save_config, ensure_dirs, get_media_dirs, resolve_path
+from core.config import load_config, save_config, ensure_dirs, resolve_path
 from core.database import Database
 from core.colors import c
+from core.orchestrator import run
 
 
 def clear_screen():
@@ -688,7 +689,6 @@ def download_media(config, force=False):
         print(c.warning("Aucune URL à traiter"))
         return False
 
-    media_dirs = get_media_dirs(config)
     db = Database(resolve_path(config, "db_file"))
 
     if force:
@@ -713,18 +713,15 @@ def download_media(config, force=False):
         db.close()
         return False
 
+    db.close()
+
     print()
     print(c.info("Lancement du téléchargement..."))
     print()
 
-    result = subprocess.run(
-        ["python", "core/orchestrator.py", media_dirs["img_dir"], media_dirs["vid_dir"], media_dirs["text_dir"]] + urls_to_process,
-        encoding="utf-8",
-        errors="replace",
-    )
-
-    db.close()
-    return result.returncode == 0
+    stats = run(urls_to_process, config)
+    _proposer_ouverture(config, stats)
+    return stats["success"] > 0
 
 
 def download_media_dev(config):
@@ -741,8 +738,6 @@ def download_media_dev(config):
         print(c.warning("Aucune URL à traiter"))
         return False
 
-    media_dirs = get_media_dirs(config)
-
     clear_screen()
     print(c.box_header("MODE DÉVELOPPEMENT"))
     print()
@@ -758,10 +753,18 @@ def download_media_dev(config):
     if confirm and confirm not in ("o", "oui", "y", "yes"):
         return False
 
-    result = subprocess.run(
-        ["python", "core/orchestrator.py", media_dirs["img_dir"], media_dirs["vid_dir"], media_dirs["text_dir"], "--no-db"] + urls
-    )
-    return result.returncode == 0
+    stats = run(urls, config, no_db=True)
+    _proposer_ouverture(config, stats)
+    return stats["success"] > 0
+
+
+def _proposer_ouverture(config, stats):
+    """Propose d'ouvrir le dossier de téléchargements si au moins un post a réussi."""
+    if stats["success"] > 0:
+        print()
+        confirm = input(c.prompt("  Ouvrir le dossier de téléchargements ? [O/n]: ")).strip().lower()
+        if not confirm or confirm in ("o", "oui", "y", "yes"):
+            open_download_folder(config)
 
 
 # ─── Utilitaires ─────────────────────────────────────────────
@@ -808,4 +811,10 @@ def main():
 
 
 if __name__ == "__main__":
+    # Forcer l'encodage UTF-8 pour la console Windows (exécution directe uniquement,
+    # sinon conflit avec la capture de sortie de pytest)
+    if sys.platform == "win32":
+        import io
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
     main()
