@@ -123,6 +123,7 @@ class TestSync:
             assert cli.main(["sync", "--yes"]) == 0
         sync_cls.return_value.sync.assert_called_once()
         assert sync_cls.return_value.sync.call_args[0][0] == "Bearer x"
+        assert sync_cls.return_value.sync.call_args.kwargs["session_info"] is SESSION
 
     def test_pas_de_session_code_1(self, cfg):
         with patch("core.cli.get_session", return_value=None):
@@ -230,7 +231,7 @@ class TestRun:
         with patch("core.cli.get_session", return_value=SESSION), \
              patch("core.cli.BookmarkSync") as sync_cls, \
              patch("core.cli.orchestrator.run", return_value=_stats()) as run:
-            def fake_sync(token, on_progress=None):
+            def fake_sync(token, on_progress=None, session_info=None):
                 from core.config import resolve_path
                 resolve_path(cfg, "urls_file").write_text("https://bsky.app/profile/a/post/9",
                                                           encoding="utf-8")

@@ -6,6 +6,7 @@ Pont entre l'API (export_bookmarks) et la base de données locale.
 from datetime import datetime
 
 from api.export_bookmarks import fetch_bookmarks, DEFAULT_PDS_URL
+from core.auth import AuthError, refresh_session
 from core.bookmarks_cache import load_cache, save_cache
 from core.config import resolve_path, save_config
 
@@ -21,13 +22,16 @@ class BookmarkSync:
         self.db = db
         self._online_urls = None
 
-    def sync(self, token, on_progress=None):
+    def sync(self, token, on_progress=None, session_info=None):
         """
         Synchronise : récupère les bookmarks en ligne et compare avec la DB.
 
         Args:
             token: "Bearer xxx"
             on_progress: callback(page, count) optionnel
+            session_info: dict de core.auth.get_session() (optionnel). Si l'export renvoie
+                `expired` et qu'il porte un `refresh_jwt`, le token est renouvelé UNE fois
+                (refreshSession) et l'export relancé ; le dict est mis à jour en place.
 
         Returns:
             dict: {
@@ -46,6 +50,16 @@ class BookmarkSync:
         """
         pds_url = self.config.get("pds_url") or DEFAULT_PDS_URL
         result = fetch_bookmarks(token, on_progress, pds_url=pds_url)
+
+        # Token d'accès expiré (~2 h) pendant une longue synchro : un seul renouvellement
+        if result["error"] and result["expired"] and (session_info or {}).get("refresh_jwt"):
+            try:
+                nouvelle = refresh_session(session_info["refresh_jwt"], pds_url)
+            except AuthError:
+                pass  # on rend le résultat « expiré » d'origine
+            else:
+                session_info.update(nouvelle)
+                result = fetch_bookmarks(nouvelle["token"], on_progress, pds_url=pds_url)
 
         if result["error"]:
             return {

@@ -109,6 +109,7 @@ def cmd_sync(config, args=None):
         result = BookmarkSync(config, db).sync(
             session["token"],
             on_progress=lambda page, count: print(f"  Page {page}... {count} bookmarks"),
+            session_info=session,
         )
     finally:
         db.close()
