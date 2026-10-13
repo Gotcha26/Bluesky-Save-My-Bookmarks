@@ -7,7 +7,6 @@ from core.auth import create_session, get_session, get_token, has_credentials, A
 
 
 class TestCreateSession:
-    @patch("core.auth.requests.post")
     def test_success(self, mock_post):
         mock_resp = MagicMock()
         mock_resp.status_code = 200
@@ -37,7 +36,6 @@ class TestCreateSession:
         }
         mock_post.assert_called_once()
 
-    @patch("core.auth.requests.post")
     def test_pds_url_fallback_without_service(self, mock_post):
         """didDoc sans service #atproto_pds → bsky.social."""
         mock_resp = MagicMock()
@@ -51,7 +49,6 @@ class TestCreateSession:
 
         assert create_session("user", "pass")["pds_url"] == "https://bsky.social"
 
-    @patch("core.auth.requests.post")
     def test_pds_url_fallback_without_didDoc(self, mock_post):
         """Réponse sans didDoc du tout → bsky.social."""
         mock_resp = MagicMock()
@@ -64,7 +61,6 @@ class TestCreateSession:
         assert session["pds_url"] == DEFAULT_PDS_URL == "https://bsky.social"
         assert session["token"] == "Bearer eyJ.token.xyz"
 
-    @patch("core.auth.requests.post")
     def test_invalid_credentials(self, mock_post):
         mock_resp = MagicMock()
         mock_resp.status_code = 401
@@ -73,7 +69,6 @@ class TestCreateSession:
         with pytest.raises(AuthError, match="Identifiants invalides"):
             create_session("bad", "wrong")
 
-    @patch("core.auth.requests.post")
     def test_rate_limit(self, mock_post):
         mock_resp = MagicMock()
         mock_resp.status_code = 429
@@ -82,7 +77,6 @@ class TestCreateSession:
         with pytest.raises(AuthError, match="Trop de tentatives"):
             create_session("user", "pass")
 
-    @patch("core.auth.requests.post")
     def test_missing_jwt(self, mock_post):
         mock_resp = MagicMock()
         mock_resp.status_code = 200
@@ -93,7 +87,6 @@ class TestCreateSession:
         with pytest.raises(AuthError, match="accessJwt"):
             create_session("user", "pass")
 
-    @patch("core.auth.requests.post")
     def test_connection_error(self, mock_post):
         import requests
         mock_post.side_effect = requests.exceptions.ConnectionError()
@@ -101,7 +94,6 @@ class TestCreateSession:
         with pytest.raises(AuthError, match="Impossible de se connecter"):
             create_session("user", "pass")
 
-    @patch("core.auth.requests.post")
     def test_timeout(self, mock_post):
         import requests
         mock_post.side_effect = requests.exceptions.Timeout()

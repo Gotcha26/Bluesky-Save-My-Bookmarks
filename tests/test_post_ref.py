@@ -85,7 +85,6 @@ class TestFromAtUri:
 
 
 class TestResolveHandle:
-    @patch("core.post_ref.requests.get")
     def test_resolution(self, mock_get):
         resp = MagicMock()
         resp.json.return_value = {"did": "did:plc:abc"}
@@ -96,7 +95,6 @@ class TestResolveHandle:
         assert args[0] == "https://public.api.bsky.app/xrpc/com.atproto.identity.resolveHandle"
         assert kwargs["params"] == {"handle": "user.bsky.social"}
 
-    @patch("core.post_ref.requests.get")
     def test_erreur_http_propagee(self, mock_get):
         resp = MagicMock()
         resp.raise_for_status.side_effect = requests.exceptions.HTTPError("400")

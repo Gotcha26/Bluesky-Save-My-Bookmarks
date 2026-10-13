@@ -2,7 +2,7 @@
 """
 Analyse préalable d'un post Bluesky pour déterminer son type et sa disponibilité
 """
-import requests
+from core import http as bsmb_http
 from urllib.parse import urlparse
 from enum import Enum
 
@@ -40,9 +40,14 @@ def _identity(did, rkey):
 
 
 class PostAnalyzer:
-    def __init__(self):
+    def __init__(self, session=None):
         self.api_base = "https://bsky.social/xrpc/com.atproto.repo.getRecord"
-    
+        self.session = session
+
+    def _http(self):
+        """Session fournie, sinon session partagée de core.http."""
+        return self.session or bsmb_http.get_session()
+
     def analyze(self, post_url, post_view=None):
         """
         Analyse un post et retourne son type + données associées
@@ -73,7 +78,7 @@ class PostAnalyzer:
                 "collection": "app.bsky.feed.post",
                 "rkey": post_id
             }
-            resp = requests.get(self.api_base, params=params, timeout=15)
+            resp = self._http().get(self.api_base, params=params, timeout=15)
 
             if resp.status_code == 400:
                 return PostType.ERROR_400, {"handle": handle, "post_id": post_id, **identity}, {"status": 400}

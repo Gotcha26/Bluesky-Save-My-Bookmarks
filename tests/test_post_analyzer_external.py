@@ -20,8 +20,9 @@ def _analyser(reponse):
     resp.status_code = 200
     resp.raise_for_status.return_value = None
     resp.json.return_value = reponse
-    with patch("api.post_analyzer.requests.get", return_value=resp):
-        return PostAnalyzer().analyze(URL)
+    session = MagicMock()
+    session.get.return_value = resp
+    return PostAnalyzer(session).analyze(URL)
 
 
 class TestExternalSimple:

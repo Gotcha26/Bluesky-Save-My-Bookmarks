@@ -168,11 +168,11 @@ class TestDownloadImages:
         assert all(len(r.filename) <= 30 for r in res)
         assert res[0].filename.endswith("_001.jpg")
 
-    def test_sans_session_utilise_requests(self, tmp_path, exiftool):
+    def test_sans_session_utilise_la_session_partagee(self, tmp_path, exiftool, fake_session):
         session = _session(_thread(EMBED_2_IMAGES))
-        with patch("downloaders.images.requests.get", side_effect=session.get.side_effect), \
-             patch("downloaders.images.requests.head", return_value=session.head.return_value):
-            res = download_images(URL, tmp_path, DEFAULT_CONFIG)
+        fake_session.get.side_effect = session.get.side_effect
+        fake_session.head.return_value = session.head.return_value
+        res = download_images(URL, tmp_path, DEFAULT_CONFIG)
         assert len(res) == 2
 
 

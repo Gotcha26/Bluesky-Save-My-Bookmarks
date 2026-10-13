@@ -76,10 +76,10 @@ class TestSaveText:
         with pytest.raises(DownloadError):
             save_text(URL, tmp_path, DEFAULT_CONFIG, session=_session(erreur=requests.ConnectionError("x")))
 
-    def test_sans_session_utilise_requests(self, tmp_path):
-        session = _session()
-        with patch("downloaders.text.requests.get", return_value=session.get.return_value):
-            assert len(save_text(URL, tmp_path, DEFAULT_CONFIG)) == 1
+    def test_sans_session_utilise_la_session_partagee(self, tmp_path, fake_session):
+        fake_session.get.return_value = _session().get.return_value
+        assert len(save_text(URL, tmp_path, DEFAULT_CONFIG)) == 1
+        fake_session.get.assert_called_once()
 
 
 class TestModeManuel:

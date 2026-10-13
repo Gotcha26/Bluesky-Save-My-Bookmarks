@@ -15,7 +15,7 @@ import os
 from pathlib import Path
 from urllib.parse import urlparse
 
-import requests
+from core import http as bsmb_http
 
 from downloaders import DownloadError, DownloadResult
 from downloaders.archive import write_text
@@ -111,7 +111,7 @@ def download_external(post_url, data, dirs, config, session=None):
         DownloadError : écriture du fichier texte impossible. Un échec réseau sur la
         vignette ou le média direct est journalisé mais n'invalide pas le texte.
     """
-    http = session or requests
+    http = session or bsmb_http.get_session()
     external = data.get("external") or {}
     if not external:
         return []

@@ -30,6 +30,7 @@ from core.config import (  # noqa: E402
 from core.database import Database  # noqa: E402
 from core.colors import c  # noqa: E402
 from core import ui  # noqa: E402
+from core import http as bsmb_http  # noqa: E402
 from api.post_analyzer import PostAnalyzer, PostType  # noqa: E402
 from api.quote_resolver import QuoteResolver  # noqa: E402
 from downloaders import DownloadError, lignes_console  # noqa: E402
@@ -128,6 +129,12 @@ class _Contexte:
     buf_print: object
     log_func: object
     db: object = None
+    session: object = None   # session HTTP partagée (None : les downloaders prennent core.http.get_session())
+
+
+def _session(ctx):
+    """Option `session=` à transmettre aux downloaders (rien si aucune session n'est fournie)."""
+    return {"session": ctx.session} if ctx.session is not None else {}
 
 
 # Libellés des états d'un record cité qui n'est plus lisible
@@ -168,19 +175,19 @@ def _contenu_propre(post_type, data, url, ctx, name_prefix=None, erreurs=None, d
     if post_type == PostType.IMAGES:
         ctx.buf_print(c.info(f"{data.get('image_count', 1)} image(s) détectée(s)"))
         results = _telecharger(download_images, url, dirs["img_dir"], *args, erreurs=erreurs,
-                               record=record, existing_cid=_chemin_par_cid(ctx), **options)
+                               record=record, existing_cid=_chemin_par_cid(ctx), **_session(ctx), **options)
     elif post_type == PostType.VIDEO:
         ctx.buf_print(c.info("Vidéo détectée"))
         full = (debug_info or {}).get("full_data") or {}
         results = _telecharger(download_video, url, dirs["vid_dir"], *args, erreurs=erreurs,
                                record=full.get("value") or full.get("record"), did=data.get("did"),
-                               view_embed=data.get("view_embed"), **options)
+                               view_embed=data.get("view_embed"), **_session(ctx), **options)
     elif post_type == PostType.EXTERNAL and not cite:
         # Embed externe : carte de lien, GIF, lien tiers
         ctx.buf_print(c.info("Lien externe détecté"))
         donnees = {**data, "record": record} if record else data  # le record donne facets et langue au .txt
         results = _telecharger(
-            lambda u, _dest, cfg: download_external(u, donnees, dirs, cfg),
+            lambda u, _dest, cfg: download_external(u, donnees, dirs, cfg, **_session(ctx)),
             url, dirs["text_dir"], *args, erreurs=erreurs)
     elif post_type in (PostType.TEXT_ONLY, PostType.QUOTE, PostType.EXTERNAL):
         if cite and post_type == PostType.EXTERNAL:
@@ -188,7 +195,7 @@ def _contenu_propre(post_type, data, url, ctx, name_prefix=None, erreurs=None, d
             ctx.buf_print(f"  {c.DIM}Citation : carte de lien non archivée (texte seul){c.RESET}")
             ctx.log_func(f"   NOTE: citation : carte de lien non archivée (texte seul) ({url})", to_console=False)
         ctx.buf_print(c.info("Texte seul détecté" if post_type == PostType.TEXT_ONLY else "Texte du post détecté"))
-        results = _telecharger(save_text, url, dirs["text_dir"], *args, erreurs=erreurs, **options)
+        results = _telecharger(save_text, url, dirs["text_dir"], *args, erreurs=erreurs, **_session(ctx), **options)
 
     # Archive fidèle : texte lisible (hors types dont le downloader l'a déjà écrit) et fiche JSON
     if results and not (erreurs is not None and len(erreurs) > nb_erreurs):
@@ -315,7 +322,7 @@ def _archiver_citation(url, quote_uri, depth, base, ctx, post_view=None):
 
 
 def process_post(url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_dir, log_func, config=None,
-                 depth=0, quotes_unresolved=None, post_view=None, compteurs=None):
+                 depth=0, quotes_unresolved=None, post_view=None, compteurs=None, session=None):
     """
     Traite un post unique et retourne les stats.
     Returns: (has_success, img_count, vid_count, text_count, status, output_lines)
@@ -329,6 +336,7 @@ def process_post(url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_d
         que le post qu'il cite n'a pas pu l'être (erreur réseau ou serveur).
     post_view : vue hydratée du post (getBookmarks) ; l'analyse se fait alors sans
         getRecord, et le résolveur y lit l'état du post cité.
+    session : session HTTP transmise aux downloaders (défaut : core.http.get_session()).
 
     Une citation est archivée comme un post normal (texte, média d'un recordWithMedia),
     puis le post cité l'est à son tour ; tous les fichiers sont enregistrés sous `url`.
@@ -391,6 +399,7 @@ def process_post(url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_d
     ctx = _Contexte(
         dirs={"img_dir": IMG_DIR, "vid_dir": VID_DIR, "text_dir": TEXT_DIR},
         config=config, analyzer=analyzer, resolver=resolver, buf_print=buf_print, log_func=log_func, db=db,
+        session=session,
     )
     est_citation = post_type == PostType.QUOTE or bool(data.get("is_quote"))
 
@@ -624,8 +633,9 @@ def _run(urls, config, media_dirs, no_db=False, on_progress=None, quiet=False, p
     TEXT_DIR = media_dirs["text_dir"]
 
     max_workers = max(1, int(config.get("max_workers", 4)))
-    analyzer = PostAnalyzer()
-    resolver = QuoteResolver()
+    session = bsmb_http.get_session()  # une seule session pour tous les workers
+    analyzer = PostAnalyzer(session)
+    resolver = QuoteResolver(session)
 
     # Compteurs (mis à jour dans le thread principal, au fil de as_completed)
     total_jobs = len(urls)
@@ -680,6 +690,7 @@ def _run(urls, config, media_dirs, no_db=False, on_progress=None, quiet=False, p
         has_success, imgs, vids, texts, status, output_lines = process_post(
             url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_dir, log, config,
             quotes_unresolved=quotes_unresolved_urls, post_view=post_views.get(url), compteurs=compteurs,
+            session=session,
         )
         return idx, url, has_success, imgs, vids, texts, status, output_lines, compteurs["sidecars"]
 

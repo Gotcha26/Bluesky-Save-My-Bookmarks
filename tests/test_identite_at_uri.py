@@ -105,8 +105,7 @@ class TestGetNewRefs:
         assert tmp_db.get_new_refs([]) == []
 
 
-def _session_avec(bookmarks):
-    session = MagicMock()
+def _session_avec(session, bookmarks):
     response = MagicMock()
     response.status_code = 200
     response.json.return_value = {"bookmarks": bookmarks, "cursor": None}
@@ -115,9 +114,8 @@ def _session_avec(bookmarks):
 
 
 class TestExportPosts:
-    @patch("api.export_bookmarks.requests.Session")
-    def test_posts_et_urls(self, mock_cls):
-        mock_cls.return_value = _session_avec([{
+    def test_posts_et_urls(self, fake_session):
+        _session_avec(fake_session, [{
             "subject": {"uri": URI},
             "item": {"author": {"did": DID, "handle": "user.bsky.social"}},
         }])
@@ -125,9 +123,8 @@ class TestExportPosts:
         assert result["posts"] == [_post()]
         assert result["urls"] == [URL]
 
-    @patch("api.export_bookmarks.requests.Session")
-    def test_handle_invalid_remplace_par_le_did(self, mock_cls):
-        mock_cls.return_value = _session_avec([{
+    def test_handle_invalid_remplace_par_le_did(self, fake_session):
+        _session_avec(fake_session, [{
             "subject": {"uri": URI},
             "item": {"author": {"did": DID, "handle": "handle.invalid"}},
         }])
@@ -138,9 +135,8 @@ class TestExportPosts:
         assert result["posts"][0]["url"] == attendu
         assert result["posts"][0]["at_uri"] == URI
 
-    @patch("api.export_bookmarks.requests.Session")
-    def test_aucune_resolution_reseau(self, mock_cls):
-        mock_cls.return_value = _session_avec([{
+    def test_aucune_resolution_reseau(self, fake_session):
+        _session_avec(fake_session, [{
             "subject": {"uri": URI},
             "item": {"author": {"handle": "handle.invalid"}},
         }])
@@ -148,9 +144,8 @@ class TestExportPosts:
             fetch_bookmarks("Bearer t")
         resolve.assert_not_called()
 
-    @patch("api.export_bookmarks.requests.Session")
-    def test_uri_invalide_ignoree(self, mock_cls):
-        mock_cls.return_value = _session_avec([
+    def test_uri_invalide_ignoree(self, fake_session):
+        _session_avec(fake_session, [
             {"subject": {"uri": "at://did:plc:abc"}, "item": {}},
             {"subject": {"uri": URI}, "item": {"author": {"handle": "user.bsky.social"}}},
         ])
@@ -169,7 +164,6 @@ def _reponse_get_record(uri=URI):
 
 
 class TestAnalyzerRepo:
-    @patch("api.post_analyzer.requests.get")
     def test_repo_est_le_did_quand_l_url_en_contient_un(self, mock_get):
         mock_get.return_value = _reponse_get_record()
         _, data, _ = PostAnalyzer().analyze(f"https://bsky.app/profile/{DID}/post/3k1")
@@ -178,7 +172,6 @@ class TestAnalyzerRepo:
         assert data["did"] == DID
         assert data["at_uri"] == URI
 
-    @patch("api.post_analyzer.requests.get")
     def test_repo_reste_le_handle_sinon(self, mock_get):
         mock_get.return_value = _reponse_get_record()
         _, data, _ = PostAnalyzer().analyze(URL)
@@ -188,7 +181,6 @@ class TestAnalyzerRepo:
         assert data["did"] == DID
         assert data["at_uri"] == URI
 
-    @patch("api.post_analyzer.requests.get")
     def test_erreur_400_avec_did_dans_l_url_garde_l_identite(self, mock_get):
         mock_get.return_value = MagicMock(status_code=400)
         post_type, data, _ = PostAnalyzer().analyze(f"https://bsky.app/profile/{DID}/post/3k1")
@@ -197,7 +189,6 @@ class TestAnalyzerRepo:
 
 
 class TestResolverRepo:
-    @patch("api.quote_resolver.requests.get")
     def test_repo_est_le_did_quand_l_url_en_contient_un(self, mock_get):
         resp = MagicMock(status_code=200)
         resp.json.return_value = {"value": {"embed": {"$type": "app.bsky.embed.text"}}}
@@ -205,7 +196,6 @@ class TestResolverRepo:
         QuoteResolver().resolve(f"https://bsky.app/profile/{DID}/post/3k1")
         assert mock_get.call_args.kwargs["params"]["repo"] == DID
 
-    @patch("api.quote_resolver.requests.get")
     def test_repo_reste_le_handle_sinon(self, mock_get):
         resp = MagicMock(status_code=200)
         resp.json.return_value = {"value": {"embed": {"$type": "app.bsky.embed.text"}}}
@@ -213,7 +203,6 @@ class TestResolverRepo:
         QuoteResolver().resolve(URL)
         assert mock_get.call_args.kwargs["params"]["repo"] == "user.bsky.social"
 
-    @patch("api.quote_resolver.requests.get")
     def test_handle_invalid_du_post_cite_remplace_par_le_did(self, mock_get):
         record = MagicMock(status_code=200)
         record.raise_for_status.return_value = None

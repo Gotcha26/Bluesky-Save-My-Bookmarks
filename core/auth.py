@@ -5,6 +5,7 @@ Obtient un token Bearer automatiquement à partir du handle + App Password.
 """
 import requests
 
+from core import http as bsmb_http
 from core.config import resolve_path
 from core.secret_store import load_app_password
 
@@ -37,13 +38,14 @@ def _extract_pds_url(did_doc):
     return DEFAULT_PDS_URL
 
 
-def create_session(handle, app_password):
+def create_session(handle, app_password, session=None):
     """
     Authentification via com.atproto.server.createSession.
 
     Args:
         handle: Handle Bluesky (ex: "user.bsky.social")
         app_password: App Password (format xxxx-xxxx-xxxx-xxxx)
+        session: session HTTP (défaut : session partagée de core.http)
 
     Returns:
         dict: {
@@ -57,7 +59,7 @@ def create_session(handle, app_password):
         AuthError: En cas d'echec d'authentification
     """
     try:
-        resp = requests.post(
+        resp = (session or bsmb_http.get_session()).post(
             ENDPOINT,
             json={"identifier": handle, "password": app_password},
             timeout=15,
