@@ -14,11 +14,19 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from unittest.mock import MagicMock  # noqa: E402
 
 from core import http as _http  # noqa: E402
+from core import i18n as _i18n  # noqa: E402
 from core import ui as _ui  # noqa: E402
 
 # Vraies fonctions, conservées avant que les fixtures autouse ne les remplacent
 IS_INTERACTIVE_REEL = _ui.is_interactive
 GET_SESSION_REEL = _http.get_session
+
+
+@pytest.fixture(autouse=True)
+def _langue_francaise():
+    """Les tests attendent les messages français, quelle que soit la locale de la machine
+    (la CI tourne en `C` / `en_US`) : la langue est forcée à `fr` avant chaque test."""
+    _i18n.init("fr")
 
 
 @pytest.fixture(autouse=True)

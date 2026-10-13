@@ -25,6 +25,7 @@ MODULES = [
     "core.bookmarks_cache",
     "core.cli",
     "core.http",
+    "core.i18n",
     "core.orchestrator",
     "core.secret_store",
     "core.ui",
@@ -39,6 +40,8 @@ MODULES = [
     "downloaders.images",
     "downloaders.videos",
     "downloaders.text",
+    "msgfmt",  # tools/*.py : scripts autonomes, hors paquet
+    "extract_strings",
 ]
 
 SCRIPT = (
@@ -84,8 +87,8 @@ def test_import_sans_effet_de_bord(module, tmp_path):
 
 
 def _modules_du_depot():
-    """Noms importables de tous les .py de bsmb.py, core/, api/ et downloaders/."""
-    noms = {"bsmb"}
+    """Noms importables de tous les .py de bsmb.py, core/, api/ et downloaders/ (+ tools/*.py)."""
+    noms = {"bsmb"} | {fichier.stem for fichier in (PROJECT_ROOT / "tools").glob("*.py")}
     for dossier in ("core", "api", "downloaders"):
         for fichier in sorted((PROJECT_ROOT / dossier).glob("*.py")):
             noms.add(dossier if fichier.stem == "__init__" else f"{dossier}.{fichier.stem}")
