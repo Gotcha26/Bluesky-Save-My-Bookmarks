@@ -1,0 +1,19 @@
+{
+  "uri": "at://did:plc:test1000000000000000000000/app.bsky.feed.post/3kquote0001",
+  "cid": "bafyreitest000000000000000000000000000000000000000000000000",
+  "value": {
+    "$type": "app.bsky.feed.post",
+    "text": "Regardez ça, incroyable !",
+    "createdAt": "2026-02-10T09:30:00.000Z",
+    "langs": [
+      "fr"
+    ],
+    "embed": {
+      "$type": "app.bsky.embed.record",
+      "record": {
+        "uri": "at://did:plc:test2000000000000000000000/app.bsky.feed.post/3kcited0001",
+        "cid": "bafyreitest000000000000000000000000000000000000000000000000"
+      }
+    }
+  }
+}

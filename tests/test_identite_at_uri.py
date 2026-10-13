@@ -4,7 +4,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from api.post_analyzer import PostAnalyzer, PostType
-from api.repost_resolver import RepostResolver
+from api.quote_resolver import QuoteResolver
 from core.bookmarks import BookmarkSync
 from core.database import Database
 from core.orchestrator import process_post
@@ -196,23 +196,23 @@ class TestAnalyzerRepo:
 
 
 class TestResolverRepo:
-    @patch("api.repost_resolver.requests.get")
+    @patch("api.quote_resolver.requests.get")
     def test_repo_est_le_did_quand_l_url_en_contient_un(self, mock_get):
         resp = MagicMock(status_code=200)
         resp.json.return_value = {"value": {"embed": {"$type": "app.bsky.embed.text"}}}
         mock_get.return_value = resp
-        RepostResolver().resolve(f"https://bsky.app/profile/{DID}/post/3k1")
+        QuoteResolver().resolve(f"https://bsky.app/profile/{DID}/post/3k1")
         assert mock_get.call_args.kwargs["params"]["repo"] == DID
 
-    @patch("api.repost_resolver.requests.get")
+    @patch("api.quote_resolver.requests.get")
     def test_repo_reste_le_handle_sinon(self, mock_get):
         resp = MagicMock(status_code=200)
         resp.json.return_value = {"value": {"embed": {"$type": "app.bsky.embed.text"}}}
         mock_get.return_value = resp
-        RepostResolver().resolve(URL)
+        QuoteResolver().resolve(URL)
         assert mock_get.call_args.kwargs["params"]["repo"] == "user.bsky.social"
 
-    @patch("api.repost_resolver.requests.get")
+    @patch("api.quote_resolver.requests.get")
     def test_handle_invalid_du_post_cite_remplace_par_le_did(self, mock_get):
         record = MagicMock(status_code=200)
         record.raise_for_status.return_value = None
@@ -220,14 +220,16 @@ class TestResolverRepo:
             "$type": "app.bsky.embed.record",
             "record": {"uri": "at://did:plc:cite/app.bsky.feed.post/orig"},
         }}}
+        existe = MagicMock(status_code=200)
+        existe.raise_for_status.return_value = None
         profil = MagicMock(status_code=200)
         profil.json.return_value = {"handle": "handle.invalid"}
-        mock_get.side_effect = [record, profil]
+        mock_get.side_effect = [record, existe, profil]
 
-        url, handle, post_id = RepostResolver().resolve(URL)
-        assert url == "https://bsky.app/profile/did:plc:cite/post/orig"
-        assert handle == "did:plc:cite"
-        assert post_id == "orig"
+        cible = QuoteResolver().resolve(URL)
+        assert cible.url == "https://bsky.app/profile/did:plc:cite/post/orig"
+        assert cible.did == "did:plc:cite"
+        assert cible.rkey == "orig"
 
 
 class TestBookmarkSyncPosts:

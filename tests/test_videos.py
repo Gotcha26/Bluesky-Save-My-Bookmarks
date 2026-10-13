@@ -77,6 +77,13 @@ class TestFonctionsPures:
         assert is_repost is True
         assert info["cid"] == CID
 
+    def test_extract_video_info_citation_avec_video(self):
+        embed = {"$type": "app.bsky.embed.recordWithMedia",
+                 "record": {"$type": "app.bsky.embed.record", "record": {"uri": "at://did:plc:x/app.bsky.feed.post/y"}},
+                 "media": EMBED_VIDEO}
+        info, _ = extract_video_info(_record(embed))
+        assert info["cid"] == CID
+
     def test_extract_video_info_sans_video(self):
         assert extract_video_info(_record({"$type": "app.bsky.embed.images"})) == (None, False)
         assert extract_video_info(None) == (None, False)
@@ -96,6 +103,13 @@ class TestDownloadVideo:
         assert r.path == tmp_path / "vid" / r.filename
         assert r.path.read_bytes() == b"video!+meta"
         assert r.size == len(b"video!+meta")
+
+    def test_name_prefix_remplace_la_base_du_nom(self, tmp_path, ffmpeg):
+        session = _session(_record(EMBED_VIDEO))
+        res = download_video(URL, tmp_path, DEFAULT_CONFIG, session=session,
+                             name_prefix="citant_20260210_3kq_quote")
+        assert [r.filename for r in res] == ["citant_20260210_3kq_quote_01.mp4"]
+        assert res[0].path == tmp_path / "citant_20260210_3kq_quote_01.mp4"
 
     def test_appels_api_inchanges(self, tmp_path, ffmpeg):
         session = _session(_record(EMBED_VIDEO))

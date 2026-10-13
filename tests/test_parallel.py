@@ -161,10 +161,6 @@ class TestFormatJobSummary:
         result = _format_job_summary(5, 10, "https://bsky.app/profile/user/post/err1", "error_500", 0, 0, 0)
         assert "serveur" in result
 
-    def test_repost(self):
-        result = _format_job_summary(6, 10, "https://bsky.app/profile/user/post/rp1", "repost", 0, 0, 0)
-        assert "repost" in result
-
     def test_unknown(self):
         result = _format_job_summary(7, 10, "https://bsky.app/profile/user/post/unk1", "unknown", 0, 0, 0)
         assert "inconnu" in result

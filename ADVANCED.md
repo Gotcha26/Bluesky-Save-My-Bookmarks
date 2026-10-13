@@ -128,8 +128,9 @@ bsmb/
 │
 ├── api/                         # Interactions API Bluesky
 │   ├── export_bookmarks.py     # fetch_bookmarks() + mode standalone
-│   ├── post_analyzer.py        # Détection type post (image/vidéo/repost)
-│   └── repost_resolver.py      # Résolution DID → handle
+│   ├── post_analyzer.py        # Détection type post (image/vidéo/texte/citation)
+│   ├── quote_resolver.py       # QuoteResolver : record cité par une citation (DID → handle)
+│   └── repost_resolver.py      # Alias déprécié de quote_resolver
 │
 ├── downloaders/                 # Téléchargeurs (fonctions importables)
 │   ├── __init__.py             # DownloadResult, DownloadError
@@ -150,7 +151,7 @@ bsmb.py (menu)
   → core/bookmarks.py (sync: API → urls.txt → compare DB)
   → core/orchestrator.run() (appel direct, ThreadPoolExecutor)
     → api/post_analyzer.py (détecte type)
-    → api/repost_resolver.py (résout reposts)
+    → api/quote_resolver.py (résout le post cité d'une citation, profondeur max 2)
     → downloaders/*.py (fonctions appelées dans les threads : télécharge,
                         renvoie des DownloadResult)
     → core/database.py (tracking SQLite)
@@ -206,7 +207,7 @@ L'orchestrateur utilise `concurrent.futures.ThreadPoolExecutor` avec un nombre c
 | `logs_dir` | Dossier des logs | `logs` |
 | `pds_url` | PDS du compte, détecté à la connexion (`""` = inconnu, `https://bsky.social` utilisé) | `""` |
 | `max_workers` | Workers parallèles | `4` |
-| `retry_after_days` | Délai avant de retenter un post en erreur (`error_500`, `unknown`, `repost`) | `7` |
+| `retry_after_days` | Délai avant de retenter un post en erreur (`error_500`, `unknown`, `repost` hérité) | `7` |
 | `last_sync` | Date de dernière synchronisation | `""` |
 | `advanced_mode` | Mode avancé activé | `false` |
 | `max_filename_len` | Longueur max des noms de fichiers | `64` |
@@ -229,7 +230,7 @@ Les chemins relatifs (`token_file`, `urls_file`, `db_file`, `logs_dir`) sont ré
 | `handle` | TEXT | Handle de l'auteur |
 | `added_at` | TEXT | Date d'ajout (ISO) |
 | `last_check` | TEXT | Dernière vérification (ISO) |
-| `status` | TEXT | `ok`, `deleted`, `error_500`, `unknown`, `repost` |
+| `status` | TEXT | `ok`, `deleted`, `error_500`, `unknown` (`repost` : ancien statut des citations non résolues, plus écrit, encore retenté) |
 | `at_uri` | TEXT (UNIQUE) | Identité canonique `at://<did>/app.bsky.feed.post/<rkey>` (NULL pour les anciennes lignes, complété au prochain traitement) |
 | `did` | TEXT | DID de l'auteur |
 | `rkey` | TEXT | Clé du post |
@@ -288,7 +289,7 @@ python -m pytest tests/ -v
 python -m pytest tests/test_database.py -v
 ```
 
-154 tests couvrent : config, database, auth, colors, post_analyzer, repost_resolver, images, parallélisation, bookmarks, export_bookmarks.
+154 tests couvrent : config, database, auth, colors, post_analyzer, quote_resolver, images, parallélisation, bookmarks, export_bookmarks.
 
 ---
 

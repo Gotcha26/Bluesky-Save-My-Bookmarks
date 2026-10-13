@@ -39,6 +39,11 @@ class TestSaveText:
         )
         assert r.size == r.path.stat().st_size
 
+    def test_name_prefix_remplace_la_base_du_nom(self, tmp_path):
+        res = save_text(URL, tmp_path, DEFAULT_CONFIG, session=_session(), name_prefix="citant_20260210_3kq_quote")
+        assert [r.filename for r in res] == ["citant_20260210_3kq_quote.txt"]
+        assert res[0].path.read_text(encoding="utf-8").startswith(f"Post: {URL}\n")
+
     def test_appel_getpostthread(self, tmp_path):
         session = _session()
         save_text(URL, tmp_path, DEFAULT_CONFIG, session=session)

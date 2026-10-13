@@ -206,9 +206,18 @@ def download_image(url, filepath, handle, post_id, post_url, post_text, created_
     except Exception:
         pass
 
-def download_images(post_url, dest_dir, config, session=None):
+def build_prefixed_filename(prefix: str, index: int, ext: str, max_len, index_digits) -> str:
+    """<prefix>_<n><ext>, le préfixe étant tronqué pour tenir dans max_len."""
+    suffix = f"_{index:0{index_digits}d}{ext}"
+    return prefix[:max(1, max_len - len(suffix))] + suffix
+
+
+def download_images(post_url, dest_dir, config, session=None, name_prefix=None):
     """
     Télécharge les images d'un post dans dest_dir.
+
+    name_prefix : si fourni, remplace la base <handle>_<date>_<postid> du nom
+    (images d'un post cité : <prefix>_<n>.<ext>).
 
     Returns:
         list[DownloadResult] : une entrée par image écrite ; liste vide si le
@@ -231,8 +240,11 @@ def download_images(post_url, dest_dir, config, session=None):
     erreurs = []
     for idx, img_url in enumerate(image_urls, start=1):
         ext = get_extension_for_url(img_url, http) or ".jpg"
-        filename = build_filename(handle, date_str, post_id, idx, ext,
-                                  max_len=max_len, min_postid=min_postid, index_digits=index_digits)
+        if name_prefix:
+            filename = build_prefixed_filename(name_prefix, idx, ext, max_len, index_digits)
+        else:
+            filename = build_filename(handle, date_str, post_id, idx, ext,
+                                      max_len=max_len, min_postid=min_postid, index_digits=index_digits)
         filepath = dest_dir / filename
         try:
             download_image(img_url, filepath, handle, post_id, post_url, post_text, created_at, http)

@@ -1,76 +1,16 @@
 #!/usr/bin/env python3
 """
-Résout un repost pour extraire l'URL du post original
+Module déprécié : utiliser api.quote_resolver.QuoteResolver.
+
+Un « repost » n'est jamais bookmarké ; ce que l'ancien code appelait ainsi est une
+citation (quote post). Seul le nom RepostResolver est conservé, comme alias.
 """
-import requests
-from urllib.parse import urlparse
+import warnings
 
-from core.post_ref import PostRef, INVALID_HANDLE
+from api.quote_resolver import QuoteResolver as RepostResolver  # noqa: F401
 
-class RepostResolver:
-    def __init__(self):
-        self.api_base = "https://bsky.social/xrpc/com.atproto.repo.getRecord"
-    
-    def resolve(self, post_url):
-        """
-        Résout un repost et retourne l'URL du post original
-        Returns: (original_url, original_handle, original_post_id) ou (None, None, None)
-        """
-        parts = urlparse(post_url).path.strip("/").split("/")
-        if len(parts) < 4:
-            return None, None, None
-        
-        # Segment handle ou DID : getRecord accepte les deux (repo = DID si l'URL en contient un).
-        handle = parts[1]
-        post_id = parts[-1]
-
-        try:
-            params = {
-                "repo": handle,
-                "collection": "app.bsky.feed.post",
-                "rkey": post_id
-            }
-            resp = requests.get(self.api_base, params=params, timeout=15)
-            resp.raise_for_status()
-            data = resp.json()
-            
-            embed = data.get("value", {}).get("embed", {})
-            if embed.get("$type") != "app.bsky.embed.record":
-                return None, None, None
-            
-            record = embed.get("record", {})
-            cited_uri = record.get("uri", "")
-            
-            if not cited_uri:
-                return None, None, None
-            
-            uri_parts = cited_uri.split("/")
-            if len(uri_parts) < 5:
-                return None, None, None
-            
-            cited_did = uri_parts[2]
-            cited_post_id = uri_parts[-1]
-            
-            cited_handle = self._resolve_did_to_handle(cited_did)
-            ref = PostRef(cited_did, cited_post_id, cited_handle)
-
-            # Handle absent ou `handle.invalid` : on garde le DID
-            if not cited_handle or cited_handle == INVALID_HANDLE:
-                cited_handle = cited_did
-
-            return ref.web_url, cited_handle, cited_post_id
-            
-        except Exception as e:
-            return None, None, None
-    
-    def _resolve_did_to_handle(self, did):
-        """Résout un DID en handle via l'API"""
-        try:
-            profile_api = f"https://public.api.bsky.app/xrpc/app.bsky.actor.getProfile"
-            resp = requests.get(profile_api, params={"actor": did}, timeout=10)
-            if resp.status_code == 200:
-                data = resp.json()
-                return data.get("handle")
-        except:
-            pass
-        return None
+warnings.warn(
+    "api.repost_resolver est déprécié : importer QuoteResolver depuis api.quote_resolver",
+    DeprecationWarning,
+    stacklevel=2,
+)

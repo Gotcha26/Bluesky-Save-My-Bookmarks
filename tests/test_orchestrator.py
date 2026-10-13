@@ -152,7 +152,7 @@ def env_run(tmp_config):
         "save_text": MagicMock(return_value=[_res("t.txt", "text")]),
     }
     with patch.multiple("core.orchestrator", PostAnalyzer=MagicMock(return_value=analyzer),
-                        RepostResolver=MagicMock(), **mocks):
+                        QuoteResolver=MagicMock(), **mocks):
         yield tmp_config, analyzer, mocks
 
 
@@ -167,7 +167,8 @@ class TestRun:
         stats = run([URL, URL2], config, quiet=True)
         assert stats == {
             "total": 2, "success": 1, "images": 1, "videos": 0, "texts": 0,
-            "error_500": [], "error_400": [URL2], "reposts": [], "unknown": [], "failed": [],
+            "error_500": [], "error_400": [URL2], "quotes_unresolved": [], "reposts": [],
+            "unknown": [], "failed": [],
         }
         assert capsys.readouterr().out == ""
 

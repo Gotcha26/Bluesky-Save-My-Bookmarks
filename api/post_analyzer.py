@@ -11,7 +11,8 @@ from core.post_ref import PostRef
 class PostType(Enum):
     ERROR_500 = "error_500"
     ERROR_400 = "error_400"
-    REPOST = "repost"
+    QUOTE = "quote"
+    REPOST = "quote"  # alias déprécié : un repost n'est jamais bookmarké, c'est une citation
     IMAGES = "images"
     VIDEO = "video"
     TEXT_ONLY = "text_only"
@@ -135,14 +136,17 @@ class PostAnalyzer:
                 result_data["external"] = external
                 return PostType.EXTERNAL, result_data, debug_info
 
-        # 3. Repost
+        # 3. Citation (quote post) sans média : le post citant a son propre texte
         if embed_type == "app.bsky.embed.record":
-            result_data["is_repost"] = True
-            return PostType.REPOST, result_data, debug_info
-        
-        # 4. Quote post avec média
+            result_data["is_quote"] = True
+            result_data["quote_uri"] = embed.get("record", {}).get("uri", "")
+            return PostType.QUOTE, result_data, debug_info
+
+        # 4. Citation avec média : le média du citant prime, `is_quote` signale le record cité
         if embed_type == "app.bsky.embed.recordWithMedia":
             media = embed.get("media", {})
+            result_data["is_quote"] = True
+            result_data["quote_uri"] = embed.get("record", {}).get("record", {}).get("uri", "")
             media_type = media.get("$type", "")
             
             if media_type == "app.bsky.embed.video":
@@ -173,9 +177,10 @@ class PostAnalyzer:
                 external = _external_info(media.get("external", {}))
                 if external:
                     result_data["external"] = external
-                    # Le record cité est traité à part (tâche suivante)
-                    result_data["is_quote"] = True
                     return PostType.EXTERNAL, result_data, debug_info
+
+            # Média absent ou non pris en charge : le post reste une citation
+            return PostType.QUOTE, result_data, debug_info
 
         # 5. Texte seul
         if result_data["text"] and not embed:
