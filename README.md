@@ -42,7 +42,7 @@ pipx install .
 bsmb
 ```
 
-BSMB lit et écrit `config.json`, `bsmb.db` et `logs/` dans le dossier courant : lancez `bsmb` depuis le dossier où vous souhaitez conserver vos données.
+BSMB lit et écrit `config.json`, `bsmb.db` et `logs/` dans son dossier d'installation (celui de `bsmb.py`), quel que soit le dossier courant.
 
 ---
 

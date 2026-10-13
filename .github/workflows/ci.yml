@@ -41,17 +41,5 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Vérifier la syntaxe Python
-        run: python -m py_compile bsmb.py && echo "Syntaxe OK"
-
-      - name: Vérifier les modules core
-        run: |
-          for f in core/auth.py core/config.py core/database.py core/colors.py; do
-            python -m py_compile "$f" && echo "$f OK"
-          done
-
-      - name: Vérifier les modules api
-        run: |
-          for f in api/post_analyzer.py api/repost_resolver.py; do
-            python -m py_compile "$f" && echo "$f OK"
-          done
+      - name: Vérifier la syntaxe de tous les fichiers Python
+        run: python -m compileall -q -x '[/\\]\.git[/\\]' . && echo "Syntaxe OK"
