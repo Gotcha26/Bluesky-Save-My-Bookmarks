@@ -9,7 +9,11 @@ import subprocess
 from pathlib import Path
 from datetime import datetime
 
-from core.config import load_config, save_config, ensure_dirs, resolve_path
+from core.config import load_config, save_config, ensure_dirs, resolve_path, restrict_permissions
+from core.secrets import (
+    backend_name, store_app_password, load_app_password, delete_app_password,
+    migrate_secret_to_keyring,
+)
 from core.database import Database
 from core.colors import c
 from core.orchestrator import run
@@ -192,6 +196,7 @@ def get_session(config):
     # Fallback fichier token
     token_file = resolve_path(config, "token_file")
     if token_file.exists():
+        restrict_permissions(token_file)  # le token est un secret : chmod 600 (POSIX)
         content = token_file.read_text(encoding="utf-8").strip()
         if content.startswith("Bearer "):
             return {
@@ -267,6 +272,7 @@ def menu_account(config, state):
         print(c.separator())
         print()
         print(c.menu_option("1", "Synchroniser les bookmarks"))
+        print(c.menu_option("D", "Déconnecter mon compte"))
         print(c.menu_option("0", f"{c.DIM}Retour{c.RESET}"))
         print()
 
@@ -277,6 +283,34 @@ def menu_account(config, state):
         elif choice == "1":
             do_sync(config)
             state = get_app_state(config)
+        elif choice.upper() == "D":
+            disconnect_account(config)
+            state = get_app_state(config)
+
+
+def disconnect_account(config):
+    """
+    Déconnecte le compte après confirmation : supprime l'App Password (keyring et
+    config.json), le handle et le PDS. Les fichiers téléchargés et la base restent.
+
+    Returns:
+        bool: True si le compte a été déconnecté
+    """
+    handle = config.get("bsky_handle", "")
+    print()
+    print(c.warning(f"Le compte {handle} sera déconnecté (App Password supprimé de cet ordinateur)."))
+    print(f"  {c.DIM}Vos fichiers téléchargés et la base ne sont pas touchés.{c.RESET}")
+    answer = input(c.prompt("  Confirmer ? [o/N]: ")).strip().lower()
+    if answer not in ("o", "oui"):
+        return False
+
+    delete_app_password(config, handle)
+    config["bsky_handle"] = ""
+    config["pds_url"] = ""
+    save_config(config)
+    print(c.success("Compte déconnecté"))
+    input(f"\n{c.DIM}  Appuyez sur Entrée...{c.RESET}")
+    return True
 
 
 def do_sync(config):
@@ -539,7 +573,7 @@ def configure_credentials(config):
     print()
 
     current_handle = config.get("bsky_handle", "")
-    has_pwd = bool(config.get("bsky_app_password", ""))
+    has_pwd = bool(current_handle) and bool(load_app_password(config, current_handle))
 
     print(c.config_line("Handle actuel", current_handle or f"{c.DIM}non configuré{c.RESET}"))
     print(c.config_line("App Password", f"{c.OK}configuré{c.RESET}" if has_pwd else f"{c.DIM}non configuré{c.RESET}"))
@@ -551,7 +585,11 @@ def configure_credentials(config):
     print(f"    {c.DIM}2.{c.RESET} Cliquez sur {c.VALUE}Add App Password{c.RESET}")
     print(f"    {c.DIM}3.{c.RESET} Nommez-le (ex: 'BSMB') et copiez le mot de passe généré")
     print()
-    print(f"  {c.DIM}L'App Password sera stocké dans config.json (fichier local, hors Git){c.RESET}")
+    if backend_name() == "keyring":
+        print(f"  {c.DIM}L'App Password sera stocké dans le trousseau du système (keyring){c.RESET}")
+    else:
+        print(f"  {c.DIM}L'App Password sera stocké dans config.json (fichier local, hors Git){c.RESET}")
+    print(f"  {c.DIM}Conseil : créez un App Password dédié à BSMB et révoquez-le en cas de doute.{c.RESET}")
     print()
     print(c.separator())
     print()
@@ -579,11 +617,19 @@ def configure_credentials(config):
         session = create_session(handle, app_password)
         print(c.success("Connexion réussie !"))
 
+        if current_handle and current_handle != handle:
+            delete_app_password(config, current_handle)  # ne pas laisser l'ancien secret
+        backend = store_app_password(config, handle, app_password)
         config["bsky_handle"] = handle
-        config["bsky_app_password"] = app_password
         config["pds_url"] = session["pds_url"]
+        if backend == "config.json" and not config.get("warned_plaintext_secret", False):
+            print(c.warning("AVERTISSEMENT : l'App Password est stocké en clair dans config.json."))
+            print(f"  {c.DIM}Installez keyring (pip install keyring) pour le placer dans le "
+                  f"trousseau du système.{c.RESET}")
+            config["warned_plaintext_secret"] = True
         save_config(config)
-        print(c.success("Identifiants sauvegardés"))
+        print(c.success("Identifiants sauvegardés"
+                        + (" (trousseau du système)" if backend == "keyring" else "")))
 
     except AuthError as e:
         print(c.error(f"Échec : {e}"))
@@ -782,6 +828,7 @@ def open_download_folder(config):
 
 def main():
     config = load_config()
+    migrate_secret_to_keyring(config)  # App Password en clair -> keyring si disponible
     ensure_dirs(config)
     from core.config import cleanup_old_logs
     cleanup_old_logs(config)

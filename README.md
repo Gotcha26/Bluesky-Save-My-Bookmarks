@@ -144,7 +144,7 @@ Chaque fichier est traçable vers son post d'origine sur Bluesky.
 ## FAQ
 
 **Mon App Password fonctionne-t-il après un redémarrage ?**
-Oui. BSMB stocke vos identifiants dans `config.json` et génère un nouveau token à chaque lancement. L'App Password ne change pas.
+Oui. BSMB conserve vos identifiants (trousseau du système si `keyring` est installé, sinon `config.json`) et génère un nouveau token à chaque lancement. L'App Password ne change pas.
 
 **Mes fichiers déjà téléchargés sont-ils en sécurité ?**
 Oui. La réinitialisation de la base de données ne supprime jamais les fichiers téléchargés. Elle efface uniquement l'historique de suivi.
@@ -169,7 +169,7 @@ BSMB archive le texte du post, le lien, son titre, sa description et la vignette
 ## Sécurité et confidentialité
 
 - Vos données restent **100% locales** (aucun upload, aucun tracking)
-- L'App Password est stocké dans `config.json` (fichier local, ignoré par Git)
+- L'App Password est stocké dans le trousseau du système si `keyring` est installé (`pip install -r requirements-optional.txt`), sinon dans `config.json` (fichier local, ignoré par Git). Créez un App Password **dédié** à BSMB et révoquez-le en cas de doute ; « Mon compte > D » le supprime de cet ordinateur.
 - Seules des requêtes HTTPS vers l'API Bluesky sont effectuées
 - Ne partagez jamais votre App Password
 

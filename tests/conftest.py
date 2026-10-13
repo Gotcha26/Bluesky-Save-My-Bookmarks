@@ -9,6 +9,13 @@ PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 
+@pytest.fixture(autouse=True)
+def _sans_keyring_reel(monkeypatch):
+    """Les tests ne touchent jamais au trousseau de l'OS : keyring est absent par défaut
+    (les tests de core/secrets.py injectent un module factice)."""
+    monkeypatch.setitem(sys.modules, "keyring", None)
+
+
 @pytest.fixture
 def tmp_config(tmp_path):
     """Config temporaire pour les tests."""

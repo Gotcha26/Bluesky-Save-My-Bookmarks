@@ -14,7 +14,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-keyring = ["keyring"]
+keyring = ["keyring>=24"]
 
 [project.scripts]
 bsmb = "bsmb:main"

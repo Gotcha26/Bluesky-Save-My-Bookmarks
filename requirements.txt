@@ -2,3 +2,5 @@
 # Installation : pip install -r requirements.txt
 
 requests>=2.28.0
+
+# keyring>=24  # optionnel : stockage sécurisé de l'App Password (voir requirements-optional.txt)

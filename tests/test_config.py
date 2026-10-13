@@ -271,3 +271,39 @@ class TestConsommateursAncres:
         monkeypatch.chdir(tmp_path.parent)
         etat = BookmarkSync({"urls_file": "urls.txt"}, MagicMock()).get_cached_state()
         assert etat["online_count"] == 1
+
+
+class TestPermissionsFichier:
+    """chmod 600 sur POSIX uniquement (issue #12)."""
+
+    def test_default_warned_plaintext_secret_faux(self):
+        assert DEFAULT_CONFIG["warned_plaintext_secret"] is False
+
+    def test_save_config_chmod_600_sur_posix(self, tmp_path, monkeypatch):
+        import types
+        config_file = tmp_path / "config.json"
+        monkeypatch.setattr("core.config.CONFIG_FILE", config_file)
+        appels = []
+        faux_os = types.SimpleNamespace(name="posix", chmod=lambda p, m: appels.append((p, m)))
+        monkeypatch.setattr("core.config.os", faux_os)
+        save_config({"a": 1})
+        assert appels == [(config_file, 0o600)]
+
+    def test_save_config_pas_de_chmod_hors_posix(self, tmp_path, monkeypatch):
+        import types
+        monkeypatch.setattr("core.config.CONFIG_FILE", tmp_path / "config.json")
+        appels = []
+        faux_os = types.SimpleNamespace(name="nt", chmod=lambda p, m: appels.append((p, m)))
+        monkeypatch.setattr("core.config.os", faux_os)
+        save_config({"a": 1})
+        assert appels == []
+
+    def test_chmod_en_echec_ne_plante_pas(self, tmp_path, monkeypatch):
+        import types
+
+        def boom(p, m):
+            raise OSError("refusé")
+
+        monkeypatch.setattr("core.config.CONFIG_FILE", tmp_path / "config.json")
+        monkeypatch.setattr("core.config.os", types.SimpleNamespace(name="posix", chmod=boom))
+        save_config({"a": 1})

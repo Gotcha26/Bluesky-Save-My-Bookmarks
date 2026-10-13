@@ -198,3 +198,30 @@ class TestHasCredentials:
 
     def test_missing_keys(self):
         assert has_credentials({}) is False
+
+
+class TestSecretDansKeyring:
+    """L'App Password peut être dans keyring, la clé de config vide (issue #12)."""
+
+    @staticmethod
+    def _keyring(monkeypatch, pwd="kr-pass"):
+        import sys
+        import types
+        kr = types.ModuleType("keyring")
+        kr.get_password = lambda service, user: pwd if (service, user) == ("bsmb", "user") else None
+        monkeypatch.setitem(sys.modules, "keyring", kr)
+
+    def test_has_credentials_avec_secret_en_keyring(self, monkeypatch):
+        self._keyring(monkeypatch)
+        assert has_credentials({"bsky_handle": "user", "bsky_app_password": ""}) is True
+
+    def test_has_credentials_sans_secret_nulle_part(self):
+        assert has_credentials({"bsky_handle": "user", "bsky_app_password": ""}) is False
+
+    @patch("core.auth.create_session")
+    def test_get_session_utilise_le_secret_keyring(self, mock_session, monkeypatch):
+        self._keyring(monkeypatch)
+        mock_session.return_value = {"token": "Bearer k", "refresh_jwt": None, "did": None,
+                                     "pds_url": "https://bsky.social"}
+        get_session({"bsky_handle": "user", "bsky_app_password": "", "token_file": "absent.txt"})
+        mock_session.assert_called_once_with("user", "kr-pass")
