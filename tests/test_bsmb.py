@@ -215,3 +215,22 @@ class TestMigrationAuDemarrage:
              patch("builtins.input", side_effect=["0"]):
             bsmb.main()
         assert ordre == ["load", "migrate"]
+
+
+class TestDisconnectKeyringEnEchec:
+    def test_avertissement_si_le_trousseau_n_a_pas_pu_etre_nettoye(self, tmp_config, capsys):
+        tmp_config.update(bsky_handle="user.bsky.social")
+        with patch("builtins.input", side_effect=["o", ""]), patch("bsmb.save_config"), \
+             patch("bsmb.delete_app_password", return_value=False):
+            assert bsmb.disconnect_account(tmp_config) is True
+        sortie = capsys.readouterr().out
+        assert "trousseau n'a pas pu être nettoyé" in sortie
+        assert "[OK]" not in sortie and "[ATTENTION]" in sortie
+
+    def test_succes_normal_sans_avertissement(self, tmp_config, capsys):
+        tmp_config.update(bsky_handle="user.bsky.social")
+        with patch("builtins.input", side_effect=["o", ""]), patch("bsmb.save_config"):
+            bsmb.disconnect_account(tmp_config)
+        sortie = capsys.readouterr().out
+        assert "Compte déconnecté" in sortie
+        assert "pas pu être nettoyé" not in sortie

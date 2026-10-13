@@ -12,7 +12,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 @pytest.fixture(autouse=True)
 def _sans_keyring_reel(monkeypatch):
     """Les tests ne touchent jamais au trousseau de l'OS : keyring est absent par défaut
-    (les tests de core/secrets.py injectent un module factice)."""
+    (les tests de core/secret_store.py injectent un module factice)."""
     monkeypatch.setitem(sys.modules, "keyring", None)
 
 

@@ -6,7 +6,7 @@ Obtient un token Bearer automatiquement à partir du handle + App Password.
 import requests
 
 from core.config import resolve_path
-from core.secrets import load_app_password
+from core.secret_store import load_app_password
 
 ENDPOINT = "https://bsky.social/xrpc/com.atproto.server.createSession"
 
