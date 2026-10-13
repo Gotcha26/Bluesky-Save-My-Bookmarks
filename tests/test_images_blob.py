@@ -1,4 +1,5 @@
 """Tests du blob original des images (issue #18) : getBlob, repli CDN, saut par cid."""
+
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -21,8 +22,9 @@ def _img(cid, mime="image/png", alt=""):
     return {"alt": alt, "image": {"$type": "blob", "ref": {"$link": cid}, "mimeType": mime, "size": 1}}
 
 
-RECORD = {"embed": {"$type": "app.bsky.embed.images",
-                    "images": [_img(CID1, "image/png"), _img(CID2, "image/jpeg")]}}
+RECORD = {
+    "embed": {"$type": "app.bsky.embed.images", "images": [_img(CID1, "image/png"), _img(CID2, "image/jpeg")]}
+}
 EMBED = {"$type": "app.bsky.embed.images#view", "images": [{"fullsize": IMG1}, {"fullsize": IMG2}]}
 
 
@@ -68,8 +70,10 @@ class TestModeOriginal:
         session = _session(record=RECORD, blobs={BLOB1: b"png!", BLOB2: b"jpg!"})
         res = download_images(URL, tmp_path, DEFAULT_CONFIG, session=session, record=RECORD)
 
-        assert [r.filename for r in res] == ["user.bsky.social_20260102_3abc_01.png",
-                                             "user.bsky.social_20260102_3abc_02.jpg"]
+        assert [r.filename for r in res] == [
+            "user.bsky.social_20260102_3abc_01.png",
+            "user.bsky.social_20260102_3abc_02.jpg",
+        ]
         assert res[0].path.read_bytes() == b"png!"
         assert [r.cid for r in res] == [CID1, CID2]
         assert BLOB1 in _urls(session) and BLOB2 in _urls(session)
@@ -115,8 +119,9 @@ class TestModeOriginal:
         embed = {"$type": "app.bsky.embed.images#view", "images": [{"fullsize": IMG1}]}
         session = _session(embed=embed, blobs={BLOB1: b"", IMG1: b""})
         with pytest.raises(DownloadError):
-            download_images(URL, tmp_path, DEFAULT_CONFIG, session=session,
-                            record={"embed": {"images": [_img(CID1)]}})
+            download_images(
+                URL, tmp_path, DEFAULT_CONFIG, session=session, record={"embed": {"images": [_img(CID1)]}}
+            )
 
     def test_exif_lien_du_post_est_l_url_du_post(self, tmp_path, _exiftool):
         download_images(URL, tmp_path, DEFAULT_CONFIG, session=_session(), record=RECORD)
@@ -128,10 +133,19 @@ class TestModeOriginal:
         def cdn(cid):
             return f"https://cdn.bsky.app/img/feed_fullsize/plain/{DID}/{cid}@jpeg"
 
-        record = {"embed": {"images": [_img(CID1, "image/png"), _img("bafkreicid3", "image/webp"),
-                                         _img(CID2, "image/jpeg")]}}
-        embed = {"$type": "app.bsky.embed.images#view",
-                 "images": [{"fullsize": cdn(CID1)}, {"fullsize": cdn(CID2)}]}
+        record = {
+            "embed": {
+                "images": [
+                    _img(CID1, "image/png"),
+                    _img("bafkreicid3", "image/webp"),
+                    _img(CID2, "image/jpeg"),
+                ]
+            }
+        }
+        embed = {
+            "$type": "app.bsky.embed.images#view",
+            "images": [{"fullsize": cdn(CID1)}, {"fullsize": cdn(CID2)}],
+        }
         res = download_images(URL, tmp_path, DEFAULT_CONFIG, session=_session(embed=embed), record=record)
         assert [r.cid for r in res] == [CID1, CID2]
         assert [r.filename[-4:] for r in res] == [".png", ".jpg"]
@@ -165,8 +179,11 @@ class TestModeOriginal:
         res = download_images(URL, tmp_path, DEFAULT_CONFIG, session=session)
 
         appel = next(c for c in session.get.call_args_list if c.args[0] == GET_RECORD)
-        assert appel.kwargs["params"] == {"repo": "user.bsky.social", "collection": "app.bsky.feed.post",
-                                          "rkey": "3abc"}
+        assert appel.kwargs["params"] == {
+            "repo": "user.bsky.social",
+            "collection": "app.bsky.feed.post",
+            "rkey": "3abc",
+        }
         assert [r.cid for r in res] == [CID1, CID2]
         assert BLOB1 in _urls(session)
 
@@ -177,10 +194,16 @@ class TestModeOriginal:
         assert IMG1 in _urls(session)
 
     def test_record_with_media(self, tmp_path):
-        embed = {"$type": "app.bsky.embed.recordWithMedia#view",
-                 "media": {"$type": "app.bsky.embed.images#view", "images": [{"fullsize": IMG1}]}}
-        record = {"embed": {"$type": "app.bsky.embed.recordWithMedia",
-                            "media": {"$type": "app.bsky.embed.images", "images": [_img(CID1, "image/webp")]}}}
+        embed = {
+            "$type": "app.bsky.embed.recordWithMedia#view",
+            "media": {"$type": "app.bsky.embed.images#view", "images": [{"fullsize": IMG1}]},
+        }
+        record = {
+            "embed": {
+                "$type": "app.bsky.embed.recordWithMedia",
+                "media": {"$type": "app.bsky.embed.images", "images": [_img(CID1, "image/webp")]},
+            }
+        }
         session = _session(embed=embed)
         res = download_images(URL, tmp_path, DEFAULT_CONFIG, session=session, record=record)
         assert res[0].filename.endswith("_01.webp") and res[0].cid == CID1
@@ -192,11 +215,18 @@ class TestModeOriginal:
         assert res[0].filename.endswith("_01.jpg")
 
     def test_images_du_post_cite_gardent_le_cdn(self, tmp_path):
-        embed = {"$type": "app.bsky.embed.record#view",
-                 "record": {"embeds": [{"$type": "app.bsky.embed.images#view", "images": [{"fullsize": IMG2}]}]}}
+        embed = {
+            "$type": "app.bsky.embed.record#view",
+            "record": {"embeds": [{"$type": "app.bsky.embed.images#view", "images": [{"fullsize": IMG2}]}]},
+        }
         session = _session(embed=embed)
-        res = download_images(URL, tmp_path, DEFAULT_CONFIG, session=session,
-                              record={"embed": {"$type": "app.bsky.embed.record"}})
+        res = download_images(
+            URL,
+            tmp_path,
+            DEFAULT_CONFIG,
+            session=session,
+            record={"embed": {"$type": "app.bsky.embed.record"}},
+        )
         assert len(res) == 1 and res[0].cid is None
         assert IMG2 in _urls(session)
         assert not any("getBlob" in u for u in _urls(session))
@@ -236,7 +266,9 @@ class TestSautParCid:
             appels.append(cid)
             return str(fichier) if cid == CID1 else None
 
-        res = download_images(URL, tmp_path, DEFAULT_CONFIG, session=session, record=RECORD, existing_cid=existing)
+        res = download_images(
+            URL, tmp_path, DEFAULT_CONFIG, session=session, record=RECORD, existing_cid=existing
+        )
 
         assert appels == [CID1, CID2]
         assert res[0].skipped is True
@@ -247,8 +279,14 @@ class TestSautParCid:
 
     def test_fichier_disparu_est_retelecharge(self, tmp_path):
         session = _session()
-        res = download_images(URL, tmp_path, DEFAULT_CONFIG, session=session, record=RECORD,
-                              existing_cid=lambda cid: str(tmp_path / "disparu.png"))
+        res = download_images(
+            URL,
+            tmp_path,
+            DEFAULT_CONFIG,
+            session=session,
+            record=RECORD,
+            existing_cid=lambda cid: str(tmp_path / "disparu.png"),
+        )
         assert not any(r.skipped for r in res)
         assert BLOB1 in _urls(session)
 
@@ -263,8 +301,14 @@ class TestSautParCid:
     def test_toutes_sautees_pas_d_erreur(self, tmp_path):
         fichier = self._existant(tmp_path)
         session = _session()
-        res = download_images(URL, tmp_path, DEFAULT_CONFIG, session=session, record=RECORD,
-                              existing_cid=lambda cid: str(fichier))
+        res = download_images(
+            URL,
+            tmp_path,
+            DEFAULT_CONFIG,
+            session=session,
+            record=RECORD,
+            existing_cid=lambda cid: str(fichier),
+        )
         assert [r.skipped for r in res] == [True, True]
 
     def test_ligne_console_skip(self, tmp_path):
@@ -274,8 +318,13 @@ class TestSautParCid:
 
 class TestAlt:
     """Le texte alternatif du record va dans EXIF ImageDescription et dans DownloadResult.alt (issue #7)."""
-    RECORD_ALT = {"embed": {"$type": "app.bsky.embed.images",
-                            "images": [_img(CID1, "image/png", alt="Un chat noir"), _img(CID2, "image/jpeg")]}}
+
+    RECORD_ALT = {
+        "embed": {
+            "$type": "app.bsky.embed.images",
+            "images": [_img(CID1, "image/png", alt="Un chat noir"), _img(CID2, "image/jpeg")],
+        }
+    }
 
     def test_alt_dans_la_commande_exiftool_et_le_resultat(self, tmp_path, _exiftool):
         res = download_images(URL, tmp_path, DEFAULT_CONFIG, session=_session(), record=self.RECORD_ALT)
@@ -299,8 +348,14 @@ class TestAlt:
     def test_alt_d_une_image_sautee(self, tmp_path):
         fichier = tmp_path / "deja.png"
         fichier.write_bytes(b"x")
-        res = download_images(URL, tmp_path, DEFAULT_CONFIG, session=_session(), record=self.RECORD_ALT,
-                              existing_cid=lambda cid: str(fichier))
+        res = download_images(
+            URL,
+            tmp_path,
+            DEFAULT_CONFIG,
+            session=_session(),
+            record=self.RECORD_ALT,
+            existing_cid=lambda cid: str(fichier),
+        )
         assert res[0].skipped and res[0].alt == "Un chat noir"
 
 

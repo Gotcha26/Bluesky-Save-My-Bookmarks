@@ -6,6 +6,7 @@ Chaque downloader renvoie une liste de DownloadResult (liste vide = aucun
 média trouvé) et lève DownloadError en cas d'erreur technique. Aucun
 n'imprime : l'affichage est produit par l'appelant via lignes_console().
 """
+
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -13,10 +14,11 @@ from pathlib import Path
 @dataclass
 class DownloadResult:
     """Un fichier écrit sur le disque par un downloader."""
+
     filename: str
     path: Path
     media_type: str  # "image", "video", "subtitle", "text" ou "sidecar" (fiche JSON)
-    size: int        # taille en octets
+    size: int  # taille en octets
     cid: str | None = None
     skipped: bool = False  # image déjà présente (même cid) : rien n'a été écrit
     alt: str | None = None  # texte alternatif du média (None si absent)

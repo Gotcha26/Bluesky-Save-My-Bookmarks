@@ -1,4 +1,5 @@
 """Tests de bsmb.py : le téléchargement appelle orchestrator.run() directement (issue #10)."""
+
 from pathlib import Path
 from unittest.mock import patch
 
@@ -10,9 +11,19 @@ URL2 = "https://bsky.app/profile/user.bsky.social/post/3k2"
 
 
 def _stats(success=1):
-    return {"total": 1, "success": success, "images": 0, "videos": 0, "texts": success,
-            "error_500": [], "error_400": [], "quotes_unresolved": [], "reposts": [],
-            "unknown": [], "failed": []}
+    return {
+        "total": 1,
+        "success": success,
+        "images": 0,
+        "videos": 0,
+        "texts": success,
+        "error_500": [],
+        "error_400": [],
+        "quotes_unresolved": [],
+        "reposts": [],
+        "unknown": [],
+        "failed": [],
+    }
 
 
 def _urls(tmp_config, *urls):
@@ -27,33 +38,38 @@ class TestDownloadMedia:
         db.add_post(URL)
         db.mark_post_status(URL, "ok")
         db.close()
-        with patch("bsmb.run", return_value=_stats()) as run, \
-             patch("builtins.input", side_effect=["", "n"]), \
-             patch("subprocess.run") as sous_processus:
+        with (
+            patch("bsmb.run", return_value=_stats()) as run,
+            patch("builtins.input", side_effect=["", "n"]),
+            patch("subprocess.run") as sous_processus,
+        ):
             assert bsmb.download_media(tmp_config) is True
         run.assert_called_once_with([URL2], tmp_config)
         sous_processus.assert_not_called()
 
     def test_force_traite_toutes_les_urls(self, tmp_config):
         _urls(tmp_config, URL, URL2)
-        with patch("bsmb.run", return_value=_stats()) as run, \
-             patch("builtins.input", side_effect=["", "n"]):
+        with patch("bsmb.run", return_value=_stats()) as run, patch("builtins.input", side_effect=["", "n"]):
             bsmb.download_media(tmp_config, force=True)
         assert run.call_args.args[0] == [URL, URL2]
 
     def test_ouverture_du_dossier_proposee_apres_succes(self, tmp_config):
         _urls(tmp_config, URL)
-        with patch("bsmb.run", return_value=_stats()), \
-             patch("builtins.input", side_effect=["", "o"]), \
-             patch("bsmb.open_download_folder") as ouvrir:
+        with (
+            patch("bsmb.run", return_value=_stats()),
+            patch("builtins.input", side_effect=["", "o"]),
+            patch("bsmb.open_download_folder") as ouvrir,
+        ):
             bsmb.download_media(tmp_config)
         ouvrir.assert_called_once_with(tmp_config)
 
     def test_pas_de_proposition_sans_succes(self, tmp_config):
         _urls(tmp_config, URL)
-        with patch("bsmb.run", return_value=_stats(success=0)), \
-             patch("builtins.input", side_effect=[""]), \
-             patch("bsmb.open_download_folder") as ouvrir:
+        with (
+            patch("bsmb.run", return_value=_stats(success=0)),
+            patch("builtins.input", side_effect=[""]),
+            patch("bsmb.open_download_folder") as ouvrir,
+        ):
             assert bsmb.download_media(tmp_config) is False
         ouvrir.assert_not_called()
 
@@ -61,14 +77,17 @@ class TestDownloadMedia:
 class TestDownloadMediaDev:
     def test_run_sans_base(self, tmp_config):
         _urls(tmp_config, URL, URL2)
-        with patch("bsmb.run", return_value=_stats()) as run, \
-             patch("bsmb.clear_screen"), \
-             patch("builtins.input", side_effect=["", "n"]):
+        with (
+            patch("bsmb.run", return_value=_stats()) as run,
+            patch("bsmb.clear_screen"),
+            patch("builtins.input", side_effect=["", "n"]),
+        ):
             bsmb.download_media_dev(tmp_config)
         run.assert_called_once_with([URL, URL2], tmp_config, no_db=True)
 
 
 # ─── Identifiants et déconnexion (issue #12) ─────────────────
+
 
 class _FauxKeyring:
     def __init__(self):
@@ -90,15 +109,18 @@ def _session():
 
 class TestConfigureCredentials:
     def _run(self, config, handle="user.bsky.social", pwd="abcd-efgh-ijkl-mnop"):
-        with patch("bsmb.clear_screen"), \
-             patch("builtins.input", side_effect=[handle, pwd, ""]), \
-             patch("core.auth.create_session", return_value=_session()), \
-             patch("bsmb.save_config") as save:
+        with (
+            patch("bsmb.clear_screen"),
+            patch("builtins.input", side_effect=[handle, pwd, ""]),
+            patch("core.auth.create_session", return_value=_session()),
+            patch("bsmb.save_config") as save,
+        ):
             bsmb.configure_credentials(config)
         return save
 
     def test_secret_en_keyring_pas_dans_config(self, tmp_config, monkeypatch):
         import sys
+
         kr = _FauxKeyring()
         monkeypatch.setitem(sys.modules, "keyring", kr)
         save = self._run(tmp_config)
@@ -118,6 +140,7 @@ class TestConfigureCredentials:
 
     def test_pas_d_avertissement_avec_keyring(self, tmp_config, monkeypatch, capsys):
         import sys
+
         monkeypatch.setitem(sys.modules, "keyring", _FauxKeyring())
         self._run(tmp_config)
         assert tmp_config.get("warned_plaintext_secret", False) is False
@@ -129,10 +152,13 @@ class TestConfigureCredentials:
 
     def test_echec_de_connexion_ne_stocke_rien(self, tmp_config):
         from core.auth import AuthError
-        with patch("bsmb.clear_screen"), \
-             patch("builtins.input", side_effect=["user.bsky.social", "mauvais", ""]), \
-             patch("core.auth.create_session", side_effect=AuthError("non")), \
-             patch("bsmb.save_config") as save:
+
+        with (
+            patch("bsmb.clear_screen"),
+            patch("builtins.input", side_effect=["user.bsky.social", "mauvais", ""]),
+            patch("core.auth.create_session", side_effect=AuthError("non")),
+            patch("bsmb.save_config") as save,
+        ):
             bsmb.configure_credentials(tmp_config)
         assert tmp_config["bsky_app_password"] == ""
         save.assert_not_called()
@@ -140,12 +166,14 @@ class TestConfigureCredentials:
 
 class TestDisconnectAccount:
     def _config(self, tmp_config):
-        tmp_config.update(bsky_handle="user.bsky.social", pds_url="https://pds.example",
-                          bsky_app_password="en-clair")
+        tmp_config.update(
+            bsky_handle="user.bsky.social", pds_url="https://pds.example", bsky_app_password="en-clair"
+        )
         return tmp_config
 
     def test_confirmation_supprime_secret_handle_et_pds(self, tmp_config, monkeypatch):
         import sys
+
         kr = _FauxKeyring()
         kr.store[("bsmb", "user.bsky.social")] = "secret"
         monkeypatch.setitem(sys.modules, "keyring", kr)
@@ -178,18 +206,18 @@ class TestDisconnectAccount:
 
     def test_option_d_du_menu_compte(self, tmp_config):
         config = self._config(tmp_config)
-        state = {"has_account": True, "last_sync": "", "has_urls": False,
-                 "stats": {"posts": 0, "dead": 0}}
-        with patch("bsmb.clear_screen"), \
-             patch("bsmb.disconnect_account", return_value=True) as disc, \
-             patch("bsmb.get_app_state", return_value={**state, "has_account": False}), \
-             patch("builtins.input", side_effect=["D", "0"]):
+        state = {"has_account": True, "last_sync": "", "has_urls": False, "stats": {"posts": 0, "dead": 0}}
+        with (
+            patch("bsmb.clear_screen"),
+            patch("bsmb.disconnect_account", return_value=True) as disc,
+            patch("bsmb.get_app_state", return_value={**state, "has_account": False}),
+            patch("builtins.input", side_effect=["D", "0"]),
+        ):
             bsmb.menu_account(config, state)
         disc.assert_called_once_with(config)
 
     def test_option_d_absente_sans_compte(self, tmp_config, capsys):
-        state = {"has_account": False, "last_sync": "", "has_urls": False,
-                 "stats": {"posts": 0, "dead": 0}}
+        state = {"has_account": False, "last_sync": "", "has_urls": False, "stats": {"posts": 0, "dead": 0}}
         with patch("bsmb.clear_screen"), patch("builtins.input", side_effect=["0"]):
             bsmb.menu_account(tmp_config, state)
         assert "Déconnecter" not in capsys.readouterr().out
@@ -208,12 +236,17 @@ class TestGetSessionPermissions:
 class TestMigrationAuDemarrage:
     def test_main_appelle_la_migration_apres_load_config(self, tmp_config):
         ordre = []
-        with patch("bsmb.load_config", side_effect=lambda: ordre.append("load") or tmp_config), \
-             patch("bsmb.migrate_secret_to_keyring", side_effect=lambda c: ordre.append("migrate")), \
-             patch("bsmb.ensure_dirs"), patch("core.config.cleanup_old_logs"), \
-             patch("bsmb.clear_screen"), patch("bsmb.get_app_state", return_value={}), \
-             patch("bsmb.print_header"), patch("bsmb.show_main_menu"), \
-             patch("builtins.input", side_effect=["0"]):
+        with (
+            patch("bsmb.load_config", side_effect=lambda: ordre.append("load") or tmp_config),
+            patch("bsmb.migrate_secret_to_keyring", side_effect=lambda c: ordre.append("migrate")),
+            patch("bsmb.ensure_dirs"),
+            patch("core.config.cleanup_old_logs"),
+            patch("bsmb.clear_screen"),
+            patch("bsmb.get_app_state", return_value={}),
+            patch("bsmb.print_header"),
+            patch("bsmb.show_main_menu"),
+            patch("builtins.input", side_effect=["0"]),
+        ):
             bsmb.main([])
         assert ordre == ["load", "migrate"]
 
@@ -221,8 +254,11 @@ class TestMigrationAuDemarrage:
 class TestDisconnectKeyringEnEchec:
     def test_avertissement_si_le_trousseau_n_a_pas_pu_etre_nettoye(self, tmp_config, capsys):
         tmp_config.update(bsky_handle="user.bsky.social")
-        with patch("builtins.input", side_effect=["o", ""]), patch("bsmb.save_config"), \
-             patch("bsmb.delete_app_password", return_value=False):
+        with (
+            patch("builtins.input", side_effect=["o", ""]),
+            patch("bsmb.save_config"),
+            patch("bsmb.delete_app_password", return_value=False),
+        ):
             assert bsmb.disconnect_account(tmp_config) is True
         sortie = capsys.readouterr().out
         assert "trousseau n'a pas pu être nettoyé" in sortie
@@ -240,22 +276,28 @@ class TestDisconnectKeyringEnEchec:
 class TestDownloadMediaCache:
     def test_post_views_du_cache_passes_a_run(self, tmp_config):
         from core.bookmarks_cache import save_cache
+
         at_uri = "at://did:plc:test/app.bsky.feed.post/3k2"
         vue = {"uri": at_uri, "record": {"text": "x"}}
-        save_cache(tmp_config["bookmarks_cache"], [
-            {"at_uri": at_uri, "url": URL2, "item_type": "postView", "post_view": vue},
-            {"at_uri": "at://did:plc:test/app.bsky.feed.post/3k9", "url": "u9",
-             "item_type": "notFoundPost", "post_view": None},
-        ])
+        save_cache(
+            tmp_config["bookmarks_cache"],
+            [
+                {"at_uri": at_uri, "url": URL2, "item_type": "postView", "post_view": vue},
+                {
+                    "at_uri": "at://did:plc:test/app.bsky.feed.post/3k9",
+                    "url": "u9",
+                    "item_type": "notFoundPost",
+                    "post_view": None,
+                },
+            ],
+        )
         _urls(tmp_config, URL2)
-        with patch("bsmb.run", return_value=_stats()) as run, \
-             patch("builtins.input", side_effect=["", "n"]):
+        with patch("bsmb.run", return_value=_stats()) as run, patch("builtins.input", side_effect=["", "n"]):
             bsmb.download_media(tmp_config)
         assert run.call_args.kwargs["post_views"] == {at_uri: vue, URL2: vue}
 
     def test_sans_cache_run_inchange(self, tmp_config):
         _urls(tmp_config, URL2)
-        with patch("bsmb.run", return_value=_stats()) as run, \
-             patch("builtins.input", side_effect=["", "n"]):
+        with patch("bsmb.run", return_value=_stats()) as run, patch("builtins.input", side_effect=["", "n"]):
             bsmb.download_media(tmp_config)
         run.assert_called_once_with([URL2], tmp_config)

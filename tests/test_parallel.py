@@ -1,4 +1,5 @@
 """Tests pour la parallélisation (thread-safety DB, orchestrator helpers)."""
+
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -118,7 +119,7 @@ class TestFormatSize:
         assert format_size(5 * 1024 * 1024) == "5.00 Mo"
 
     def test_gigabytes(self):
-        assert format_size(2 * 1024 ** 3) == "2.00 Go"
+        assert format_size(2 * 1024**3) == "2.00 Go"
 
     def test_zero(self):
         assert format_size(0) == "0.00 o"
@@ -140,7 +141,9 @@ class TestFormatDuration:
 
 class TestFormatJobSummary:
     def test_success_images(self):
-        result = _format_job_summary(1, 10, "https://bsky.app/profile/user.bsky.social/post/abc123", "success", 3, 0, 0)
+        result = _format_job_summary(
+            1, 10, "https://bsky.app/profile/user.bsky.social/post/abc123", "success", 3, 0, 0
+        )
         assert "OK" in result
         assert "3 images" in result
 

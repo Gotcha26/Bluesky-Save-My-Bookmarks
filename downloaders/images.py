@@ -14,6 +14,7 @@ Ne télécharge QUE les images (pas les thumbs de vidéo).
 Usage manuel : python downloaders/images.py <dossier> <url_post | fichier_urls>
 Codes de sortie : 0 = au moins une image, 1 = erreur technique, 2 = aucune image.
 """
+
 import mimetypes
 import os
 import re
@@ -38,58 +39,77 @@ BLOB_HOST = "https://bsky.social"  # relaie (302) vers le PDS de l'auteur, quel 
 
 def safe_part(s: str) -> str:
     s = (s or "").strip()
-    s = re.sub(r'[<>:"/\\|?*\n\r\t]', '_', s)
-    s = re.sub(r'\s+', '_', s)
-    s = re.sub(r'_+', '_', s)
-    s = s.strip(' ._')
+    s = re.sub(r'[<>:"/\\|?*\n\r\t]', "_", s)
+    s = re.sub(r"\s+", "_", s)
+    s = re.sub(r"_+", "_", s)
+    s = s.strip(" ._")
     return s or "_"
 
+
 def guess_ext_from_ct(ct: str) -> str:
-    if not ct: return ''
-    ct = ct.split(';',1)[0].strip().lower()
-    if 'jpeg' in ct or 'jpg' in ct: return '.jpg'
-    if 'png' in ct: return '.png'
-    if 'webp' in ct: return '.webp'
-    if 'gif' in ct: return '.gif'
-    if 'bmp' in ct: return '.bmp'
-    if 'tiff' in ct: return '.tif'
-    return mimetypes.guess_extension(ct) or ''
+    if not ct:
+        return ""
+    ct = ct.split(";", 1)[0].strip().lower()
+    if "jpeg" in ct or "jpg" in ct:
+        return ".jpg"
+    if "png" in ct:
+        return ".png"
+    if "webp" in ct:
+        return ".webp"
+    if "gif" in ct:
+        return ".gif"
+    if "bmp" in ct:
+        return ".bmp"
+    if "tiff" in ct:
+        return ".tif"
+    return mimetypes.guess_extension(ct) or ""
+
 
 def get_extension_for_url(url: str, http=None) -> str:
     http = http or bsmb_http.get_session()
-    if not url: return '.jpg'
+    if not url:
+        return ".jpg"
     path_ext = os.path.splitext(urlparse(url).path)[1]
     if path_ext and len(path_ext) <= 8:
         return path_ext.lower()
     try:
         h = http.head(url, allow_redirects=True, timeout=10)
-        ext = guess_ext_from_ct(h.headers.get('content-type',''))
-        if ext: return ext
+        ext = guess_ext_from_ct(h.headers.get("content-type", ""))
+        if ext:
+            return ext
     except Exception:
         # Meilleur effort : on essaie l'étape suivante, puis l'extension par défaut.
         pass
     try:
         r = http.get(url, stream=True, timeout=10)
-        ext = guess_ext_from_ct(r.headers.get('content-type',''))
+        ext = guess_ext_from_ct(r.headers.get("content-type", ""))
         r.close()
-        if ext: return ext
+        if ext:
+            return ext
     except Exception:
         # Meilleur effort : on essaie l'étape suivante, puis l'extension par défaut.
         pass
-    return '.jpg'
+    return ".jpg"
 
-def build_filename(handle: str, date_str: str, post_id: str, index: int, ext: str,
-                   max_len=DEFAULT_CONFIG["max_filename_len"],
-                   min_postid=DEFAULT_CONFIG["min_postid_short"],
-                   index_digits=DEFAULT_CONFIG["index_digits"],
-                   spacer=SPACER) -> str:
+
+def build_filename(
+    handle: str,
+    date_str: str,
+    post_id: str,
+    index: int,
+    ext: str,
+    max_len=DEFAULT_CONFIG["max_filename_len"],
+    min_postid=DEFAULT_CONFIG["min_postid_short"],
+    index_digits=DEFAULT_CONFIG["index_digits"],
+    spacer=SPACER,
+) -> str:
     handle = safe_part(handle)
     post_id = safe_part(post_id)
     date_str = safe_part(date_str)
     ext_len = len(ext)
     idx_len = 1 + index_digits
     allowed_hp = max_len - (len(date_str) + 2 + idx_len + ext_len)
-    min_postid = max(1, allowed_hp//3) if allowed_hp < (1 + min_postid) else min_postid
+    min_postid = max(1, allowed_hp // 3) if allowed_hp < (1 + min_postid) else min_postid
     if len(handle) + len(post_id) <= allowed_hp:
         handle_short, postid_short = handle, post_id
     else:
@@ -99,13 +119,14 @@ def build_filename(handle: str, date_str: str, post_id: str, index: int, ext: st
         else:
             handle_max = max(1, allowed_hp - min_postid)
             handle_short = handle[:handle_max]
-            postid_short = post_id[:max(1, allowed_hp-len(handle_short))]
+            postid_short = post_id[: max(1, allowed_hp - len(handle_short))]
     base = f"{handle_short}_{date_str}_{postid_short}"
     idx_str = f"_{index:0{index_digits}d}"
     filename = f"{base}{idx_str}{ext}"
     if len(filename) > max_len:
-        filename = filename[:max_len - ext_len] + ext
+        filename = filename[: max_len - ext_len] + ext
     return filename
+
 
 # -------------------- Bluesky API / Extraction --------------------
 def fetch_post_json(handle: str, post_id: str, http=None):
@@ -114,6 +135,7 @@ def fetch_post_json(handle: str, post_id: str, http=None):
     resp = http.get(api_url, timeout=15)
     resp.raise_for_status()
     return resp.json()
+
 
 def extract_images_from_bsky(post_url: str, http=None, details: dict | None = None):
     """
@@ -160,7 +182,9 @@ def extract_images_from_bsky(post_url: str, http=None, details: dict | None = No
     images = []
     is_repost = False
     if details is not None:
-        details["did"] = author.get("did") or (handle_from_url if handle_from_url.startswith("did:") else None)
+        details["did"] = author.get("did") or (
+            handle_from_url if handle_from_url.startswith("did:") else None
+        )
 
     # ORDRE : 1. Images directes, 2. RecordWithMedia, 3. Repost
 
@@ -213,8 +237,11 @@ def fetch_record(handle_or_did: str, post_id: str, http=None):
     """Record brut (`value`) du post via getRecord, ou None si indisponible."""
     http = http or bsmb_http.get_session()
     try:
-        resp = http.get(GET_RECORD_URL, params={"repo": handle_or_did, "collection": "app.bsky.feed.post",
-                                                "rkey": post_id}, timeout=15)
+        resp = http.get(
+            GET_RECORD_URL,
+            params={"repo": handle_or_did, "collection": "app.bsky.feed.post", "rkey": post_id},
+            timeout=15,
+        )
         resp.raise_for_status()
         return (resp.json() or {}).get("value")
     except Exception:
@@ -230,6 +257,7 @@ def ext_from_mime(mime: str) -> str:
         return ""
     mime = mime.split(";", 1)[0].strip().lower()
     return MIME_EXT.get(mime) or mimetypes.guess_extension(mime) or ".jpg"
+
 
 # -------------------- Téléchargement --------------------
 def download_image(url, filepath, handle, post_id, post_url, post_text, created_at, http=None, alt=""):
@@ -255,7 +283,7 @@ def download_image(url, filepath, handle, post_id, post_url, post_text, created_
             f"-Title={post_id}",
             f"-XPComment={full_comment}",
             f"-Artist={handle}",
-            f"-DateTimeOriginal={created_at.replace('Z','') if created_at else ''}",
+            f"-DateTimeOriginal={created_at.replace('Z', '') if created_at else ''}",
             f"-Copyright={post_url}",
         ]
         if alt:
@@ -266,10 +294,11 @@ def download_image(url, filepath, handle, post_id, post_url, post_text, created_
         # Meilleur effort : exiftool absent ou en échec ne doit pas bloquer le téléchargement.
         pass
 
+
 def build_prefixed_filename(prefix: str, index: int, ext: str, max_len, index_digits) -> str:
     """<prefix>_<n><ext>, le préfixe étant tronqué pour tenir dans max_len."""
     suffix = f"_{index:0{index_digits}d}{ext}"
-    return prefix[:max(1, max_len - len(suffix))] + suffix
+    return prefix[: max(1, max_len - len(suffix))] + suffix
 
 
 def _blob_de_l_image(img_url, index, propres, blobs, par_cid):
@@ -299,8 +328,9 @@ def _existant_sur_disque(existing_cid, cid):
     return None
 
 
-def download_images(post_url, dest_dir, config, session=None, name_prefix=None,
-                    record=None, existing_cid=None):
+def download_images(
+    post_url, dest_dir, config, session=None, name_prefix=None, record=None, existing_cid=None
+):
     """
     Télécharge les images d'un post dans dest_dir.
 
@@ -323,7 +353,8 @@ def download_images(post_url, dest_dir, config, session=None, name_prefix=None,
     http = session or bsmb_http.get_session()
     details = {}
     handle, date_str, post_id, image_urls, post_text, created_at, _ = extract_images_from_bsky(
-        post_url, http, details)
+        post_url, http, details
+    )
     if not image_urls:
         return []
 
@@ -353,23 +384,44 @@ def download_images(post_url, dest_dir, config, session=None, name_prefix=None,
         if sauter:
             existant = _existant_sur_disque(existing_cid, cid)
             if existant:
-                results.append(DownloadResult(existant.name, existant, "image", existant.stat().st_size,
-                                              cid, skipped=True, alt=alt or None))
+                results.append(
+                    DownloadResult(
+                        existant.name,
+                        existant,
+                        "image",
+                        existant.stat().st_size,
+                        cid,
+                        skipped=True,
+                        alt=alt or None,
+                    )
+                )
                 continue
 
         def chemin_pour(ext, idx=idx):
             if name_prefix:
                 nom = build_prefixed_filename(name_prefix, idx, ext, max_len, index_digits)
             else:
-                nom = build_filename(handle, date_str, post_id, idx, ext,
-                                     max_len=max_len, min_postid=min_postid, index_digits=index_digits)
+                nom = build_filename(
+                    handle,
+                    date_str,
+                    post_id,
+                    idx,
+                    ext,
+                    max_len=max_len,
+                    min_postid=min_postid,
+                    index_digits=index_digits,
+                )
             return nom, dest_dir / nom
 
         # Candidats dans l'ordre : (url, extension connue ou None -> deviner par l'URL)
         candidats = []
         if original and cid and did:
-            candidats.append((f"{BLOB_HOST}/xrpc/com.atproto.sync.getBlob?did={did}&cid={cid}",
-                              ext_from_mime(mime) or ".jpg"))
+            candidats.append(
+                (
+                    f"{BLOB_HOST}/xrpc/com.atproto.sync.getBlob?did={did}&cid={cid}",
+                    ext_from_mime(mime) or ".jpg",
+                )
+            )
         candidats.append((img_url, ext_from_mime(mime) if not original else None))
 
         ecrit = None
@@ -386,12 +438,14 @@ def download_images(post_url, dest_dir, config, session=None, name_prefix=None,
         if ecrit is None:
             erreurs.extend(echecs)
             continue
-        results.append(DownloadResult(ecrit[0], ecrit[1], "image", ecrit[1].stat().st_size, cid,
-                                      alt=alt or None))
+        results.append(
+            DownloadResult(ecrit[0], ecrit[1], "image", ecrit[1].stat().st_size, cid, alt=alt or None)
+        )
 
     if erreurs and not results:
         raise DownloadError(" ; ".join(erreurs))
     return results
+
 
 # -------------------- Usage manuel --------------------
 def main(argv=None):
@@ -425,6 +479,7 @@ def main(argv=None):
             print(ligne)
         code = 0
     return code
+
 
 if __name__ == "__main__":
     sys.exit(main())

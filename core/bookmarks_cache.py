@@ -5,6 +5,7 @@ Cache de la dernière réponse complète de getBookmarks (`bookmarks.json`).
 Chaque entrée garde le `postView` brut renvoyé par l'API : l'analyse d'un post peut
 alors se faire sans requête (issue #3) et la réponse reste exploitable hors ligne.
 """
+
 import json
 import os
 import sys
@@ -36,7 +37,9 @@ def save_cache(path, posts, pds_url=""):
     try:
         temporaire.write_text(json.dumps(contenu, ensure_ascii=False, indent=1), encoding="utf-8")
         os.replace(temporaire, chemin)
-        restrict_permissions(chemin)  # le cache contient le texte des posts : lecture réservée au propriétaire
+        restrict_permissions(
+            chemin
+        )  # le cache contient le texte des posts : lecture réservée au propriétaire
     finally:
         temporaire.unlink(missing_ok=True)
 

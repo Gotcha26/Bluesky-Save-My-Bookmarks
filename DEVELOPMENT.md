@@ -161,7 +161,7 @@ def create_session(handle, app_password):
     resp = requests.post(
         "https://bsky.social/xrpc/com.atproto.server.createSession",
         json={"identifier": handle, "password": app_password},
-        timeout=15
+        timeout=15,
     )
 
     # Gestion d'erreurs spécifiques
@@ -175,6 +175,7 @@ def create_session(handle, app_password):
     access_jwt = data.get("accessJwt")
 
     return f"Bearer {access_jwt}"
+
 
 def get_token(config):
     """
@@ -207,7 +208,7 @@ env["BSMB_TOKEN"] = token
 subprocess.run(
     ["python", "api/export_bookmarks.py"],
     env=env,  # Passe token via env var
-    encoding="utf-8"
+    encoding="utf-8",
 )
 ```
 
@@ -238,13 +239,11 @@ DEFAULT_CONFIG = {
     "urls_file": "urls.txt",
     "db_file": "bsmb.db",
     "logs_dir": "logs",
-
     # Limites
     "max_logs": 5,
     "max_filename_len": 64,
     "min_postid_short": 4,
     "index_digits": 1,
-
     # Authentification (NEW)
     "bsky_handle": "",
     "bsky_app_password": "",
@@ -405,9 +404,9 @@ def process_post(url, IMG_DIR, VID_DIR, db, analyzer, resolver, logs_dir):
 
     # 2. Gestion erreurs
     if post_type == PostType.ERROR_400:
-        return False, 0, 0, 0, 'error_400'
+        return False, 0, 0, 0, "error_400"
     if post_type == PostType.ERROR_500:
-        return False, 0, 0, 0, 'error_500'
+        return False, 0, 0, 0, "error_500"
 
     # 3. Résolution repost
     if post_type == PostType.REPOST:
@@ -428,7 +427,7 @@ def process_post(url, IMG_DIR, VID_DIR, db, analyzer, resolver, logs_dir):
         for media in downloaded:
             db.add_media(url, media.type, media.filename)
 
-    return success, img_count, vid_count, txt_count, 'success'
+    return success, img_count, vid_count, txt_count, "success"
 ```
 
 ---
@@ -444,7 +443,7 @@ result = subprocess.run(
     capture_output=True,
     text=True,
     encoding="utf-8",
-    errors="replace"
+    errors="replace",
 )
 
 if result.returncode == 0:
@@ -530,6 +529,7 @@ def _detect_color_support(force_color):
     if sys.platform == "win32":
         try:
             import ctypes
+
             kernel32 = ctypes.windll.kernel32
             handle = kernel32.GetStdHandle(-11)  # STD_OUTPUT_HANDLE
             mode = ctypes.c_ulong()
@@ -572,15 +572,14 @@ PROMPT (jaune) = inputs
 import pytest
 from core.auth import create_session, AuthError
 
+
 class TestCreateSession:
     """Tests pour create_session()"""
 
     def test_valid_credentials(self, mocker):
         """Vérifie que token est retourné avec credentials valides"""
         mock_post = mocker.patch("requests.post")
-        mock_post.return_value.json.return_value = {
-            "accessJwt": "abc123..."
-        }
+        mock_post.return_value.json.return_value = {"accessJwt": "abc123..."}
 
         result = create_session("user.bsky.social", "xxxx-xxxx-xxxx-xxxx")
 
@@ -687,6 +686,7 @@ python tools/debug_post.py "https://bsky.app/profile/user/post/123"
 ### Inspecter config.json
 ```python
 import json
+
 with open("config.json") as f:
     config = json.load(f)
     for key, val in config.items():

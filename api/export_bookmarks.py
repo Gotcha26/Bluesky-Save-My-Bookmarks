@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Export des bookmarks Bluesky — module importable et script standalone."""
+
 import json
 import os
 import sys
@@ -143,16 +144,18 @@ def fetch_bookmarks(token, on_progress=None, pds_url=DEFAULT_PDS_URL, session=No
 
                 item_type = _item_type(item)
                 urls.append(ref.web_url)
-                posts.append({
-                    "at_uri": ref.at_uri,
-                    "did": ref.did,
-                    "rkey": ref.rkey,
-                    "handle": handle,
-                    "url": ref.web_url,
-                    "item_type": item_type,
-                    "post_view": item if item_type == "postView" else None,
-                    "created_at": bm.get("createdAt"),
-                })
+                posts.append(
+                    {
+                        "at_uri": ref.at_uri,
+                        "did": ref.did,
+                        "rkey": ref.rkey,
+                        "handle": handle,
+                        "url": ref.web_url,
+                        "item_type": item_type,
+                        "post_view": item if item_type == "postView" else None,
+                        "created_at": bm.get("createdAt"),
+                    }
+                )
 
             if on_progress:
                 on_progress(page, len(urls))
@@ -208,7 +211,9 @@ if __name__ == "__main__":
     PDS_URL = os.environ.get("BSMB_PDS_URL", "").strip()
     if not PDS_URL and Path("config.json").exists():
         try:
-            PDS_URL = str(json.loads(Path("config.json").read_text(encoding="utf-8")).get("pds_url") or "").strip()
+            PDS_URL = str(
+                json.loads(Path("config.json").read_text(encoding="utf-8")).get("pds_url") or ""
+            ).strip()
         except (OSError, ValueError):
             PDS_URL = ""
     PDS_URL = PDS_URL or DEFAULT_PDS_URL

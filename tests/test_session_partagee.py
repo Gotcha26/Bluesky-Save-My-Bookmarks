@@ -1,4 +1,5 @@
 """Tous les appels réseau passent par la session partagée de core/http.py (issue #11)."""
+
 import re
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -48,6 +49,7 @@ def test_aucun_import_direct_de_get_session():
 
 def test_la_barriere_reseau_bloque_les_hotes_externes():
     import socket
+
     with pytest.raises(AssertionError, match="interdit"):
         socket.create_connection(("bsky.social", 443), timeout=1)
 
@@ -104,6 +106,7 @@ def test_la_vraie_session_ne_garde_pas_le_jeton():
 
 def test_orchestrateur_cree_une_seule_session(tmp_config, fake_session, monkeypatch):
     from core import orchestrator
+
     vus = []
     monkeypatch.setattr(orchestrator, "PostAnalyzer", lambda s=None: vus.append(("a", s)) or MagicMock())
     monkeypatch.setattr(orchestrator, "QuoteResolver", lambda s=None: vus.append(("q", s)) or MagicMock())

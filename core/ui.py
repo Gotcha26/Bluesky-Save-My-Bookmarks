@@ -5,6 +5,7 @@ Interactions utilisateur de BSMB : mode (non) interactif, pause et confirmation.
 En mode non interactif (entrée standard redirigée ou option --yes), plus aucun
 input() n'est émis : pause() ne fait rien et confirm() renvoie la valeur par défaut.
 """
+
 import sys
 
 from core.colors import c

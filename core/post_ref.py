@@ -5,6 +5,7 @@ Identité d'un post Bluesky : AT-URI canonique (DID + rkey).
 Le handle n'est qu'un alias d'affichage, susceptible de changer ou de valoir
 `handle.invalid` quand l'AppView ne peut pas le vérifier.
 """
+
 from dataclasses import dataclass
 from urllib.parse import urlparse
 
@@ -55,8 +56,14 @@ class PostRef:
     def from_at_uri(cls, uri, handle=None):
         """Parse `at://<did>/app.bsky.feed.post/<rkey>`."""
         parts = (uri or "").split("/")
-        if len(parts) != 5 or parts[0] != "at:" or parts[1] != "" or not parts[2] \
-                or parts[3] != POST_COLLECTION or not parts[4]:
+        if (
+            len(parts) != 5
+            or parts[0] != "at:"
+            or parts[1] != ""
+            or not parts[2]
+            or parts[3] != POST_COLLECTION
+            or not parts[4]
+        ):
             raise ValueError(f"AT-URI de post invalide : {uri!r}")
         return cls(did=parts[2], rkey=parts[4], handle=handle)
 

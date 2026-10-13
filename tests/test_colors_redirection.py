@@ -1,4 +1,5 @@
 """Détection des couleurs quand la sortie est redirigée (core/colors.py)."""
+
 import pytest
 
 from core.colors import Colors

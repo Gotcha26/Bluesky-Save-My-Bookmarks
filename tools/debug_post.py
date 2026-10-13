@@ -13,19 +13,17 @@ def extract_post_info(url):
         sys.exit(1)
     return m.groups()
 
+
 def get_post_json(handle, post_id):
     """Récupère le JSON d’un post via l’API Bsky"""
     api_url = "https://bsky.social/xrpc/com.atproto.repo.getRecord"
-    params = {
-        "repo": handle,
-        "collection": "app.bsky.feed.post",
-        "rkey": post_id
-    }
+    params = {"repo": handle, "collection": "app.bsky.feed.post", "rkey": post_id}
     resp = requests.get(api_url, params=params)
     if resp.status_code != 200:
         print(f"Erreur {resp.status_code} : {resp.text}")
         sys.exit(1)
     return resp.json()
+
 
 def display_media(post_json):
     """Analyse le JSON et affiche les médias disponibles"""
@@ -68,6 +66,7 @@ def display_media(post_json):
 
     else:
         print("\n⚠️ Type d’embed non encore géré :", embed.get("$type"))
+
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:

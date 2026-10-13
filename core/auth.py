@@ -3,6 +3,7 @@
 Authentification Bluesky via createSession
 Obtient un token Bearer automatiquement à partir du handle + App Password.
 """
+
 import requests
 
 from core import http as bsmb_http
@@ -17,6 +18,7 @@ DEFAULT_PDS_URL = "https://bsky.social"
 
 class AuthError(Exception):
     """Erreur d'authentification Bluesky."""
+
     pass
 
 
@@ -24,6 +26,7 @@ class NetworkError(AuthError):
     """Échec réseau (connexion, timeout, HTTP 5xx) pendant l'authentification.
 
     Sous-classe d'AuthError : le code existant qui attrape AuthError reste valable."""
+
     pass
 
 

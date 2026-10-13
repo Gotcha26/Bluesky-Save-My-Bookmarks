@@ -6,6 +6,7 @@ Sauvegarde du texte d'un post Bluesky sans média, dans :
 Usage manuel : python downloaders/text.py [<dossier>] <url_post>
 Codes de sortie : 0 = texte sauvegardé, 1 = erreur technique, 2 = pas de texte.
 """
+
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -26,6 +27,7 @@ def fetch_post(handle, post_id, http=None):
     resp = http.get(api_url, timeout=15)
     resp.raise_for_status()
     return resp.json()
+
 
 def nom_base_texte(handle, post_id, created_at):
     """Nom sans extension : <handle>_<YYYYMMDD>_<postid> (date du jour si createdAt est illisible)."""
@@ -79,7 +81,9 @@ def save_text(post_url, dest_dir, config, session=None, name_prefix=None):
 
     # Format commun à tous les posts (facets résolues, alt, citation…) : voir downloaders/archive.py
     from downloaders.archive import write_text  # import tardif : archive importe nom_base_texte d'ici
+
     return write_text(post_url, record, dest_dir, config, name_prefix=name_prefix)
+
 
 # -------------------- Usage manuel --------------------
 def main(argv=None):
@@ -104,6 +108,7 @@ def main(argv=None):
     for ligne in lignes_console(results):
         print(ligne)
     return 0
+
 
 if __name__ == "__main__":
     sys.exit(main())

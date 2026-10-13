@@ -12,6 +12,7 @@ Interface en ligne de commande non interactive de BSMB.
 Codes de retour : 0 succès, 1 erreur d'authentification, 2 erreur réseau,
 3 téléchargements en échec.
 """
+
 import argparse
 import json
 
@@ -49,20 +50,24 @@ def build_parser():
         description="BSMB - Bsky Save My Bookmarks. Sans sous-commande : menu interactif.",
     )
     parser.add_argument("--version", action="version", version=f"BSMB {__version__}")
-    parser.add_argument("--yes", action="store_true",
-                        help="mode non interactif : accepte les valeurs par défaut")
+    parser.add_argument(
+        "--yes", action="store_true", help="mode non interactif : accepte les valeurs par défaut"
+    )
     sub = parser.add_subparsers(dest="command", metavar="{sync,download,run,status}")
 
     def ajouter(nom, aide):
         p = sub.add_parser(nom, help=aide, description=aide)
-        p.add_argument("--yes", action="store_true", default=argparse.SUPPRESS,
-                       help="mode non interactif : accepte les valeurs par défaut")
+        p.add_argument(
+            "--yes",
+            action="store_true",
+            default=argparse.SUPPRESS,
+            help="mode non interactif : accepte les valeurs par défaut",
+        )
         return p
 
     ajouter("sync", "synchronise les bookmarks en ligne")
     p_dl = ajouter("download", "télécharge les posts pas encore traités")
-    p_dl.add_argument("--force", action="store_true",
-                      help="retraite tous les posts de urls.txt")
+    p_dl.add_argument("--force", action="store_true", help="retraite tous les posts de urls.txt")
     ajouter("run", "synchronise puis télécharge (pour la planification)")
     p_st = ajouter("status", "affiche l'état du compte et les compteurs")
     p_st.add_argument("--json", action="store_true", help="sortie JSON")
@@ -87,6 +92,7 @@ def _lire_urls(config):
 
 
 # ─── Sous-commandes ──────────────────────────────────────────
+
 
 def cmd_sync(config, args=None):
     """Synchronise les bookmarks. Retourne un code de retour."""
@@ -213,8 +219,9 @@ def cmd_status(config, args=None):
     print(c.config_line("Nouveaux", str(etat["new_count"])))
     print(c.config_line("Liens morts", str(etat["dead_count"])))
     media = etat["media"]
-    print(c.config_line("Images / vidéos / textes",
-                        f"{media['images']} / {media['videos']} / {media['texts']}"))
+    print(
+        c.config_line("Images / vidéos / textes", f"{media['images']} / {media['videos']} / {media['texts']}")
+    )
     print(c.config_line("Destination", etat["download_dir"]))
     return EXIT_OK
 

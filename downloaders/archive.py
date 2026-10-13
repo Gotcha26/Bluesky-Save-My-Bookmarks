@@ -7,6 +7,7 @@ Archive fidèle d'un post Bluesky (issue #7), écrite dans le dossier des textes
 <base> vaut <handle>_<YYYYMMDD>_<postid> (nom_base_texte) ou name_prefix pour un post cité.
 Pas d'usage manuel : l'orchestrateur et les downloaders texte / external fournissent le record.
 """
+
 import json
 import os
 from datetime import UTC, datetime
@@ -52,7 +53,11 @@ def resolve_facets(text, facets):
         if not isinstance(facet, dict) or not isinstance(facet.get("index"), dict):
             continue
         debut, fin = facet["index"].get("byteStart"), facet["index"].get("byteEnd")
-        if not (isinstance(debut, int) and isinstance(fin, int)) or isinstance(debut, bool) or isinstance(fin, bool):
+        if (
+            not (isinstance(debut, int) and isinstance(fin, int))
+            or isinstance(debut, bool)
+            or isinstance(fin, bool)
+        ):
             continue
         if not 0 <= debut < fin <= len(brut):
             continue
@@ -144,8 +149,13 @@ def _contenu_texte(post_url, record, alts, auteur=None):
         blocs.append(alt)
     external = _media_du_record(record).get("external") or {}
     if external:
-        blocs.append([f"Lien: {external.get('uri', '')}", f"Titre: {external.get('title', '')}",
-                      f"Description: {external.get('description', '')}"])
+        blocs.append(
+            [
+                f"Lien: {external.get('uri', '')}",
+                f"Titre: {external.get('title', '')}",
+                f"Description: {external.get('description', '')}",
+            ]
+        )
     fin = []
     if citee := _uri_citee(record):
         fin.append(f"Cite: {citee}")
@@ -217,7 +227,9 @@ def write_sidecar(post_url, record, post_view, dest_dir, config, name_prefix=Non
         dest_dir.mkdir(parents=True, exist_ok=True)
         chemin = dest_dir / f"{base}.json"
         part = Path(f"{chemin}.part")
-        part.write_text(json.dumps(fiche, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
+        part.write_text(
+            json.dumps(fiche, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n"
+        )
         os.replace(part, chemin)
         part = None
         return [_resultat(chemin, "sidecar")]

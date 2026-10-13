@@ -1,4 +1,5 @@
 """Tests pour api/post_analyzer.py"""
+
 from unittest.mock import MagicMock
 
 import pytest
@@ -94,9 +95,7 @@ class TestAnalyzePostTypes:
         }
         mock_get.return_value = mock_resp
 
-        post_type, data, _ = self.analyzer.analyze(
-            "https://bsky.app/profile/user.bsky.social/post/123"
-        )
+        post_type, data, _ = self.analyzer.analyze("https://bsky.app/profile/user.bsky.social/post/123")
         assert post_type == PostType.IMAGES
         assert data["image_count"] == 2
         assert len(data["images"]) == 2
@@ -122,9 +121,7 @@ class TestAnalyzePostTypes:
         }
         mock_get.return_value = mock_resp
 
-        post_type, data, _ = self.analyzer.analyze(
-            "https://bsky.app/profile/user.bsky.social/post/456"
-        )
+        post_type, data, _ = self.analyzer.analyze("https://bsky.app/profile/user.bsky.social/post/456")
         assert post_type == PostType.VIDEO
         assert "video_url" in data
         assert data["video_cid"] == "bafkrei_vid1"
@@ -146,9 +143,7 @@ class TestAnalyzePostTypes:
         }
         mock_get.return_value = mock_resp
 
-        post_type, data, _ = self.analyzer.analyze(
-            "https://bsky.app/profile/user.bsky.social/post/789"
-        )
+        post_type, data, _ = self.analyzer.analyze("https://bsky.app/profile/user.bsky.social/post/789")
         assert post_type == PostType.QUOTE
         assert data["is_quote"] is True
 
@@ -165,9 +160,7 @@ class TestAnalyzePostTypes:
         }
         mock_get.return_value = mock_resp
 
-        post_type, data, _ = self.analyzer.analyze(
-            "https://bsky.app/profile/user.bsky.social/post/txt1"
-        )
+        post_type, data, _ = self.analyzer.analyze("https://bsky.app/profile/user.bsky.social/post/txt1")
         assert post_type == PostType.TEXT_ONLY
 
     def test_detect_record_with_media_images(self, mock_get):
@@ -191,14 +184,13 @@ class TestAnalyzePostTypes:
         }
         mock_get.return_value = mock_resp
 
-        post_type, data, _ = self.analyzer.analyze(
-            "https://bsky.app/profile/user.bsky.social/post/qp1"
-        )
+        post_type, data, _ = self.analyzer.analyze("https://bsky.app/profile/user.bsky.social/post/qp1")
         assert post_type == PostType.IMAGES
         assert data["image_count"] == 1
 
     def test_network_error(self, mock_get):
         import requests
+
         mock_get.side_effect = requests.exceptions.ConnectionError()
 
         post_type, data, debug = self.analyzer.analyze(
@@ -236,6 +228,7 @@ def sans_reseau(fake_session):
 
     def interdit(*args, **kwargs):
         raise AssertionError("la session ne doit pas être appelée avec un post_view")
+
     fake_session.get.side_effect = interdit
 
 
@@ -255,8 +248,13 @@ class TestAnalyzeAvecPostView:
         assert data["embed_type"] == ""
 
     def test_images(self, sans_reseau):
-        embed = {"$type": "app.bsky.embed.images", "images": [
-            {"image": {"ref": {"$link": "bafkrei_a"}}}, {"image": {"ref": {"$link": "bafkrei_b"}}}]}
+        embed = {
+            "$type": "app.bsky.embed.images",
+            "images": [
+                {"image": {"ref": {"$link": "bafkrei_a"}}},
+                {"image": {"ref": {"$link": "bafkrei_b"}}},
+            ],
+        }
         vue_embed = {"$type": "app.bsky.embed.images#view", "images": [{"fullsize": "https://cdn/x.jpg"}]}
         t, data, _ = self.analyzer.analyze(URL_PV, post_view=_post_view(embed, vue_embed))
         assert t == PostType.IMAGES
@@ -265,8 +263,10 @@ class TestAnalyzeAvecPostView:
         assert data["view_embed"] == vue_embed
 
     def test_video(self, sans_reseau):
-        embed = {"$type": "app.bsky.embed.video",
-                 "video": {"ref": {"$link": "bafkrei_v"}, "mimeType": "video/mp4", "size": 99}}
+        embed = {
+            "$type": "app.bsky.embed.video",
+            "video": {"ref": {"$link": "bafkrei_v"}, "mimeType": "video/mp4", "size": 99},
+        }
         vue_embed = {"$type": "app.bsky.embed.video#view", "playlist": "https://video.bsky.app/p.m3u8"}
         t, data, _ = self.analyzer.analyze(URL_PV, post_view=_post_view(embed, vue_embed))
         assert t == PostType.VIDEO
@@ -275,8 +275,10 @@ class TestAnalyzeAvecPostView:
         assert data["view_embed"]["playlist"] == "https://video.bsky.app/p.m3u8"
 
     def test_external(self, sans_reseau):
-        embed = {"$type": "app.bsky.embed.external",
-                 "external": {"uri": "https://example.com/a", "title": "T", "description": "D"}}
+        embed = {
+            "$type": "app.bsky.embed.external",
+            "external": {"uri": "https://example.com/a", "title": "T", "description": "D"},
+        }
         t, data, _ = self.analyzer.analyze(URL_PV, post_view=_post_view(embed))
         assert t == PostType.EXTERNAL
         assert data["external"]["uri"] == "https://example.com/a"
@@ -291,17 +293,23 @@ class TestAnalyzeAvecPostView:
 
     def test_citation_avec_media(self, sans_reseau):
         cite = "at://did:plc:test2000000000000000000000/app.bsky.feed.post/3kcited0001"
-        embed = {"$type": "app.bsky.embed.recordWithMedia",
-                 "record": {"record": {"uri": cite, "cid": "c"}},
-                 "media": {"$type": "app.bsky.embed.images",
-                           "images": [{"image": {"ref": {"$link": "bafkrei_a"}}}]}}
+        embed = {
+            "$type": "app.bsky.embed.recordWithMedia",
+            "record": {"record": {"uri": cite, "cid": "c"}},
+            "media": {
+                "$type": "app.bsky.embed.images",
+                "images": [{"image": {"ref": {"$link": "bafkrei_a"}}}],
+            },
+        }
         t, data, _ = self.analyzer.analyze(URL_PV, post_view=_post_view(embed))
         assert t == PostType.IMAGES
         assert data["is_quote"] is True
         assert data["quote_uri"] == cite
 
     def test_embed_inconnu(self, sans_reseau):
-        t, data, debug = self.analyzer.analyze(URL_PV, post_view=_post_view({"$type": "app.bsky.embed.autre"}))
+        t, data, debug = self.analyzer.analyze(
+            URL_PV, post_view=_post_view({"$type": "app.bsky.embed.autre"})
+        )
         assert t == PostType.UNKNOWN
         assert debug["embed_type"] == "app.bsky.embed.autre"
 

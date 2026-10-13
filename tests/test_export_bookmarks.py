@@ -1,4 +1,5 @@
 """Tests pour api/export_bookmarks.py — fonction fetch_bookmarks()"""
+
 from unittest.mock import MagicMock
 
 from api.export_bookmarks import fetch_bookmarks
@@ -118,9 +119,7 @@ class TestFetchBookmarksSuccess:
         response = MagicMock()
         response.status_code = 200
         response.json.return_value = {
-            "bookmarks": [
-                {"item": {"uri": "at://did:plc:xyz/app.bsky.feed.post/456"}}
-            ],
+            "bookmarks": [{"item": {"uri": "at://did:plc:xyz/app.bsky.feed.post/456"}}],
             "cursor": None,
         }
         response.raise_for_status = MagicMock()
@@ -150,9 +149,7 @@ class TestFetchBookmarksPdsUrl:
     def test_default_pds_url_is_bsky_social(self, fake_session):
         session = self._setup(fake_session)
         fetch_bookmarks("Bearer t")
-        assert session.get.call_args[0][0] == (
-            "https://bsky.social/xrpc/app.bsky.bookmark.getBookmarks"
-        )
+        assert session.get.call_args[0][0] == ("https://bsky.social/xrpc/app.bsky.bookmark.getBookmarks")
 
     def test_keeps_appview_proxy_header(self, fake_session):
         session = self._setup(fake_session)
@@ -195,6 +192,7 @@ class TestFetchBookmarksErrors:
 
     def test_network_error(self, fake_session):
         import requests
+
         session = fake_session
         session.get.side_effect = requests.exceptions.ConnectionError("Network error")
 
@@ -209,7 +207,10 @@ class TestFetchBookmarksItemTypes:
     def test_item_type_post_view_et_created_at(self, fake_session):
         import json
         from pathlib import Path
-        page = json.loads((Path(__file__).parent / "fixtures" / "bookmarks_page.json").read_text(encoding="utf-8"))
+
+        page = json.loads(
+            (Path(__file__).parent / "fixtures" / "bookmarks_page.json").read_text(encoding="utf-8")
+        )
         session = fake_session
         response = MagicMock(status_code=200)
         response.json.return_value = page
@@ -235,9 +236,18 @@ class TestFetchBookmarksItemTypes:
     def test_item_sans_type_reste_post_view_si_record(self, fake_session):
         session = fake_session
         response = MagicMock(status_code=200)
-        response.json.return_value = {"bookmarks": [{"item": {
-            "uri": "at://did:plc:abc/app.bsky.feed.post/123",
-            "author": {"handle": "u.example.com"}, "record": {"text": "x"}}}], "cursor": None}
+        response.json.return_value = {
+            "bookmarks": [
+                {
+                    "item": {
+                        "uri": "at://did:plc:abc/app.bsky.feed.post/123",
+                        "author": {"handle": "u.example.com"},
+                        "record": {"text": "x"},
+                    }
+                }
+            ],
+            "cursor": None,
+        }
         session.get.return_value = response
 
         post = fetch_bookmarks("Bearer test")["posts"][0]

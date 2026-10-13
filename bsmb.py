@@ -3,6 +3,7 @@
 BSMB - Bsky Save My Bookmarks
 Interface novice-first pour sauvegarder vos bookmarks Bluesky
 """
+
 import os
 import subprocess
 import sys
@@ -49,7 +50,7 @@ def get_folder_size(path):
 
 def format_size(size_bytes):
     """Formate une taille en octets lisible."""
-    for unit in ['o', 'Ko', 'Mo', 'Go']:
+    for unit in ["o", "Ko", "Mo", "Go"]:
         if size_bytes < 1024.0:
             return f"{size_bytes:.1f} {unit}"
         size_bytes /= 1024.0
@@ -80,6 +81,7 @@ def format_last_sync(iso_str):
 
 # ─── État de l'application ───────────────────────────────────
 
+
 def get_app_state(config):
     """Récupère l'état complet de l'application."""
     db = Database(resolve_path(config, "db_file"))
@@ -98,6 +100,7 @@ def get_app_state(config):
         new_count = len(new_urls)
 
     from core.auth import has_credentials
+
     has_account = has_credentials(config)
 
     db.close()
@@ -115,6 +118,7 @@ def get_app_state(config):
 
 # ─── En-tête ─────────────────────────────────────────────────
 
+
 def print_header(config, state):
     """Affiche l'en-tête avec ligne de statut."""
     print(c.box_header(f"BSMB v{__version__} - BSKY SAVE MY BOOKMARKS"))
@@ -128,9 +132,7 @@ def print_header(config, state):
 
     media_total = state["stats"]["images"] + state["stats"]["videos"]
     media_status = (
-        f"{c.VALUE}{media_total}{c.RESET} fichiers"
-        if media_total > 0
-        else f"{c.DIM}aucun{c.RESET}"
+        f"{c.VALUE}{media_total}{c.RESET} fichiers" if media_total > 0 else f"{c.DIM}aucun{c.RESET}"
     )
 
     print(f"  Compte: {account_status} | Médias: {media_status}")
@@ -143,6 +145,7 @@ def print_header(config, state):
 
 
 # ─── Menu principal ──────────────────────────────────────────
+
 
 def show_main_menu(state):
     """Affiche le menu principal novice-first."""
@@ -169,10 +172,12 @@ def show_main_menu(state):
 
 # ─── Token ───────────────────────────────────────────────────
 
+
 def get_token_from_clipboard():
     """Récupère le token depuis le presse-papier."""
     try:
         import win32clipboard  # type: ignore
+
         win32clipboard.OpenClipboard()
         token = win32clipboard.GetClipboardData(win32clipboard.CF_UNICODETEXT)
         win32clipboard.CloseClipboard()
@@ -181,7 +186,8 @@ def get_token_from_clipboard():
         try:
             result = subprocess.run(
                 ["powershell", "-command", "Get-Clipboard"],
-                capture_output=True, text=True,
+                capture_output=True,
+                text=True,
             )
             return result.stdout.strip() if result.returncode == 0 else None
         except Exception:
@@ -228,6 +234,7 @@ def _remember_pds_url(config, pds_url):
 
 
 # ─── Mon compte ──────────────────────────────────────────────
+
 
 def menu_account(config, state):
     """Menu Mon compte : connexion et synchronisation."""
@@ -321,8 +328,12 @@ def disconnect_account(config):
     if nettoye:
         print(c.success("Compte déconnecté"))
     else:
-        print(c.warning("Compte déconnecté, mais le trousseau n'a pas pu être nettoyé : "
-                        "supprimez l'entrée « bsmb » à la main."))
+        print(
+            c.warning(
+                "Compte déconnecté, mais le trousseau n'a pas pu être nettoyé : "
+                "supprimez l'entrée « bsmb » à la main."
+            )
+        )
     pause()
     return True
 
@@ -347,6 +358,7 @@ def do_sync(config):
 
     db = Database(resolve_path(config, "db_file"))
     from core.bookmarks import BookmarkSync
+
     sync = BookmarkSync(config, db)
 
     def progress(page, count):
@@ -376,6 +388,7 @@ def do_sync(config):
 
 
 # ─── Stockage local ──────────────────────────────────────────
+
 
 def menu_local_storage(config, state):
     """Menu Stockage local : stats, dossier, nettoyage."""
@@ -435,7 +448,7 @@ def menu_local_storage(config, state):
             reset_database(config)
             state = get_app_state(config)
         else:
-            print(c.error(f"Choix invalide : \"{choice}\""))
+            print(c.error(f'Choix invalide : "{choice}"'))
             pause()
 
 
@@ -503,6 +516,7 @@ def reset_database(config):
 
 # ─── Paramètres ──────────────────────────────────────────────
 
+
 def menu_settings(config, state):
     """Menu Paramètres : configuration de l'application."""
     while True:
@@ -511,7 +525,10 @@ def menu_settings(config, state):
         print()
 
         from core.auth import has_credentials
-        auth_status = f"{c.OK}connecté{c.RESET}" if has_credentials(config) else f"{c.DIM}non connecté{c.RESET}"
+
+        auth_status = (
+            f"{c.OK}connecté{c.RESET}" if has_credentials(config) else f"{c.DIM}non connecté{c.RESET}"
+        )
         advanced = config.get("advanced_mode", False)
 
         print(c.config_line("1. Identifiants Bluesky", auth_status))
@@ -550,7 +567,9 @@ def menu_settings(config, state):
             get_app_state(config)
         elif choice == "2":
             _edit_config_value(
-                config, "download_dir", "Dossier de téléchargements",
+                config,
+                "download_dir",
+                "Dossier de téléchargements",
                 after_save=lambda: ensure_dirs(config),
             )
         elif choice == "3":
@@ -567,6 +586,7 @@ def menu_settings(config, state):
             _edit_config_value(config, "urls_file", "Fichier URLs")
         elif choice == "7" and advanced:
             from core.config import cleanup_logs
+
             deleted = cleanup_logs(config)
             print(c.success(f"{deleted} fichier(s) log supprimé(s)"))
             pause()
@@ -577,7 +597,7 @@ def menu_settings(config, state):
             download_media(config, force=True)
             pause()
         else:
-            print(c.error(f"Choix invalide : \"{choice}\""))
+            print(c.error(f'Choix invalide : "{choice}"'))
             pause()
 
 
@@ -591,7 +611,11 @@ def configure_credentials(config):
     has_pwd = bool(current_handle) and bool(load_app_password(config, current_handle))
 
     print(c.config_line("Handle actuel", current_handle or f"{c.DIM}non configuré{c.RESET}"))
-    print(c.config_line("App Password", f"{c.OK}configuré{c.RESET}" if has_pwd else f"{c.DIM}non configuré{c.RESET}"))
+    print(
+        c.config_line(
+            "App Password", f"{c.OK}configuré{c.RESET}" if has_pwd else f"{c.DIM}non configuré{c.RESET}"
+        )
+    )
     print()
     print(c.separator())
     print()
@@ -628,6 +652,7 @@ def configure_credentials(config):
     print(c.info("Test de connexion..."))
 
     from core.auth import AuthError, create_session
+
     try:
         session = create_session(handle, app_password)
         print(c.success("Connexion réussie !"))
@@ -639,12 +664,17 @@ def configure_credentials(config):
         config["pds_url"] = session["pds_url"]
         if backend == "config.json" and not config.get("warned_plaintext_secret", False):
             print(c.warning("AVERTISSEMENT : l'App Password est stocké en clair dans config.json."))
-            print(f"  {c.DIM}Installez keyring (pip install keyring) pour le placer dans le "
-                  f"trousseau du système.{c.RESET}")
+            print(
+                f"  {c.DIM}Installez keyring (pip install keyring) pour le placer dans le "
+                f"trousseau du système.{c.RESET}"
+            )
             config["warned_plaintext_secret"] = True
         save_config(config)
-        print(c.success("Identifiants sauvegardés"
-                        + (" (trousseau du système)" if backend == "keyring" else "")))
+        print(
+            c.success(
+                "Identifiants sauvegardés" + (" (trousseau du système)" if backend == "keyring" else "")
+            )
+        )
 
     except AuthError as e:
         print(c.error(f"Échec : {e}"))
@@ -699,6 +729,7 @@ def _edit_workers(config):
 
 
 # ─── Téléchargement ──────────────────────────────────────────
+
 
 def menu_download_new(config, state):
     """Menu Télécharger : synchronise si besoin, puis télécharge les nouveaux."""
@@ -831,6 +862,7 @@ def _proposer_ouverture(config, stats):
 
 # ─── Utilitaires ─────────────────────────────────────────────
 
+
 def open_download_folder(config):
     """Ouvre le dossier de téléchargements."""
     download_dir = config["download_dir"]
@@ -841,6 +873,7 @@ def open_download_folder(config):
 
 
 # ─── Boucle principale ──────────────────────────────────────
+
 
 def main(argv=None):
     """Point d'entrée : sous-commande -> CLI non interactive, sinon menu interactif.
@@ -858,6 +891,7 @@ def main(argv=None):
     migrate_secret_to_keyring(config)  # App Password en clair -> keyring si disponible
     ensure_dirs(config)
     from core.config import cleanup_old_logs
+
     cleanup_old_logs(config)
 
     try:
@@ -889,7 +923,7 @@ def run_menu(config):
         elif choice == "4":
             menu_download_new(config, state)
         else:
-            print(c.error(f"Choix invalide : \"{choice}\""))
+            print(c.error(f'Choix invalide : "{choice}"'))
             pause()
 
 
@@ -898,6 +932,7 @@ if __name__ == "__main__":
     # sinon conflit avec la capture de sortie de pytest)
     if sys.platform == "win32":
         import io
-        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
     sys.exit(main())

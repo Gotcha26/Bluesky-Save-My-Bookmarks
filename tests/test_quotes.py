@@ -1,4 +1,5 @@
 """Archivage des citations (quote posts, issue #5) : analyseur et résolveur réels, réseau et downloaders mockés."""
+
 import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -14,7 +15,12 @@ from downloaders import DownloadError, DownloadResult
 
 FIXTURES = Path(__file__).parent / "fixtures"
 D1, D2, D3, D4 = (f"did:plc:test{i}000000000000000000000" for i in (1, 2, 3, 4))
-HANDLES = {D1: "citant.example.com", D2: "cite.example.com", D3: "troisieme.example.com", D4: "quatrieme.example.com"}
+HANDLES = {
+    D1: "citant.example.com",
+    D2: "cite.example.com",
+    D3: "troisieme.example.com",
+    D4: "quatrieme.example.com",
+}
 BASE = "citant_example_com_20260210"  # <handle>_<date> du citant (handle sans points)
 
 
@@ -68,8 +74,17 @@ class Downloaders:
         self.erreur = erreur or {}
 
     def _fabriquer(self, nom, media_type, ext):
-        def telecharger(url, dest, config, session=None, name_prefix=None, record=None, existing_cid=None,
-                        did=None, view_embed=None):
+        def telecharger(
+            url,
+            dest,
+            config,
+            session=None,
+            name_prefix=None,
+            record=None,
+            existing_cid=None,
+            did=None,
+            view_embed=None,
+        ):
             self.appels.append((nom, url, name_prefix))
             cle = (nom, url) if (nom, url) in self.erreur else url
             if cle in self.erreur:
@@ -79,6 +94,7 @@ class Downloaders:
             base = name_prefix or f"propre_{url.rsplit('/', 1)[-1]}"
             suffixe = "" if media_type == "text" else "_1"
             return [DownloadResult(f"{base}{suffixe}.{ext}", Path(f"{base}{suffixe}.{ext}"), media_type, 3)]
+
         return telecharger
 
     def patch(self):
@@ -101,8 +117,16 @@ def lancer(url, records, tmp_db, tmp_path, statuts=None, downloaders=None, non_r
     session.get.side_effect = reseau
     with downloaders.patch():
         resultat = process_post(
-            url, "IMG", "VID", "TXT", tmp_db, PostAnalyzer(session), QuoteResolver(session), tmp_path,
-            lambda msg, **k: journal.append(msg), config={"max_filename_len": 120, "save_sidecar": sidecar},
+            url,
+            "IMG",
+            "VID",
+            "TXT",
+            tmp_db,
+            PostAnalyzer(session),
+            QuoteResolver(session),
+            tmp_path,
+            lambda msg, **k: journal.append(msg),
+            config={"max_filename_len": 120, "save_sidecar": sidecar},
             quotes_unresolved=non_resolues,
         )
     return resultat, downloaders, journal, reseau
@@ -124,7 +148,9 @@ def statut(db, url):
 class TestCitationDeTexte:
     def test_le_citant_est_archive_puis_le_cite_avec_le_prefixe(self, tmp_db, tmp_path):
         url = url_citant("quote_text.json")
-        res, dl, _, _ = lancer(url, [charger("quote_text.json"), post_texte(D2, "3kcited0001")], tmp_db, tmp_path)
+        res, dl, _, _ = lancer(
+            url, [charger("quote_text.json"), post_texte(D2, "3kcited0001")], tmp_db, tmp_path
+        )
 
         assert res[0] is True and res[4] == "success"
         assert res[3] == 2  # deux textes
@@ -140,18 +166,25 @@ class TestCitationDeTexte:
         assert tmp_db.conn.execute("SELECT COUNT(*) FROM posts").fetchone()[0] == 1
 
     def test_cite_avec_images_utilise_le_downloader_d_images(self, tmp_db, tmp_path):
-        images = {"$type": "app.bsky.embed.images", "images": [{"image": {"ref": {"$link": "bafkreitestimage"}}}]}
+        images = {
+            "$type": "app.bsky.embed.images",
+            "images": [{"image": {"ref": {"$link": "bafkreitestimage"}}}],
+        }
         url = url_citant("quote_text.json")
-        res, dl, _, _ = lancer(url, [charger("quote_text.json"), post_texte(D2, "3kcited0001", embed=images)],
-                               tmp_db, tmp_path)
+        res, dl, _, _ = lancer(
+            url, [charger("quote_text.json"), post_texte(D2, "3kcited0001", embed=images)], tmp_db, tmp_path
+        )
         assert ("download_images", f"{BASE}_3kquote0001_quote") in dl.noms()
-        assert res[1] == 1 and res[3] == 2  # une image citée, le texte du citant et celui du cité (write_text)
+        assert (
+            res[1] == 1 and res[3] == 2
+        )  # une image citée, le texte du citant et celui du cité (write_text)
 
     def test_cite_avec_video(self, tmp_db, tmp_path):
         video = {"$type": "app.bsky.embed.video", "video": {"ref": {"$link": "bafkreitestvideo"}}}
         url = url_citant("quote_text.json")
-        res, dl, _, _ = lancer(url, [charger("quote_text.json"), post_texte(D2, "3kcited0001", embed=video)],
-                               tmp_db, tmp_path)
+        res, dl, _, _ = lancer(
+            url, [charger("quote_text.json"), post_texte(D2, "3kcited0001", embed=video)], tmp_db, tmp_path
+        )
         assert ("download_video", f"{BASE}_3kquote0001_quote") in dl.noms()
         assert res[2] == 1
 
@@ -159,8 +192,9 @@ class TestCitationDeTexte:
 class TestFichesJsonDesCitations:
     def test_le_cite_a_sa_propre_fiche_json_prefixee(self, tmp_db, tmp_path):
         url = url_citant("quote_text.json")
-        res, _, _, _ = lancer(url, [charger("quote_text.json"), post_texte(D2, "3kcited0001")], tmp_db, tmp_path,
-                              sidecar=True)
+        res, _, _, _ = lancer(
+            url, [charger("quote_text.json"), post_texte(D2, "3kcited0001")], tmp_db, tmp_path, sidecar=True
+        )
         fiches = [r for r in medias(tmp_db) if r.endswith(".json")]
         assert fiches == [f"{BASE}_3kquote0001.json", f"{BASE}_3kquote0001_quote.json"]
         cite = json.loads((tmp_path / "TXT" / f"{BASE}_3kquote0001_quote.json").read_text(encoding="utf-8"))
@@ -170,12 +204,19 @@ class TestFichesJsonDesCitations:
 
 class TestCitantSansTextePropre:
     """Citation dont save_text ne renvoie rien : le citant a quand même son .txt (Cite:) et sa fiche JSON."""
+
     IMAGES = {"$type": "app.bsky.embed.images", "images": [{"image": {"ref": {"$link": "bafkreitestimage"}}}]}
 
     def test_txt_et_json_du_citant_ecrits_et_enregistres(self, tmp_db, tmp_path):
         url = url_citant("quote_text.json")
-        res, _, _, _ = lancer(url, [charger("quote_text.json"), post_texte(D2, "3kcited0001", embed=self.IMAGES)],
-                              tmp_db, tmp_path, downloaders=Downloaders(texte_vide=True), sidecar=True)
+        res, _, _, _ = lancer(
+            url,
+            [charger("quote_text.json"), post_texte(D2, "3kcited0001", embed=self.IMAGES)],
+            tmp_db,
+            tmp_path,
+            downloaders=Downloaders(texte_vide=True),
+            sidecar=True,
+        )
         assert res[0] is True and res[4] == "success"
         base = f"{BASE}_3kquote0001"
         txt = tmp_path / "TXT" / f"{base}.txt"
@@ -186,8 +227,14 @@ class TestCitantSansTextePropre:
 
     def test_cite_non_archive_pas_de_fichiers_du_citant(self, tmp_db, tmp_path):
         url = url_citant("quote_text.json")
-        res, _, _, _ = lancer(url, [charger("quote_text.json")], tmp_db, tmp_path,
-                              downloaders=Downloaders(texte_vide=True), sidecar=True)
+        res, _, _, _ = lancer(
+            url,
+            [charger("quote_text.json")],
+            tmp_db,
+            tmp_path,
+            downloaders=Downloaders(texte_vide=True),
+            sidecar=True,
+        )
         assert res[0] is False
         assert not (tmp_path / "TXT").exists()
 
@@ -195,8 +242,9 @@ class TestCitantSansTextePropre:
 class TestCitationAvecMedia:
     def test_media_du_citant_texte_puis_cite(self, tmp_db, tmp_path):
         url = url_citant("quote_with_media.json")
-        res, dl, _, _ = lancer(url, [charger("quote_with_media.json"), post_texte(D2, "3kcited0001")],
-                               tmp_db, tmp_path)
+        res, dl, _, _ = lancer(
+            url, [charger("quote_with_media.json"), post_texte(D2, "3kcited0001")], tmp_db, tmp_path
+        )
         assert res[4] == "success"
         assert dl.noms() == [
             ("download_images", None),
@@ -212,8 +260,13 @@ class TestEchecDuContenuPropre:
     def test_images_en_erreur_texte_ok_est_failed(self, tmp_db, tmp_path):
         url = url_citant("quote_with_media.json")
         dl = Downloaders(erreur={("download_images", url): "API"})
-        res, _, _, _ = lancer(url, [charger("quote_with_media.json"), post_texte(D2, "3kcited0001")],
-                              tmp_db, tmp_path, downloaders=dl)
+        res, _, _, _ = lancer(
+            url,
+            [charger("quote_with_media.json"), post_texte(D2, "3kcited0001")],
+            tmp_db,
+            tmp_path,
+            downloaders=dl,
+        )
         assert res[0] is False and res[4] == "failed"
         # ce qui a été obtenu est conservé en base (le texte du citant, écrit avec le média, attend la réussite)
         assert len(medias(tmp_db)) == 1
@@ -224,18 +277,22 @@ class TestEchecDuContenuPropre:
         tmp_db.add_post(url)
         tmp_db.mark_post_status(url, "unknown")
         dl = Downloaders(erreur={("save_text", url): "API"})
-        res, _, _, _ = lancer(url, [charger("quote_text.json"), post_texte(D2, "3kcited0001")],
-                              tmp_db, tmp_path, downloaders=dl)
+        res, _, _, _ = lancer(
+            url, [charger("quote_text.json"), post_texte(D2, "3kcited0001")], tmp_db, tmp_path, downloaders=dl
+        )
         assert res[0] is False and res[4] == "failed"
         assert statut(tmp_db, url) == "unknown"  # reste retentable
         assert len(medias(tmp_db)) == 1
 
     def test_cite_externe_archive_par_son_texte_avec_note(self, tmp_db, tmp_path):
-        externe = {"$type": "app.bsky.embed.external",
-                   "external": {"uri": "https://example.com/x", "title": "t", "description": "d"}}
+        externe = {
+            "$type": "app.bsky.embed.external",
+            "external": {"uri": "https://example.com/x", "title": "t", "description": "d"},
+        }
         url = url_citant("quote_text.json")
-        res, dl, journal, _ = lancer(url, [charger("quote_text.json"),
-                                           post_texte(D2, "3kcited0001", embed=externe)], tmp_db, tmp_path)
+        res, dl, journal, _ = lancer(
+            url, [charger("quote_text.json"), post_texte(D2, "3kcited0001", embed=externe)], tmp_db, tmp_path
+        )
         assert res[4] == "success"
         assert ("save_text", f"{BASE}_3kquote0001_quote") in dl.noms()
         assert any("carte de lien non archivée (texte seul)" in m for m in journal)
@@ -260,12 +317,19 @@ class TestRecordCiteNonArchivable:
         assert not any("CITATION NON ARCHIVÉE" in m for m in journal)
 
     @pytest.mark.parametrize("statut_http", [500, 429])
-    def test_cite_en_erreur_serveur_le_citant_reste_ok_et_la_citation_est_notee(self, tmp_db, tmp_path, statut_http):
+    def test_cite_en_erreur_serveur_le_citant_reste_ok_et_la_citation_est_notee(
+        self, tmp_db, tmp_path, statut_http
+    ):
         url = url_citant("quote_text.json")
         non_resolues = []
-        res, dl, journal, _ = lancer(url, [charger("quote_text.json"), post_texte(D2, "3kcited0001")],
-                                     tmp_db, tmp_path, statuts={"3kcited0001": statut_http},
-                                     non_resolues=non_resolues)
+        res, dl, journal, _ = lancer(
+            url,
+            [charger("quote_text.json"), post_texte(D2, "3kcited0001")],
+            tmp_db,
+            tmp_path,
+            statuts={"3kcited0001": statut_http},
+            non_resolues=non_resolues,
+        )
         assert res[4] == "success"
         assert statut(tmp_db, url) == "ok"
         assert non_resolues == [url]
@@ -275,25 +339,36 @@ class TestRecordCiteNonArchivable:
         url = url_citant("quote_text.json")
         cite = f"https://bsky.app/profile/{HANDLES[D2]}/post/3kcited0001"
         non_resolues = []
-        res, _, journal, _ = lancer(url, [charger("quote_text.json"), post_texte(D2, "3kcited0001")],
-                                    tmp_db, tmp_path, downloaders=Downloaders(erreur={cite: "API"}),
-                                    non_resolues=non_resolues)
+        res, _, journal, _ = lancer(
+            url,
+            [charger("quote_text.json"), post_texte(D2, "3kcited0001")],
+            tmp_db,
+            tmp_path,
+            downloaders=Downloaders(erreur={cite: "API"}),
+            non_resolues=non_resolues,
+        )
         assert res[4] == "success" and statut(tmp_db, url) == "ok"
         assert non_resolues == [url]
         assert any(f"CITATION NON ARCHIVÉE: {cite}" in m for m in journal)
 
     def test_citant_sans_contenu_et_cite_en_echec_est_failed(self, tmp_db, tmp_path):
         url = url_citant("quote_text.json")
-        res, _, _, _ = lancer(url, [charger("quote_text.json"), post_texte(D2, "3kcited0001")], tmp_db, tmp_path,
-                              statuts={"3kcited0001": 500},
-                              downloaders=Downloaders(erreur={url: "API"}))
+        res, _, _, _ = lancer(
+            url,
+            [charger("quote_text.json"), post_texte(D2, "3kcited0001")],
+            tmp_db,
+            tmp_path,
+            statuts={"3kcited0001": 500},
+            downloaders=Downloaders(erreur={url: "API"}),
+        )
         assert res[0] is False and res[4] == "failed"
         assert tmp_db.conn.execute("SELECT COUNT(*) FROM media").fetchone()[0] == 0
 
     def test_citant_sans_texte_et_cite_supprime_est_deleted(self, tmp_db, tmp_path):
         url = url_citant("quote_text.json")
-        res, _, _, _ = lancer(url, [charger("quote_text.json")], tmp_db, tmp_path,
-                              downloaders=Downloaders(texte_vide=True))
+        res, _, _, _ = lancer(
+            url, [charger("quote_text.json")], tmp_db, tmp_path, downloaders=Downloaders(texte_vide=True)
+        )
         assert res[0] is False and res[4] == "error_400"
         assert statut(tmp_db, url) == "deleted"
 
@@ -310,8 +385,18 @@ class TestRecordCiteNonArchivable:
         session = MagicMock()
         session.get.side_effect = reseau
         with dl.patch(), patch.object(orchestrator, "save_text", save_text):
-            res = process_post(url, "IMG", "VID", "TXT", tmp_db, PostAnalyzer(session), QuoteResolver(session), tmp_path,
-                               lambda *a, **k: None, config={})
+            res = process_post(
+                url,
+                "IMG",
+                "VID",
+                "TXT",
+                tmp_db,
+                PostAnalyzer(session),
+                QuoteResolver(session),
+                tmp_path,
+                lambda *a, **k: None,
+                config={},
+            )
         assert res[4] == "success" and statut(tmp_db, url) == "ok"
 
 
@@ -324,9 +409,9 @@ class TestProfondeur:
 
         base = f"{BASE}_3kchain000a"
         assert dl.noms() == [
-            ("save_text", None),                  # A
-            ("save_text", f"{base}_quote"),       # B
-            ("save_text", f"{base}_quote2"),      # C (cité de B, préfixé par A)
+            ("save_text", None),  # A
+            ("save_text", f"{base}_quote"),  # B
+            ("save_text", f"{base}_quote2"),  # C (cité de B, préfixé par A)
         ]
         assert not any("3kchain000d" in u for _, u, _ in dl.appels)  # rien pour D
         assert "3kchain000d" not in reseau.rkeys_lus
@@ -343,7 +428,13 @@ class TestProfondeur:
     def test_echec_du_maillon_c_n_invalide_pas_a_et_b(self, tmp_db, tmp_path):
         url = url_citant("quote_chain_a.json")
         non_resolues = []
-        res, dl, _, _ = lancer(url, [charger(n) for n in self.RECORDS], tmp_db, tmp_path,
-                               statuts={"3kchain000c": 500}, non_resolues=non_resolues)
+        res, dl, _, _ = lancer(
+            url,
+            [charger(n) for n in self.RECORDS],
+            tmp_db,
+            tmp_path,
+            statuts={"3kchain000c": 500},
+            non_resolues=non_resolues,
+        )
         assert res[4] == "success" and res[3] == 2
         assert non_resolues == [url]

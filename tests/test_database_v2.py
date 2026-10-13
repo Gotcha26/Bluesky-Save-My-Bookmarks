@@ -1,4 +1,5 @@
 """Tests de la base de données : statut conservé, doublons, relance des erreurs, migrations (issue #9)."""
+
 import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -67,7 +68,11 @@ class TestAddPostConserveLeStatut:
         assert tmp_db.get_stats()["posts"] == 1
         assert _ligne(tmp_db, URL) is None
         ligne = _ligne(tmp_db, nouvelle)
-        assert (ligne["handle"], ligne["status"], ligne["added_at"]) == ("nouveau.bsky.social", "error_500", added_at)
+        assert (ligne["handle"], ligne["status"], ligne["added_at"]) == (
+            "nouveau.bsky.social",
+            "error_500",
+            added_at,
+        )
         medias = tmp_db.conn.execute("SELECT post_url, filename FROM media").fetchall()
         assert [tuple(m) for m in medias] == [(nouvelle, "a.jpg")]
 
@@ -75,6 +80,7 @@ class TestAddPostConserveLeStatut:
         import inspect
 
         import core.database
+
         assert "INSERT OR REPLACE" not in inspect.getsource(core.database).upper()
 
 
@@ -170,16 +176,34 @@ class TestGetPendingPosts:
 class TestMigrations:
     def _base_v0(self, chemin):
         conn = sqlite3.connect(chemin)
-        conn.execute("CREATE TABLE posts (url TEXT PRIMARY KEY, post_id TEXT, handle TEXT, "
-                     "added_at TEXT, last_check TEXT)")
-        conn.execute("CREATE TABLE media (id INTEGER PRIMARY KEY AUTOINCREMENT, post_url TEXT, "
-                     "media_type TEXT, filename TEXT, downloaded_at TEXT, "
-                     "FOREIGN KEY(post_url) REFERENCES posts(url))")
-        conn.execute("INSERT INTO posts VALUES (?, '3k1', 'user', '2025-01-01T00:00:00', '2025-01-02T00:00:00')", (URL,))
-        conn.execute("INSERT INTO media (post_url, media_type, filename, downloaded_at) VALUES (?, 'image', 'image_0', 't1')", (URL,))
-        conn.execute("INSERT INTO media (post_url, media_type, filename, downloaded_at) VALUES (?, 'image', 'image_0', 't2')", (URL,))
-        conn.execute("INSERT INTO media (post_url, media_type, filename, downloaded_at) VALUES (?, 'video', 'v.mp4', 't3')", (URL,))
-        conn.execute("INSERT INTO media (post_url, media_type, filename, downloaded_at) VALUES ('https://orphelin', 'image', 'x.jpg', 't4')")
+        conn.execute(
+            "CREATE TABLE posts (url TEXT PRIMARY KEY, post_id TEXT, handle TEXT, "
+            "added_at TEXT, last_check TEXT)"
+        )
+        conn.execute(
+            "CREATE TABLE media (id INTEGER PRIMARY KEY AUTOINCREMENT, post_url TEXT, "
+            "media_type TEXT, filename TEXT, downloaded_at TEXT, "
+            "FOREIGN KEY(post_url) REFERENCES posts(url))"
+        )
+        conn.execute(
+            "INSERT INTO posts VALUES (?, '3k1', 'user', '2025-01-01T00:00:00', '2025-01-02T00:00:00')",
+            (URL,),
+        )
+        conn.execute(
+            "INSERT INTO media (post_url, media_type, filename, downloaded_at) VALUES (?, 'image', 'image_0', 't1')",
+            (URL,),
+        )
+        conn.execute(
+            "INSERT INTO media (post_url, media_type, filename, downloaded_at) VALUES (?, 'image', 'image_0', 't2')",
+            (URL,),
+        )
+        conn.execute(
+            "INSERT INTO media (post_url, media_type, filename, downloaded_at) VALUES (?, 'video', 'v.mp4', 't3')",
+            (URL,),
+        )
+        conn.execute(
+            "INSERT INTO media (post_url, media_type, filename, downloaded_at) VALUES ('https://orphelin', 'image', 'x.jpg', 't4')"
+        )
         conn.commit()
         conn.close()
 
@@ -199,7 +223,9 @@ class TestMigrations:
             assert {"status", "at_uri", "did", "rkey"} <= colonnes
             ligne = _ligne(db, URL)
             assert (ligne["status"], ligne["added_at"]) == ("ok", "2025-01-01T00:00:00")
-            medias = [tuple(m) for m in db.conn.execute("SELECT filename, downloaded_at FROM media ORDER BY id")]
+            medias = [
+                tuple(m) for m in db.conn.execute("SELECT filename, downloaded_at FROM media ORDER BY id")
+            ]
             assert medias == [("image_0", "t1"), ("v.mp4", "t3")]  # doublon et orphelin retirés
             assert "cid" in {r[1] for r in db.conn.execute("PRAGMA table_info(media)")}
             db.add_media(URL, "image", "v.mp4")
@@ -248,8 +274,10 @@ def _downloaders(resultats=(), erreur=None):
     """Les trois downloaders mockés, renvoyant tous `resultats` (ou levant `erreur`)."""
     return patch.multiple(
         "core.orchestrator",
-        **{nom: MagicMock(return_value=list(resultats), side_effect=erreur)
-           for nom in ("download_images", "download_video", "save_text")},
+        **{
+            nom: MagicMock(return_value=list(resultats), side_effect=erreur)
+            for nom in ("download_images", "download_video", "save_text")
+        },
     )
 
 
@@ -257,8 +285,9 @@ def _lancer(db, tmp_path, post_type, data, resultats=(), erreur=None, resolver=N
     analyzer = MagicMock()
     analyzer.analyze.return_value = (post_type, data, {"embed_type": "x"})
     with _downloaders(resultats, erreur):
-        return process_post(url, "IMG", "VID", "TXT", db, analyzer, resolver or MagicMock(),
-                            tmp_path, lambda *a, **k: None)
+        return process_post(
+            url, "IMG", "VID", "TXT", db, analyzer, resolver or MagicMock(), tmp_path, lambda *a, **k: None
+        )
 
 
 def _medias(db):
@@ -351,8 +380,18 @@ class TestCitationEnEchec:
 
         non_resolues = []
         with patch.multiple("core.orchestrator", save_text=save_text):
-            res = process_post(URL, "IMG", "VID", "TXT", db, analyzer, resolver, tmp_path,
-                               lambda *a, **k: None, quotes_unresolved=non_resolues)
+            res = process_post(
+                URL,
+                "IMG",
+                "VID",
+                "TXT",
+                db,
+                analyzer,
+                resolver,
+                tmp_path,
+                lambda *a, **k: None,
+                quotes_unresolved=non_resolues,
+            )
         return res, non_resolues
 
     def test_cite_en_erreur_500_le_citant_reste_ok(self, tmp_db, tmp_path):
@@ -364,7 +403,8 @@ class TestCitationEnEchec:
 
     def test_echec_de_telechargement_du_cite_le_citant_reste_ok(self, tmp_db, tmp_path):
         res, non_resolues = self._citant_dont_le_cite(
-            tmp_db, tmp_path, PostType.TEXT_ONLY, erreur_cite=DownloadError("API"))
+            tmp_db, tmp_path, PostType.TEXT_ONLY, erreur_cite=DownloadError("API")
+        )
         assert res[4] == "success"
         assert _ligne(tmp_db, URL)["status"] == "ok"
         assert non_resolues == [URL]
@@ -387,8 +427,12 @@ class TestSynchronisation:
         tmp_db.mark_post_status(URL, "error_500")
         _vieillir(tmp_db, URL, 9)
         mock_fetch.return_value = {
-            "urls": [URL], "posts": [{"at_uri": None, "url": URL}],
-            "count": 1, "pages": 1, "error": None, "expired": False,
+            "urls": [URL],
+            "posts": [{"at_uri": None, "url": URL}],
+            "count": 1,
+            "pages": 1,
+            "error": None,
+            "expired": False,
         }
         result = BookmarkSync(tmp_config, tmp_db).sync("Bearer t")
         assert result["new_urls"] == [URL]

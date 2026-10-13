@@ -1,4 +1,5 @@
 """Tests de downloaders/archive.py : facets, fichier texte et sidecar JSON (issue #7)."""
+
 import json
 import os
 from pathlib import Path
@@ -28,16 +29,20 @@ def record(post):
 def _lien(texte, sous, uri):
     """Facet de lien sur la première occurrence de `sous` (index en octets UTF-8)."""
     debut = texte.encode("utf-8").index(sous.encode("utf-8"))
-    return {"index": {"byteStart": debut, "byteEnd": debut + len(sous.encode("utf-8"))},
-            "features": [{"$type": "app.bsky.richtext.facet#link", "uri": uri}]}
+    return {
+        "index": {"byteStart": debut, "byteEnd": debut + len(sous.encode("utf-8"))},
+        "features": [{"$type": "app.bsky.richtext.facet#link", "uri": uri}],
+    }
 
 
 class TestResolveFacets:
     def test_lien_apres_des_emojis_index_en_octets(self, record):
         # Les index sont des octets UTF-8 : « 🎉🔥 » pèse 8 octets pour 2 caractères
         resultat = resolve_facets(record["text"], record["facets"])
-        assert resultat == ("🎉🔥 Voir libidex.example/article-tres-lo... (https://libidex.example/article-tres-long-titre)"
-                            " avec @alice.example.com et #bluesky é")
+        assert resultat == (
+            "🎉🔥 Voir libidex.example/article-tres-lo... (https://libidex.example/article-tres-long-titre)"
+            " avec @alice.example.com et #bluesky é"
+        )
 
     def test_les_index_ne_sont_pas_des_caracteres(self):
         texte = "😀😀😀 site.test"
@@ -61,13 +66,21 @@ class TestResolveFacets:
     def test_facet_hors_bornes_ignoree(self):
         texte = "Voir site.test"
         bonne = _lien(texte, "site.test", "https://site.test")
-        hors = {"index": {"byteStart": 3, "byteEnd": 400},
-                "features": [{"$type": "app.bsky.richtext.facet#link", "uri": "https://x.test"}]}
-        negative = {"index": {"byteStart": -2, "byteEnd": 3},
-                    "features": [{"$type": "app.bsky.richtext.facet#link", "uri": "https://y.test"}]}
-        inversee = {"index": {"byteStart": 8, "byteEnd": 4},
-                    "features": [{"$type": "app.bsky.richtext.facet#link", "uri": "https://z.test"}]}
-        assert resolve_facets(texte, [hors, negative, inversee, bonne]) == "Voir site.test (https://site.test)"
+        hors = {
+            "index": {"byteStart": 3, "byteEnd": 400},
+            "features": [{"$type": "app.bsky.richtext.facet#link", "uri": "https://x.test"}],
+        }
+        negative = {
+            "index": {"byteStart": -2, "byteEnd": 3},
+            "features": [{"$type": "app.bsky.richtext.facet#link", "uri": "https://y.test"}],
+        }
+        inversee = {
+            "index": {"byteStart": 8, "byteEnd": 4},
+            "features": [{"$type": "app.bsky.richtext.facet#link", "uri": "https://z.test"}],
+        }
+        assert (
+            resolve_facets(texte, [hors, negative, inversee, bonne]) == "Voir site.test (https://site.test)"
+        )
 
     def test_facet_chevauchante_ignoree(self):
         texte = "abc def ghi"
@@ -77,15 +90,23 @@ class TestResolveFacets:
 
     def test_facet_coupant_un_caractere_ignoree(self):
         texte = "é site.test"  # « é » pèse 2 octets : byteStart 1 coupe le caractère
-        coupee = {"index": {"byteStart": 1, "byteEnd": 5},
-                  "features": [{"$type": "app.bsky.richtext.facet#link", "uri": "https://x.test"}]}
+        coupee = {
+            "index": {"byteStart": 1, "byteEnd": 5},
+            "features": [{"$type": "app.bsky.richtext.facet#link", "uri": "https://x.test"}],
+        }
         assert resolve_facets(texte, [coupee]) == texte
 
     def test_facets_malformees_sans_exception(self):
         texte = "Voir site.test"
-        for facet in ({}, {"index": None}, {"index": {"byteStart": "a", "byteEnd": 3}, "features": []},
-                      {"index": {"byteStart": 0, "byteEnd": 3}, "features": None},
-                      {"index": {"byteStart": 0, "byteEnd": 3}, "features": [{"$type": "autre"}]}, "x", None):
+        for facet in (
+            {},
+            {"index": None},
+            {"index": {"byteStart": "a", "byteEnd": 3}, "features": []},
+            {"index": {"byteStart": 0, "byteEnd": 3}, "features": None},
+            {"index": {"byteStart": 0, "byteEnd": 3}, "features": [{"$type": "autre"}]},
+            "x",
+            None,
+        ):
             assert resolve_facets(texte, [facet]) == texte
 
     def test_facets_desordonnees(self):
@@ -126,39 +147,61 @@ class TestWriteText:
         assert "[Image 2 : Deuxième]" in texte
 
     def test_alts_fournis_prioritaires(self, tmp_path, record):
-        texte = write_text(URL, record, tmp_path, DEFAULT_CONFIG,
-                           alts=["Autre alt", ""])[0].path.read_text(encoding="utf-8")
+        texte = write_text(URL, record, tmp_path, DEFAULT_CONFIG, alts=["Autre alt", ""])[0].path.read_text(
+            encoding="utf-8"
+        )
         assert "[Image 1 : Autre alt]" in texte
         assert "Un chat noir" not in texte
 
     def test_video(self, tmp_path):
-        record = {"text": "Clip", "createdAt": "2026-02-03T09:08:07.123Z",
-                  "embed": {"$type": "app.bsky.embed.video", "alt": "Un chien qui court", "video": {}}}
+        record = {
+            "text": "Clip",
+            "createdAt": "2026-02-03T09:08:07.123Z",
+            "embed": {"$type": "app.bsky.embed.video", "alt": "Un chien qui court", "video": {}},
+        }
         texte = write_text(URL, record, tmp_path, DEFAULT_CONFIG)[0].path.read_text(encoding="utf-8")
         assert texte.endswith("Clip\n\n[Vidéo : Un chien qui court]\n")
         assert "Langue" not in texte
 
     def test_media_d_un_recordwithmedia(self, tmp_path):
-        record = {"text": "Cité", "createdAt": "2026-02-03T09:08:07.123Z",
-                  "embed": {"$type": "app.bsky.embed.recordWithMedia",
-                            "record": {"$type": "app.bsky.embed.record",
-                                       "record": {"uri": "at://did:plc:x/app.bsky.feed.post/3kcite", "cid": "c"}},
-                            "media": {"$type": "app.bsky.embed.images",
-                                      "images": [{"alt": "Dessin", "image": {}}]}}}
+        record = {
+            "text": "Cité",
+            "createdAt": "2026-02-03T09:08:07.123Z",
+            "embed": {
+                "$type": "app.bsky.embed.recordWithMedia",
+                "record": {
+                    "$type": "app.bsky.embed.record",
+                    "record": {"uri": "at://did:plc:x/app.bsky.feed.post/3kcite", "cid": "c"},
+                },
+                "media": {"$type": "app.bsky.embed.images", "images": [{"alt": "Dessin", "image": {}}]},
+            },
+        }
         texte = write_text(URL, record, tmp_path, DEFAULT_CONFIG)[0].path.read_text(encoding="utf-8")
-        assert texte.endswith("Cité\n\n[Image 1 : Dessin]\n\nCite: at://did:plc:x/app.bsky.feed.post/3kcite\n")
+        assert texte.endswith(
+            "Cité\n\n[Image 1 : Dessin]\n\nCite: at://did:plc:x/app.bsky.feed.post/3kcite\n"
+        )
 
     def test_citation_simple(self, tmp_path):
-        record = {"text": "Je cite", "createdAt": "2026-02-03T09:08:07.123Z",
-                  "embed": {"$type": "app.bsky.embed.record",
-                            "record": {"uri": "at://did:plc:x/app.bsky.feed.post/3kcite", "cid": "c"}}}
+        record = {
+            "text": "Je cite",
+            "createdAt": "2026-02-03T09:08:07.123Z",
+            "embed": {
+                "$type": "app.bsky.embed.record",
+                "record": {"uri": "at://did:plc:x/app.bsky.feed.post/3kcite", "cid": "c"},
+            },
+        }
         texte = write_text(URL, record, tmp_path, DEFAULT_CONFIG)[0].path.read_text(encoding="utf-8")
         assert texte.endswith("Je cite\n\nCite: at://did:plc:x/app.bsky.feed.post/3kcite\n")
 
     def test_external(self, tmp_path):
-        record = {"text": "Un lien", "createdAt": "2026-02-03T09:08:07.123Z",
-                  "embed": {"$type": "app.bsky.embed.external",
-                            "external": {"uri": "https://exemple.org/a", "title": "Titre", "description": "Desc"}}}
+        record = {
+            "text": "Un lien",
+            "createdAt": "2026-02-03T09:08:07.123Z",
+            "embed": {
+                "$type": "app.bsky.embed.external",
+                "external": {"uri": "https://exemple.org/a", "title": "Titre", "description": "Desc"},
+            },
+        }
         texte = write_text(URL, record, tmp_path, DEFAULT_CONFIG)[0].path.read_text(encoding="utf-8")
         assert texte.endswith("Un lien\n\nLien: https://exemple.org/a\nTitre: Titre\nDescription: Desc\n")
 
@@ -211,10 +254,13 @@ class TestWriteSidecar:
         assert json.loads(r.path.read_text(encoding="utf-8"))["at_uri"] == AT_URI
         r = write_sidecar(URL, record, None, tmp_path, DEFAULT_CONFIG)[0]
         assert json.loads(r.path.read_text(encoding="utf-8"))["at_uri"] == (
-            "at://auteur.example.com/app.bsky.feed.post/3ktestfacets")
+            "at://auteur.example.com/app.bsky.feed.post/3ktestfacets"
+        )
 
     def test_name_prefix(self, tmp_path, record):
-        r = write_sidecar(URL, record, None, tmp_path, DEFAULT_CONFIG, name_prefix="citant_20260210_3kq_quote2")[0]
+        r = write_sidecar(
+            URL, record, None, tmp_path, DEFAULT_CONFIG, name_prefix="citant_20260210_3kq_quote2"
+        )[0]
         assert r.filename == "citant_20260210_3kq_quote2.json"
 
     def test_aucun_fichier_temporaire_ne_subsiste(self, tmp_path, record):

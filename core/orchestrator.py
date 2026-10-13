@@ -9,6 +9,7 @@ ThreadPoolExecutor ; aucun sous-processus Python n'est lancé.
 
 Usage manuel : python core/orchestrator.py <IMG_DIR> <VID_DIR> <TEXT_DIR> [--no-db] <URL1> [URL2] ...
 """
+
 import json
 import os
 import subprocess
@@ -67,7 +68,7 @@ def get_folder_size(path):
 
 
 def format_size(size_bytes):
-    for unit in ['o', 'Ko', 'Mo', 'Go']:
+    for unit in ["o", "Ko", "Mo", "Go"]:
         if size_bytes < 1024.0:
             return f"{size_bytes:.2f} {unit}"
         size_bytes /= 1024.0
@@ -127,6 +128,7 @@ def _telecharger(downloader, url, dest_dir, config, buf_print, log_func, erreurs
 @dataclass
 class _Contexte:
     """Ce dont l'archivage d'un post (et de ses citations) a besoin."""
+
     dirs: dict
     config: dict
     analyzer: object
@@ -134,7 +136,7 @@ class _Contexte:
     buf_print: object
     log_func: object
     db: object = None
-    session: object = None   # session HTTP partagée (None : les downloaders prennent core.http.get_session())
+    session: object = None  # session HTTP partagée (None : les downloaders prennent core.http.get_session())
 
 
 def _session(ctx):
@@ -154,10 +156,13 @@ def _chemin_par_cid(ctx):
     def chemin(cid):
         nom = ctx.db.find_media_by_cid(cid)
         return str(Path(ctx.dirs["img_dir"]) / nom) if nom else None
+
     return chemin
 
 
-def _contenu_propre(post_type, data, url, ctx, name_prefix=None, erreurs=None, debug_info=None, post_view=None):
+def _contenu_propre(
+    post_type, data, url, ctx, name_prefix=None, erreurs=None, debug_info=None, post_view=None
+):
     """
     Télécharge le contenu propre d'un post selon son type (sans suivre sa citation), puis
     écrit son texte lisible (.txt) et sa fiche JSON.
@@ -179,28 +184,56 @@ def _contenu_propre(post_type, data, url, ctx, name_prefix=None, erreurs=None, d
 
     if post_type == PostType.IMAGES:
         ctx.buf_print(c.info(f"{data.get('image_count', 1)} image(s) détectée(s)"))
-        results = _telecharger(download_images, url, dirs["img_dir"], *args, erreurs=erreurs,
-                               record=record, existing_cid=_chemin_par_cid(ctx), **_session(ctx), **options)
+        results = _telecharger(
+            download_images,
+            url,
+            dirs["img_dir"],
+            *args,
+            erreurs=erreurs,
+            record=record,
+            existing_cid=_chemin_par_cid(ctx),
+            **_session(ctx),
+            **options,
+        )
     elif post_type == PostType.VIDEO:
         ctx.buf_print(c.info("Vidéo détectée"))
         full = (debug_info or {}).get("full_data") or {}
-        results = _telecharger(download_video, url, dirs["vid_dir"], *args, erreurs=erreurs,
-                               record=full.get("value") or full.get("record"), did=data.get("did"),
-                               view_embed=data.get("view_embed"), **_session(ctx), **options)
+        results = _telecharger(
+            download_video,
+            url,
+            dirs["vid_dir"],
+            *args,
+            erreurs=erreurs,
+            record=full.get("value") or full.get("record"),
+            did=data.get("did"),
+            view_embed=data.get("view_embed"),
+            **_session(ctx),
+            **options,
+        )
     elif post_type == PostType.EXTERNAL and not cite:
         # Embed externe : carte de lien, GIF, lien tiers
         ctx.buf_print(c.info("Lien externe détecté"))
         donnees = {**data, "record": record} if record else data  # le record donne facets et langue au .txt
         results = _telecharger(
             lambda u, _dest, cfg: download_external(u, donnees, dirs, cfg, **_session(ctx)),
-            url, dirs["text_dir"], *args, erreurs=erreurs)
+            url,
+            dirs["text_dir"],
+            *args,
+            erreurs=erreurs,
+        )
     elif post_type in (PostType.TEXT_ONLY, PostType.QUOTE, PostType.EXTERNAL):
         if cite and post_type == PostType.EXTERNAL:
             # Un lien externe cité n'est archivé que par son texte
             ctx.buf_print(f"  {c.DIM}Citation : carte de lien non archivée (texte seul){c.RESET}")
-            ctx.log_func(f"   NOTE: citation : carte de lien non archivée (texte seul) ({url})", to_console=False)
-        ctx.buf_print(c.info("Texte seul détecté" if post_type == PostType.TEXT_ONLY else "Texte du post détecté"))
-        results = _telecharger(save_text, url, dirs["text_dir"], *args, erreurs=erreurs, **_session(ctx), **options)
+            ctx.log_func(
+                f"   NOTE: citation : carte de lien non archivée (texte seul) ({url})", to_console=False
+            )
+        ctx.buf_print(
+            c.info("Texte seul détecté" if post_type == PostType.TEXT_ONLY else "Texte du post détecté")
+        )
+        results = _telecharger(
+            save_text, url, dirs["text_dir"], *args, erreurs=erreurs, **_session(ctx), **options
+        )
 
     # Archive fidèle : texte lisible (hors types dont le downloader l'a déjà écrit) et fiche JSON
     if results and not (erreurs is not None and len(erreurs) > nb_erreurs):
@@ -217,7 +250,9 @@ def _record_brut(debug_info):
     return record if isinstance(record, dict) and record else None
 
 
-def _archiver_citant_sans_contenu(propres, cites, url, data, debug_info, ctx, post_view, name_prefix, erreurs):
+def _archiver_citant_sans_contenu(
+    propres, cites, url, data, debug_info, ctx, post_view, name_prefix, erreurs
+):
     """
     Un citant sans contenu propre (save_text n'a rien renvoyé) dont le cité est archivé garde
     quand même son .txt (avec « Cite: ») et sa fiche JSON.
@@ -242,12 +277,21 @@ def _archiver_post(results, url, data, ctx, record, post_view, name_prefix, erre
     if not any(r.media_type == "text" for r in results):
         ajoutes += _telecharger(
             lambda u, d, cfg: write_text(u, record, d, cfg, name_prefix=name_prefix),
-            url, text_dir, *args, erreurs=erreurs)
+            url,
+            text_dir,
+            *args,
+            erreurs=erreurs,
+        )
     if ctx.config.get("save_sidecar", DEFAULT_CONFIG["save_sidecar"]):
         ajoutes += _telecharger(
-            lambda u, d, cfg: write_sidecar(u, record, post_view, d, cfg, name_prefix=name_prefix,
-                                            at_uri=data.get("at_uri")),
-            url, text_dir, *args, erreurs=erreurs)
+            lambda u, d, cfg: write_sidecar(
+                u, record, post_view, d, cfg, name_prefix=name_prefix, at_uri=data.get("at_uri")
+            ),
+            url,
+            text_dir,
+            *args,
+            erreurs=erreurs,
+        )
     return ajoutes
 
 
@@ -281,8 +325,10 @@ def _archiver_citation(url, quote_uri, depth, base, ctx, post_view=None):
 
     if cible.state == "not_post":
         ctx.buf_print(f"  {c.DIM}Le record cité n'est pas un post ({cible.collection}) : ignoré{c.RESET}")
-        ctx.log_func(f"   CITATION IGNORÉE: {url} - le record cité n'est pas un post ({cible.collection})",
-                     to_console=False)
+        ctx.log_func(
+            f"   CITATION IGNORÉE: {url} - le record cité n'est pas un post ({cible.collection})",
+            to_console=False,
+        )
         return [], []
 
     if cible.state != "post":
@@ -300,7 +346,8 @@ def _archiver_citation(url, quote_uri, depth, base, ctx, post_view=None):
         ctx.log_func(f"   NOTE: post cité supprimé ({cible.url}) pour {url}", to_console=False)
         return [], [("not_found", cible.url)]
     if post_type in (PostType.ERROR_500, PostType.ERROR_429) or (
-            post_type == PostType.UNKNOWN and "error" in debug_info):
+        post_type == PostType.UNKNOWN and "error" in debug_info
+    ):
         ctx.buf_print(c.warning("Post cité inaccessible"))
         ctx.log_func(f"   CITATION NON ARCHIVÉE: {cible.url}", to_console=False)
         return [], [("failed", cible.url)]
@@ -311,8 +358,15 @@ def _archiver_citation(url, quote_uri, depth, base, ctx, post_view=None):
 
     suffixe = "quote" if profondeur == 1 else f"quote{profondeur}"
     erreurs = []
-    results = _contenu_propre(post_type, data, cible.url, ctx, name_prefix=f"{base}_{suffixe}", erreurs=erreurs,
-                              debug_info=debug_info)
+    results = _contenu_propre(
+        post_type,
+        data,
+        cible.url,
+        ctx,
+        name_prefix=f"{base}_{suffixe}",
+        erreurs=erreurs,
+        debug_info=debug_info,
+    )
     problemes = []
     if erreurs:
         ctx.log_func(f"   CITATION NON ARCHIVÉE: {cible.url}", to_console=False)
@@ -321,14 +375,34 @@ def _archiver_citation(url, quote_uri, depth, base, ctx, post_view=None):
     est_citation = post_type == PostType.QUOTE or data.get("is_quote")
     if est_citation and profondeur < PROFONDEUR_MAX:
         suite, suite_problemes = _archiver_citation(cible.url, data.get("quote_uri"), profondeur, base, ctx)
-        results = (_archiver_citant_sans_contenu(results, suite, cible.url, data, debug_info, ctx, None,
-                                                 f"{base}_{suffixe}", erreurs) + results + suite)
+        results = (
+            _archiver_citant_sans_contenu(
+                results, suite, cible.url, data, debug_info, ctx, None, f"{base}_{suffixe}", erreurs
+            )
+            + results
+            + suite
+        )
         problemes += suite_problemes
     return results, problemes
 
 
-def process_post(url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_dir, log_func, config=None,
-                 depth=0, quotes_unresolved=None, post_view=None, compteurs=None, session=None):
+def process_post(
+    url,
+    IMG_DIR,
+    VID_DIR,
+    TEXT_DIR,
+    db,
+    analyzer,
+    resolver,
+    logs_dir,
+    log_func,
+    config=None,
+    depth=0,
+    quotes_unresolved=None,
+    post_view=None,
+    compteurs=None,
+    session=None,
+):
     """
     Traite un post unique et retourne les stats.
     Returns: (has_success, img_count, vid_count, text_count, status, output_lines)
@@ -377,8 +451,8 @@ def process_post(url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_d
         log_func(f"   ERREUR 500: {url}", to_console=False)
         if db:
             db.update_last_check(url)
-            db.mark_post_status(url, 'error_500')
-        return False, 0, 0, 0, 'error_500', output
+            db.mark_post_status(url, "error_500")
+        return False, 0, 0, 0, "error_500", output
 
     # Limite de débit (429) persistante après les reprises : retenté à la prochaine exécution
     if post_type == PostType.ERROR_429:
@@ -386,34 +460,39 @@ def process_post(url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_d
         log_func(f"   LIMITE DE DÉBIT 429: {url}", to_console=False)
         if db:
             db.update_last_check(url)
-            db.mark_post_status(url, 'error_429')
-        return False, 0, 0, 0, 'error_429', output
+            db.mark_post_status(url, "error_429")
+        return False, 0, 0, 0, "error_429", output
 
     # Post supprimé
     if post_type == PostType.ERROR_400:
         buf_print(c.error("Post supprimé ou inaccessible (400)"))
         log_func(f"   POST SUPPRIMÉ: {url}", to_console=False)
         if db:
-            db.mark_post_status(url, 'deleted')
-        return False, 0, 0, 0, 'error_400', output
+            db.mark_post_status(url, "deleted")
+        return False, 0, 0, 0, "error_400", output
 
     # Cas inconnu - MODE DEBUG
     if post_type == PostType.UNKNOWN:
         buf_print(c.warning("Type de post non reconnu"))
         debug_file = save_debug_info(post_id, debug_info, logs_dir)
         buf_print(f"  {c.DIM}Debug sauvegardé : {debug_file.name}{c.RESET}")
-        buf_print(c.config_line("Embed type", debug_info.get('embed_type', 'N/A')))
-        buf_print(c.config_line("Has embed", str(debug_info.get('has_embed', False))))
-        buf_print(c.config_line("Texte", data.get('text', '')[:80] + "..."))
+        buf_print(c.config_line("Embed type", debug_info.get("embed_type", "N/A")))
+        buf_print(c.config_line("Has embed", str(debug_info.get("has_embed", False))))
+        buf_print(c.config_line("Texte", data.get("text", "")[:80] + "..."))
 
         log_func(f"   TYPE INCONNU: {url} - Debug: {debug_file.name}", to_console=False)
         if db:
-            db.mark_post_status(url, 'unknown')
-        return False, 0, 0, 0, 'unknown', output
+            db.mark_post_status(url, "unknown")
+        return False, 0, 0, 0, "unknown", output
 
     ctx = _Contexte(
         dirs={"img_dir": IMG_DIR, "vid_dir": VID_DIR, "text_dir": TEXT_DIR},
-        config=config, analyzer=analyzer, resolver=resolver, buf_print=buf_print, log_func=log_func, db=db,
+        config=config,
+        analyzer=analyzer,
+        resolver=resolver,
+        buf_print=buf_print,
+        log_func=log_func,
+        db=db,
         session=session,
     )
     est_citation = post_type == PostType.QUOTE or bool(data.get("is_quote"))
@@ -422,16 +501,23 @@ def process_post(url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_d
     if est_citation:
         buf_print(c.info("Citation détectée, résolution du post cité..."))
     erreurs = []
-    results = _contenu_propre(post_type, data, url, ctx, erreurs=erreurs, debug_info=debug_info,
-                              post_view=post_view)
+    results = _contenu_propre(
+        post_type, data, url, ctx, erreurs=erreurs, debug_info=debug_info, post_view=post_view
+    )
 
     # 2. Le post qu'il cite (profondeur max PROFONDEUR_MAX)
     problemes = []
     if est_citation and depth < PROFONDEUR_MAX:
-        cites, problemes = _archiver_citation(url, data.get("quote_uri"), depth, _base_de_nom(url, data), ctx,
-                                              post_view=post_view)
-        results = (_archiver_citant_sans_contenu(results, cites, url, data, debug_info, ctx, post_view, None,
-                                                 erreurs) + results + cites)
+        cites, problemes = _archiver_citation(
+            url, data.get("quote_uri"), depth, _base_de_nom(url, data), ctx, post_view=post_view
+        )
+        results = (
+            _archiver_citant_sans_contenu(
+                results, cites, url, data, debug_info, ctx, post_view, None, erreurs
+            )
+            + results
+            + cites
+        )
 
     # Une image sautée (cid déjà archivé) est affichée mais ni comptée ni enregistrée
     a_enregistrer = [r for r in results if not r.skipped]
@@ -451,7 +537,7 @@ def process_post(url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_d
                 db.add_media(url, r.media_type, r.filename, cid=r.cid)
             db.update_last_check(url)
         log_func(f"   ÉCHEC: {url}", to_console=False)
-        return False, 0, 0, 0, 'failed', output
+        return False, 0, 0, 0, "failed", output
 
     if results:
         if db:
@@ -459,11 +545,11 @@ def process_post(url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_d
                 db.add_media(url, r.media_type, r.filename, cid=r.cid)
             db.update_last_check(url)
             # Un post retenté avec succès ne doit plus rester en erreur
-            db.mark_post_status(url, 'ok')
+            db.mark_post_status(url, "ok")
         if echec_citation and quotes_unresolved is not None:
             quotes_unresolved.append(url)
         log_func(f"   SUCCÈS: {url}", to_console=False)
-        return True, img_count, vid_count, text_count, 'success', output
+        return True, img_count, vid_count, text_count, "success", output
 
     # Rien d'archivé : le citant n'a pas de contenu propre et son cité est supprimé,
     # bloqué ou détaché -> rien à conserver, comme un post supprimé
@@ -471,11 +557,11 @@ def process_post(url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_d
         buf_print(c.error("Post cité supprimé ou inaccessible"))
         log_func(f"   POST SUPPRIMÉ: {url}", to_console=False)
         if db:
-            db.mark_post_status(url, 'deleted')
-        return False, 0, 0, 0, 'error_400', output
+            db.mark_post_status(url, "deleted")
+        return False, 0, 0, 0, "error_400", output
 
     log_func(f"   ÉCHEC: {url}", to_console=False)
-    return False, 0, 0, 0, 'failed', output
+    return False, 0, 0, 0, "failed", output
 
 
 def _format_job_summary(idx, total, url, status, img_count, vid_count, text_count):
@@ -486,7 +572,7 @@ def _format_job_summary(idx, total, url, status, img_count, vid_count, text_coun
 
     counter = f"[{idx}/{total}]"
 
-    if status == 'success':
+    if status == "success":
         details = []
         if img_count:
             details.append(f"{img_count} image{'s' if img_count > 1 else ''}")
@@ -496,13 +582,13 @@ def _format_job_summary(idx, total, url, status, img_count, vid_count, text_coun
             details.append(f"{text_count} texte{'s' if text_count > 1 else ''}")
         detail_str = ", ".join(details) if details else "OK"
         return f"  {c.DIM}{counter}{c.RESET} {c.GREEN}OK{c.RESET} {c.VALUE}{handle}/{post_id}{c.RESET} {c.DIM}{detail_str}{c.RESET}"
-    elif status == 'error_400':
+    elif status == "error_400":
         return f"  {c.DIM}{counter}{c.RESET} {c.RED}--{c.RESET} {c.DIM}post supprimé (400){c.RESET}"
-    elif status == 'error_500':
+    elif status == "error_500":
         return f"  {c.DIM}{counter}{c.RESET} {c.RED}--{c.RESET} {c.DIM}erreur serveur (500){c.RESET}"
-    elif status == 'error_429':
+    elif status == "error_429":
         return f"  {c.DIM}{counter}{c.RESET} {c.YELLOW}--{c.RESET} {c.DIM}limite de débit (429){c.RESET}"
-    elif status == 'unknown':
+    elif status == "unknown":
         return f"  {c.DIM}{counter}{c.RESET} {c.YELLOW}??{c.RESET} {c.DIM}type inconnu{c.RESET}"
     else:
         return f"  {c.DIM}{counter}{c.RESET} {c.RED}!!{c.RESET} {c.DIM}échec{c.RESET}"
@@ -541,34 +627,40 @@ def print_report(stats, duration, total_size, no_db_mode, log_file, max_workers,
     print(c.title("  RÉSULTATS"))
     print(c.separator(width=78))
     print(c.config_line("Posts traités", f"{stats['success']}/{stats['total']}", 28))
-    print(c.config_line("Images téléchargées", str(stats['images']), 28))
-    print(c.config_line("Vidéos téléchargées", str(stats['videos']), 28))
-    print(c.config_line("Textes sauvegardés", str(stats['texts']), 28))
-    print(c.config_line("Fiches JSON", str(stats.get('sidecars', 0)), 28))
+    print(c.config_line("Images téléchargées", str(stats["images"]), 28))
+    print(c.config_line("Vidéos téléchargées", str(stats["videos"]), 28))
+    print(c.config_line("Textes sauvegardés", str(stats["texts"]), 28))
+    print(c.config_line("Fiches JSON", str(stats.get("sidecars", 0)), 28))
     print()
 
     # Problèmes (seulement si présents)
-    non_resolues = stats.get('quotes_unresolved', stats.get('reposts', []))
-    has_problems = any([
-        stats['error_500'], stats.get('error_429', []), stats['error_400'],
-        non_resolues, stats['unknown'], stats['failed']
-    ])
+    non_resolues = stats.get("quotes_unresolved", stats.get("reposts", []))
+    has_problems = any(
+        [
+            stats["error_500"],
+            stats.get("error_429", []),
+            stats["error_400"],
+            non_resolues,
+            stats["unknown"],
+            stats["failed"],
+        ]
+    )
 
     if has_problems:
         print(c.title("  PROBLÈMES"))
         print(c.separator(width=78))
-        if stats['error_400']:
-            print(c.config_line("Posts supprimés (400)", str(len(stats['error_400'])), 28))
-        if stats['error_500']:
-            print(c.config_line("Erreurs serveur (500)", str(len(stats['error_500'])), 28))
-        if stats.get('error_429'):
-            print(c.config_line("Limite de débit (429)", str(len(stats['error_429'])), 28))
+        if stats["error_400"]:
+            print(c.config_line("Posts supprimés (400)", str(len(stats["error_400"])), 28))
+        if stats["error_500"]:
+            print(c.config_line("Erreurs serveur (500)", str(len(stats["error_500"])), 28))
+        if stats.get("error_429"):
+            print(c.config_line("Limite de débit (429)", str(len(stats["error_429"])), 28))
         if non_resolues:
             print(c.config_line("Citations non archivées", str(len(non_resolues)), 28))
-        if stats['unknown']:
-            print(c.config_line("Types inconnus", str(len(stats['unknown'])), 28))
-        if stats['failed']:
-            print(c.config_line("Échecs", str(len(stats['failed'])), 28))
+        if stats["unknown"]:
+            print(c.config_line("Types inconnus", str(len(stats["unknown"])), 28))
+        if stats["failed"]:
+            print(c.config_line("Échecs", str(len(stats["failed"])), 28))
         print()
 
     # Métriques
@@ -598,7 +690,7 @@ def print_report(stats, duration, total_size, no_db_mode, log_file, max_workers,
 
 def _save_problem_logs(stats, logs_dir):
     """Écrit un fichier par catégorie de problème ; renvoie [(nom, détail), …]."""
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     generated = []
 
     entries = [
@@ -642,8 +734,15 @@ def run(urls, config, no_db=False, on_progress=None, quiet=False, post_views=Non
         atteinte après les reprises, post retenté à la prochaine exécution ; "quotes_unresolved" liste les
         bookmarks archivés dont le post cité ne l'a pas été, "reposts" est son ancien nom)
     """
-    return _run(urls, config, media_dirs=get_media_dirs(config), no_db=no_db,
-                on_progress=on_progress, quiet=quiet, post_views=post_views)
+    return _run(
+        urls,
+        config,
+        media_dirs=get_media_dirs(config),
+        no_db=no_db,
+        on_progress=on_progress,
+        quiet=quiet,
+        post_views=post_views,
+    )
 
 
 def _run(urls, config, media_dirs, no_db=False, on_progress=None, quiet=False, post_views=None):
@@ -700,7 +799,9 @@ def _run(urls, config, media_dirs, no_db=False, on_progress=None, quiet=False, p
     if not quiet:
         print()
         print(f"  {c.HEADER}{'─' * 78}{c.RESET}")
-        print(f"  {c.BOLD}{total_jobs} posts à traiter{c.RESET} {c.DIM}({max_workers} workers parallèles){c.RESET}")
+        print(
+            f"  {c.BOLD}{total_jobs} posts à traiter{c.RESET} {c.DIM}({max_workers} workers parallèles){c.RESET}"
+        )
         print(f"  {c.HEADER}{'─' * 78}{c.RESET}")
         print()
 
@@ -711,8 +812,19 @@ def _run(urls, config, media_dirs, no_db=False, on_progress=None, quiet=False, p
         log(f"Job {idx}/{total_jobs}: {url}", to_console=False)
         compteurs = {}
         has_success, imgs, vids, texts, status, output_lines = process_post(
-            url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_dir, log, config,
-            quotes_unresolved=quotes_unresolved_urls, post_view=post_views.get(url), compteurs=compteurs,
+            url,
+            IMG_DIR,
+            VID_DIR,
+            TEXT_DIR,
+            db,
+            analyzer,
+            resolver,
+            logs_dir,
+            log,
+            config,
+            quotes_unresolved=quotes_unresolved_urls,
+            post_view=post_views.get(url),
+            compteurs=compteurs,
             session=session,
         )
         return idx, url, has_success, imgs, vids, texts, status, output_lines, compteurs["sidecars"]
@@ -720,10 +832,7 @@ def _run(urls, config, media_dirs, no_db=False, on_progress=None, quiet=False, p
     # === EXÉCUTION PARALLÈLE ===
     try:
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = {
-                executor.submit(worker, idx, url): (idx, url)
-                for idx, url in enumerate(urls, start=1)
-            }
+            futures = {executor.submit(worker, idx, url): (idx, url) for idx, url in enumerate(urls, start=1)}
 
             for future in as_completed(futures):
                 idx, url, has_success, imgs, vids, texts, status, output_lines, sidecars = future.result()
@@ -736,15 +845,15 @@ def _run(urls, config, media_dirs, no_db=False, on_progress=None, quiet=False, p
                     text_count += texts
                     sidecar_count += sidecars
 
-                if status == 'error_500':
+                if status == "error_500":
                     error_500_urls.append(url)
-                elif status == 'error_429':
+                elif status == "error_429":
                     error_429_urls.append(url)
-                elif status == 'error_400':
+                elif status == "error_400":
                     deleted_urls.append(url)
-                elif status == 'unknown':
+                elif status == "unknown":
                     unknown_urls.append(url)
-                elif status == 'failed':
+                elif status == "failed":
                     failed_urls.append(url)
 
                 if not quiet:
@@ -764,19 +873,19 @@ def _run(urls, config, media_dirs, no_db=False, on_progress=None, quiet=False, p
         sys.stdout.flush()
 
     stats = {
-        'total': total_jobs,
-        'success': success_count,
-        'images': img_count,
-        'videos': vid_count,
-        'texts': text_count,
-        'sidecars': sidecar_count,
-        'error_500': error_500_urls,
-        'error_429': error_429_urls,
-        'error_400': deleted_urls,
-        'quotes_unresolved': quotes_unresolved_urls,
-        'reposts': quotes_unresolved_urls,  # ancien nom, même liste
-        'unknown': unknown_urls,
-        'failed': failed_urls,
+        "total": total_jobs,
+        "success": success_count,
+        "images": img_count,
+        "videos": vid_count,
+        "texts": text_count,
+        "sidecars": sidecar_count,
+        "error_500": error_500_urls,
+        "error_429": error_429_urls,
+        "error_400": deleted_urls,
+        "quotes_unresolved": quotes_unresolved_urls,
+        "reposts": quotes_unresolved_urls,  # ancien nom, même liste
+        "unknown": unknown_urls,
+        "failed": failed_urls,
     }
 
     generated = _save_problem_logs(stats, logs_dir)
@@ -804,8 +913,7 @@ def main(argv=None):
     stats = _run(argv[3:], config, media_dirs=media_dirs, no_db=no_db_mode)
 
     # Option « open_folder_after_download » (défaut vrai), ignorée en non interactif
-    if (stats["success"] > 0 and config.get("open_folder_after_download", True)
-            and ui.is_interactive()):
+    if stats["success"] > 0 and config.get("open_folder_after_download", True) and ui.is_interactive():
         download_dir = config["download_dir"]
         if sys.platform == "win32":
             os.startfile(download_dir)
@@ -817,6 +925,7 @@ if __name__ == "__main__":
     # Forcer l'encodage UTF-8 pour la console Windows (exécution directe uniquement)
     if sys.platform == "win32":
         import io
-        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
+
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
     main()

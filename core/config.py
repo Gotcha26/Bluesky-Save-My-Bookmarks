@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Configuration centralisée pour BSMB"""
+
 import json
 import os
 from datetime import datetime, timedelta
@@ -33,17 +34,15 @@ DEFAULT_CONFIG = {
     "bookmarks_cache": "bookmarks.json",  # dernière réponse getBookmarks (postView bruts)
     "gif_subfolder": False,  # GIF (vidéo presentation=gif) rangés dans videos/gifs/ au lieu du suffixe _gif
     "download_video_thumbnail": False,  # télécharge aussi la miniature de la vidéo (_01_thumb.jpg)
-    "save_sidecar": True  # écrit texts/<base>.json (record brut + postView) pour chaque post archivé
+    "save_sidecar": True,  # écrit texts/<base>.json (record brut + postView) pour chaque post archivé
 }
+
 
 def get_default_paths():
     """Retourne les chemins par défaut (utile pour les scripts)"""
     base = Path.home() / "Downloads" / "BSMB"
-    return {
-        "img_dir": str(base / "images"),
-        "vid_dir": str(base / "videos"),
-        "text_dir": str(base / "texts")
-    }
+    return {"img_dir": str(base / "images"), "vid_dir": str(base / "videos"), "text_dir": str(base / "texts")}
+
 
 def load_config():
     """Charge la config ou crée celle par défaut"""
@@ -66,6 +65,7 @@ def load_config():
 
     return config
 
+
 def restrict_permissions(path):
     """chmod 600 sur le fichier (POSIX uniquement ; un échec est ignoré)."""
     if os.name != "posix":
@@ -75,11 +75,13 @@ def restrict_permissions(path):
     except OSError:
         pass
 
+
 def save_config(config):
     """Sauvegarde la configuration (lisible par le seul propriétaire sur POSIX)"""
     with open(CONFIG_FILE, "w", encoding="utf-8") as f:
         json.dump(config, f, indent=2, ensure_ascii=False)
     restrict_permissions(CONFIG_FILE)
+
 
 def resolve_path(config, key):
     """
@@ -90,6 +92,7 @@ def resolve_path(config, key):
     chemin = Path(config.get(key, DEFAULT_CONFIG[key]))
     return chemin if chemin.is_absolute() else Path(PROJECT_ROOT) / chemin
 
+
 def ensure_dirs(config):
     """Crée les répertoires nécessaires"""
     base = Path(config["download_dir"])
@@ -97,6 +100,7 @@ def ensure_dirs(config):
     (base / "videos").mkdir(parents=True, exist_ok=True)
     (base / "texts").mkdir(parents=True, exist_ok=True)
     resolve_path(config, "logs_dir").mkdir(parents=True, exist_ok=True)
+
 
 def cleanup_logs(config):
     """Supprime TOUS les logs"""
@@ -111,6 +115,7 @@ def cleanup_logs(config):
             deleted_count += 1
 
     return deleted_count
+
 
 def cleanup_old_logs(config, max_age_days=10):
     """
@@ -138,11 +143,8 @@ def cleanup_old_logs(config, max_age_days=10):
     for log_file in download_logs[max_logs:]:
         log_file.unlink()
 
+
 def get_media_dirs(config):
     """Retourne les chemins complets des sous-dossiers médias"""
     base = Path(config["download_dir"])
-    return {
-        "img_dir": str(base / "images"),
-        "vid_dir": str(base / "videos"),
-        "text_dir": str(base / "texts")
-    }
+    return {"img_dir": str(base / "images"), "vid_dir": str(base / "videos"), "text_dir": str(base / "texts")}

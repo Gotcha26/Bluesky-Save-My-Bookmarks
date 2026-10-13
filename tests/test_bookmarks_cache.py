@@ -1,4 +1,5 @@
 """Tests de core/bookmarks_cache.py : cache JSON de la dernière réponse getBookmarks (issue #3)."""
+
 import json
 
 from core.bookmarks_cache import load_cache, save_cache
@@ -9,13 +10,26 @@ URI2 = "at://did:plc:test2000000000000000000000/app.bsky.feed.post/3kgone000001"
 
 def _posts():
     return [
-        {"at_uri": URI1, "did": "did:plc:test1000000000000000000000", "rkey": "3kpost00001",
-         "handle": "alice.example.com", "url": "https://bsky.app/profile/alice.example.com/post/3kpost00001",
-         "item_type": "postView", "post_view": {"uri": URI1, "record": {"text": "été"}},
-         "created_at": "2026-03-01T10:00:00.000Z"},
-        {"at_uri": URI2, "did": "did:plc:test2000000000000000000000", "rkey": "3kgone000001",
-         "handle": None, "url": "https://bsky.app/profile/did:plc:test2000000000000000000000/post/3kgone000001",
-         "item_type": "notFoundPost", "post_view": None, "created_at": None},
+        {
+            "at_uri": URI1,
+            "did": "did:plc:test1000000000000000000000",
+            "rkey": "3kpost00001",
+            "handle": "alice.example.com",
+            "url": "https://bsky.app/profile/alice.example.com/post/3kpost00001",
+            "item_type": "postView",
+            "post_view": {"uri": URI1, "record": {"text": "été"}},
+            "created_at": "2026-03-01T10:00:00.000Z",
+        },
+        {
+            "at_uri": URI2,
+            "did": "did:plc:test2000000000000000000000",
+            "rkey": "3kgone000001",
+            "handle": None,
+            "url": "https://bsky.app/profile/did:plc:test2000000000000000000000/post/3kgone000001",
+            "item_type": "notFoundPost",
+            "post_view": None,
+            "created_at": None,
+        },
     ]
 
 

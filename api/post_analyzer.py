@@ -2,6 +2,7 @@
 """
 Analyse préalable d'un post Bluesky pour déterminer son type et sa disponibilité
 """
+
 from enum import Enum
 from urllib.parse import urlparse
 
@@ -33,6 +34,7 @@ def _external_info(embed_external):
         "description": embed_external.get("description", ""),
         "thumb_cid": embed_external.get("thumb", {}).get("ref", {}).get("$link"),
     }
+
 
 def _identity(did, rkey):
     """Champs d'identité canonique ({} tant que le DID est inconnu)."""
@@ -75,11 +77,7 @@ class PostAnalyzer:
         identity = _identity(url_did, post_id)
 
         try:
-            params = {
-                "repo": url_did or handle,
-                "collection": "app.bsky.feed.post",
-                "rkey": post_id
-            }
+            params = {"repo": url_did or handle, "collection": "app.bsky.feed.post", "rkey": post_id}
             resp = self._http().get(self.api_base, params=params, timeout=15)
 
             if resp.status_code == 400:
@@ -89,8 +87,11 @@ class PostAnalyzer:
                 return PostType.ERROR_429, {"handle": handle, "post_id": post_id, **identity}, {"status": 429}
             elif resp.status_code >= 500:
                 # 5xx encore là après les reprises (502/503/504 comprises)
-                return PostType.ERROR_500, {"handle": handle, "post_id": post_id, **identity}, {
-                    "status": resp.status_code}
+                return (
+                    PostType.ERROR_500,
+                    {"handle": handle, "post_id": post_id, **identity},
+                    {"status": resp.status_code},
+                )
 
             resp.raise_for_status()
             data = resp.json()
@@ -111,8 +112,15 @@ class PostAnalyzer:
         if not _is_valid_handle(handle):
             handle = parts[1]  # handle.invalid : comme getRecord, retombe sur le segment d'URL (DID)
         post_id = uri_parts[-1] if len(uri_parts) > 4 else parts[-1]
-        return self._classify(post_view["record"], uri, handle, post_id, _identity(did, post_id), post_view,
-                              view_embed=post_view.get("embed"))
+        return self._classify(
+            post_view["record"],
+            uri,
+            handle,
+            post_id,
+            _identity(did, post_id),
+            post_view,
+            view_embed=post_view.get("embed"),
+        )
 
     def _classify(self, value, uri, handle, post_id, identity, full_data, view_embed=None):
         """
@@ -137,16 +145,12 @@ class PostAnalyzer:
             **identity,
             "created_at": value.get("createdAt", ""),
             "text": value.get("text", ""),
-            "embed_type": embed_type
+            "embed_type": embed_type,
         }
         if view_embed is not None:
             result_data["view_embed"] = view_embed
 
-        debug_info = {
-            "embed_type": embed_type,
-            "has_embed": bool(embed),
-            "full_data": full_data
-        }
+        debug_info = {"embed_type": embed_type, "has_embed": bool(embed), "full_data": full_data}
 
         # 1. Vidéo
         if embed_type == "app.bsky.embed.video":
@@ -155,7 +159,9 @@ class PostAnalyzer:
             if cid:
                 did = uri.split("/")[2] if "/" in uri else None
                 if did:
-                    result_data["video_url"] = f"https://bsky.social/xrpc/com.atproto.sync.getBlob?did={did}&cid={cid}"
+                    result_data["video_url"] = (
+                        f"https://bsky.social/xrpc/com.atproto.sync.getBlob?did={did}&cid={cid}"
+                    )
                     result_data["video_cid"] = cid
                     result_data["video_mime"] = video_blob.get("mimeType", "video/mp4")
                     result_data["video_size"] = video_blob.get("size", 0)
@@ -201,7 +207,9 @@ class PostAnalyzer:
                 if cid:
                     did = uri.split("/")[2] if "/" in uri else None
                     if did:
-                        result_data["video_url"] = f"https://bsky.social/xrpc/com.atproto.sync.getBlob?did={did}&cid={cid}"
+                        result_data["video_url"] = (
+                            f"https://bsky.social/xrpc/com.atproto.sync.getBlob?did={did}&cid={cid}"
+                        )
                         result_data["video_cid"] = cid
                         return PostType.VIDEO, result_data, debug_info
 

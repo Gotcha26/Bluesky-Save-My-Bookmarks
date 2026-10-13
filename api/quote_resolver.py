@@ -6,6 +6,7 @@ Une citation n'est pas un repost : le post bookmarké garde son propre contenu e
 cite un autre record, qui peut être un post, mais aussi un feed generator, une
 liste, un starter pack… ou un post supprimé, bloqué ou détaché.
 """
+
 from dataclasses import dataclass
 from urllib.parse import urlparse
 

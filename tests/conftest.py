@@ -1,4 +1,5 @@
 """Fixtures partagées pour les tests BSMB."""
+
 import socket
 import sys
 from pathlib import Path
@@ -68,6 +69,7 @@ def _terminal_interactif(monkeypatch):
     interactive par défaut (les tests du menu mockent input()). Les tests du mode
     non interactif surchargent `core.ui.is_interactive`."""
     from core import ui
+
     ui.set_yes(False)
     monkeypatch.setattr(ui, "is_interactive", lambda: not ui._etat["yes"])
 
