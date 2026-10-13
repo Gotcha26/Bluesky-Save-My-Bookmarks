@@ -293,11 +293,13 @@ class TestOrchestrateurStatuts:
         assert self._statut(tmp_db) == "unknown"
 
     def test_citation_non_resolue_sans_contenu_propre_est_failed(self, tmp_db, tmp_path):
+        tmp_db.add_post(URL)
+        tmp_db.mark_post_status(URL, "unknown")
         resolver = MagicMock()
         resolver.resolve.return_value = None
         res = _lancer(tmp_db, tmp_path, PostType.QUOTE, {}, "", resolver=resolver)
         assert res[4] == "failed"
-        assert self._statut(tmp_db) != "repost"
+        assert self._statut(tmp_db) == "unknown"  # un échec ne change pas le statut
 
     def test_succes_remet_le_statut_a_ok_apres_une_erreur(self, tmp_db, tmp_path):
         tmp_db.add_post(URL)

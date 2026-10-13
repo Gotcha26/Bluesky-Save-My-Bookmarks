@@ -32,10 +32,9 @@ from core.colors import c  # noqa: E402
 from api.post_analyzer import PostAnalyzer, PostType  # noqa: E402
 from api.quote_resolver import QuoteResolver  # noqa: E402
 from downloaders import DownloadError, lignes_console  # noqa: E402
-from downloaders.text import nom_base_texte  # noqa: E402
 from downloaders.images import download_images  # noqa: E402
 from downloaders.videos import download_video  # noqa: E402
-from downloaders.text import save_text  # noqa: E402
+from downloaders.text import nom_base_texte, save_text  # noqa: E402
 from downloaders.external import download_external  # noqa: E402
 
 # Lock global pour l'affichage console (évite les lignes entrelacées)
@@ -159,7 +158,10 @@ def _contenu_propre(post_type, data, url, ctx, name_prefix=None, erreurs=None):
             lambda u, _dest, cfg: download_external(u, data, dirs, cfg),
             url, dirs["text_dir"], *args, erreurs=erreurs)
     elif post_type in (PostType.TEXT_ONLY, PostType.QUOTE, PostType.EXTERNAL):
-        # Un lien externe cité n'est archivé que par son texte
+        if cite and post_type == PostType.EXTERNAL:
+            # Un lien externe cité n'est archivé que par son texte
+            ctx.buf_print(f"  {c.DIM}Citation : carte de lien non archivée (texte seul){c.RESET}")
+            ctx.log_func(f"   NOTE: citation : carte de lien non archivée (texte seul) ({url})", to_console=False)
         ctx.buf_print(c.info("Texte seul détecté" if post_type == PostType.TEXT_ONLY else "Texte du post détecté"))
         results = _telecharger(save_text, url, dirs["text_dir"], *args, erreurs=erreurs, **options)
 
@@ -318,7 +320,6 @@ def process_post(url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_d
         buf_print(c.info("Citation détectée, résolution du post cité..."))
     erreurs = []
     results = _contenu_propre(post_type, data, url, ctx, erreurs=erreurs)
-    propre_archive = bool(results)
 
     # 2. Le post qu'il cite (profondeur max PROFONDEUR_MAX)
     problemes = []
@@ -332,6 +333,16 @@ def process_post(url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_d
     echec_citation = any(genre == "failed" for genre, _ in problemes)
 
     # Bilan
+    if erreurs:
+        # Le contenu propre du post n'est pas complet : on garde ce qui a été obtenu,
+        # mais le post reste retentable (comme un post simple en échec)
+        if db and results:
+            for r in results:
+                db.add_media(url, r.media_type, r.filename, cid=r.cid)
+            db.update_last_check(url)
+        log_func(f"   ÉCHEC: {url}", to_console=False)
+        return False, 0, 0, 0, 'failed', output
+
     if results:
         if db:
             for r in results:

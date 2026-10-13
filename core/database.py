@@ -353,7 +353,7 @@ class Database:
 
         Args:
             url: URL du post
-            status: 'ok', 'deleted', 'error_500', 'unknown', 'repost'
+            status: 'ok', 'deleted', 'error_500', 'unknown' ('repost' n'est plus écrit, hérité)
         """
         with self._lock:
             cursor = self.conn.cursor()
