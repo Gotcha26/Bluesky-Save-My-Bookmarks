@@ -8,6 +8,11 @@ import sys
 import traceback
 from pathlib import Path
 
+# Permet `python api/export_bookmarks.py` (le dossier du script est alors seul dans sys.path)
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from core.post_ref import PostRef  # noqa: E402
+
 DEFAULT_PDS_URL = "https://bsky.social"
 
 
@@ -22,7 +27,8 @@ def fetch_bookmarks(token, on_progress=None, pds_url=DEFAULT_PDS_URL):
 
     Returns:
         dict: {
-            "urls": list[str],   # Liste des URLs de bookmarks
+            "urls": list[str],   # URLs de bookmarks (handle valide, sinon DID)
+            "posts": list[dict], # {"at_uri", "did", "rkey", "handle", "url"} par bookmark
             "count": int,        # Nombre total de bookmarks
             "pages": int,        # Nombre de pages parcourues
             "error": str|None,   # Message d'erreur si échec
@@ -32,6 +38,7 @@ def fetch_bookmarks(token, on_progress=None, pds_url=DEFAULT_PDS_URL):
     if not token or not token.startswith("Bearer "):
         return {
             "urls": [],
+            "posts": [],
             "count": 0,
             "pages": 0,
             "error": "Token invalide (doit commencer par 'Bearer ')",
@@ -41,6 +48,7 @@ def fetch_bookmarks(token, on_progress=None, pds_url=DEFAULT_PDS_URL):
     api_url = f"{(pds_url or DEFAULT_PDS_URL).rstrip('/')}/xrpc/app.bsky.bookmark.getBookmarks"
     cursor = None
     urls = []
+    posts = []
     page = 0
 
     try:
@@ -69,6 +77,7 @@ def fetch_bookmarks(token, on_progress=None, pds_url=DEFAULT_PDS_URL):
                     if error_type == "ExpiredToken" or "expired" in error_msg.lower():
                         return {
                             "urls": urls,
+                            "posts": posts,
                             "count": len(urls),
                             "pages": page,
                             "error": "Token expiré",
@@ -77,6 +86,7 @@ def fetch_bookmarks(token, on_progress=None, pds_url=DEFAULT_PDS_URL):
                     else:
                         return {
                             "urls": urls,
+                            "posts": posts,
                             "count": len(urls),
                             "pages": page,
                             "error": f"Erreur API : {error_msg}",
@@ -88,6 +98,7 @@ def fetch_bookmarks(token, on_progress=None, pds_url=DEFAULT_PDS_URL):
             except requests.exceptions.RequestException as e:
                 return {
                     "urls": urls,
+                    "posts": posts,
                     "count": len(urls),
                     "pages": page,
                     "error": f"Erreur réseau : {e}",
@@ -102,21 +113,24 @@ def fetch_bookmarks(token, on_progress=None, pds_url=DEFAULT_PDS_URL):
 
             for bm in bookmarks:
                 item = bm.get("item", {})
-                uri = item.get("uri") or bm.get("subject", {}).get("uri")
+                uri = bm.get("subject", {}).get("uri") or item.get("uri")
                 if not uri:
                     continue
 
-                parts = uri.split("/")
-                if len(parts) < 5:
+                handle = item.get("author", {}).get("handle")
+                try:
+                    ref = PostRef.from_at_uri(uri, handle=handle)
+                except ValueError:
                     continue
 
-                rkey = parts[4]
-                author_handle = item.get("author", {}).get("handle")
-                if author_handle:
-                    urls.append(f"https://bsky.app/profile/{author_handle}/post/{rkey}")
-                else:
-                    did = parts[2]
-                    urls.append(f"https://bsky.app/profile/{did}/post/{rkey}")
+                urls.append(ref.web_url)
+                posts.append({
+                    "at_uri": ref.at_uri,
+                    "did": ref.did,
+                    "rkey": ref.rkey,
+                    "handle": handle,
+                    "url": ref.web_url,
+                })
 
             if on_progress:
                 on_progress(page, len(urls))
@@ -130,6 +144,7 @@ def fetch_bookmarks(token, on_progress=None, pds_url=DEFAULT_PDS_URL):
     except Exception as e:
         return {
             "urls": urls,
+            "posts": posts,
             "count": len(urls),
             "pages": page,
             "error": f"Erreur critique : {e}",
@@ -138,6 +153,7 @@ def fetch_bookmarks(token, on_progress=None, pds_url=DEFAULT_PDS_URL):
 
     return {
         "urls": urls,
+        "posts": posts,
         "count": len(urls),
         "pages": page,
         "error": None,

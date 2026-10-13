@@ -5,6 +5,8 @@ Résout un repost pour extraire l'URL du post original
 import requests
 from urllib.parse import urlparse
 
+from core.post_ref import PostRef, INVALID_HANDLE
+
 class RepostResolver:
     def __init__(self):
         self.api_base = "https://bsky.social/xrpc/com.atproto.repo.getRecord"
@@ -18,9 +20,10 @@ class RepostResolver:
         if len(parts) < 4:
             return None, None, None
         
+        # Segment handle ou DID : getRecord accepte les deux (repo = DID si l'URL en contient un).
         handle = parts[1]
         post_id = parts[-1]
-        
+
         try:
             params = {
                 "repo": handle,
@@ -49,13 +52,13 @@ class RepostResolver:
             cited_post_id = uri_parts[-1]
             
             cited_handle = self._resolve_did_to_handle(cited_did)
-            
-            if not cited_handle:
+            ref = PostRef(cited_did, cited_post_id, cited_handle)
+
+            # Handle absent ou `handle.invalid` : on garde le DID
+            if not cited_handle or cited_handle == INVALID_HANDLE:
                 cited_handle = cited_did
-            
-            original_url = f"https://bsky.app/profile/{cited_handle}/post/{cited_post_id}"
-            
-            return original_url, cited_handle, cited_post_id
+
+            return ref.web_url, cited_handle, cited_post_id
             
         except Exception as e:
             return None, None, None

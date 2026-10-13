@@ -52,7 +52,7 @@ class BookmarkSync:
             }
 
         self._online_urls = result["urls"]
-        new_urls = self.db.get_new_posts(result["urls"])
+        new_urls = [p["url"] for p in self.db.get_new_refs(result["posts"])]
 
         # Sauvegarder dans urls.txt (rétrocompatibilité)
         urls_file = Path(self.config["urls_file"])

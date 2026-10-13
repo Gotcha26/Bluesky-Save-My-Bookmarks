@@ -218,6 +218,9 @@ L'orchestrateur utilise `concurrent.futures.ThreadPoolExecutor` avec un nombre c
 | `added_at` | TEXT | Date d'ajout (ISO) |
 | `last_check` | TEXT | Dernière vérification (ISO) |
 | `status` | TEXT | `ok`, `deleted`, `error_500`, `unknown` |
+| `at_uri` | TEXT (UNIQUE) | Identité canonique `at://<did>/app.bsky.feed.post/<rkey>` (NULL pour les anciennes lignes, complété au prochain traitement) |
+| `did` | TEXT | DID de l'auteur |
+| `rkey` | TEXT | Clé du post |
 
 ### Table `media`
 

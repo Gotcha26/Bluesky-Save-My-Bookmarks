@@ -6,6 +6,8 @@ import requests
 from urllib.parse import urlparse
 from enum import Enum
 
+from core.post_ref import PostRef
+
 class PostType(Enum):
     ERROR_500 = "error_500"
     ERROR_400 = "error_400"
@@ -14,6 +16,13 @@ class PostType(Enum):
     VIDEO = "video"
     TEXT_ONLY = "text_only"
     UNKNOWN = "unknown"
+
+def _identity(did, rkey):
+    """Champs d'identité canonique ({} tant que le DID est inconnu)."""
+    if not did:
+        return {}
+    return {"did": did, "at_uri": PostRef(did, rkey).at_uri}
+
 
 class PostAnalyzer:
     def __init__(self):
@@ -28,35 +37,44 @@ class PostAnalyzer:
         if len(parts) < 4:
             return PostType.UNKNOWN, {}, {"error": "URL invalide"}
         
+        # Le segment de l'URL est un handle ou un DID ; getRecord accepte les deux.
         handle = parts[1]
         post_id = parts[-1]
-        
+        url_did = handle if handle.startswith("did:") else None
+        identity = _identity(url_did, post_id)
+
         try:
             params = {
-                "repo": handle,
+                "repo": url_did or handle,
                 "collection": "app.bsky.feed.post",
                 "rkey": post_id
             }
             resp = requests.get(self.api_base, params=params, timeout=15)
-            
+
             if resp.status_code == 400:
-                return PostType.ERROR_400, {"handle": handle, "post_id": post_id}, {"status": 400}
+                return PostType.ERROR_400, {"handle": handle, "post_id": post_id, **identity}, {"status": 400}
             elif resp.status_code == 500:
-                return PostType.ERROR_500, {"handle": handle, "post_id": post_id}, {"status": 500}
-            
+                return PostType.ERROR_500, {"handle": handle, "post_id": post_id, **identity}, {"status": 500}
+
             resp.raise_for_status()
             data = resp.json()
-            
+
         except Exception as e:
-            return PostType.UNKNOWN, {"handle": handle, "post_id": post_id}, {"error": str(e)}
-        
+            return PostType.UNKNOWN, {"handle": handle, "post_id": post_id, **identity}, {"error": str(e)}
+
         value = data.get("value", {})
         embed = value.get("embed", {})
         embed_type = embed.get("$type", "")
-        
+
+        # Le DID figure dans l'`uri` de la réponse : aucun appel supplémentaire
+        if not identity:
+            uri_parts = data.get("uri", "").split("/")
+            identity = _identity(uri_parts[2] if len(uri_parts) > 2 else None, post_id)
+
         result_data = {
             "handle": handle,
             "post_id": post_id,
+            **identity,
             "created_at": value.get("createdAt", ""),
             "text": value.get("text", ""),
             "embed_type": embed_type
