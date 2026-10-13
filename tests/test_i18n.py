@@ -17,6 +17,9 @@ msgstr ""
 msgid "Compte déconnecté"
 msgstr "Account disconnected"
 
+msgid "Retour"
+msgstr "Back"
+
 msgid "{n} jour"
 msgid_plural "{n} jours"
 msgstr[0] "{n} day"
@@ -226,8 +229,8 @@ def test_mo_recompile_s_il_est_plus_vieux_que_le_po(lang_dir):
     i18n.init("en")
     # le .po est modifié après la compilation
     po.write_text(PO_EN.replace("Account disconnected", "Account signed out"), encoding="utf-8")
-    futur = time.time() + 10
-    os.utime(po, (futur, futur))
+    passe = time.time() - 100
+    os.utime(mo, (passe, passe))
     assert mo.stat().st_mtime < po.stat().st_mtime
     i18n.init("en")
     assert i18n._("Compte déconnecté") == "Account signed out"
@@ -251,21 +254,57 @@ def test_po_invalide_repli_sur_la_source(tmp_path, monkeypatch):
     assert i18n._("Compte déconnecté") == "Compte déconnecté"
 
 
-def test_dossier_lang_en_lecture_seule_repli_temporaire(lang_dir, tmp_path, monkeypatch):
-    """Si le .mo ne peut pas être écrit à côté du .po, il est compilé dans le dossier temporaire."""
-    po_en = lang_dir / "en" / "LC_MESSAGES" / "bsmb.po"
-    reel = i18n._compiler
-    ecrits = []
-
-    def compiler(po, mo):
-        if mo.parent == po.parent:
-            return False  # écriture refusée à côté du .po
-        ecrits.append(mo)
-        return reel(po, mo)
-
-    monkeypatch.setattr(i18n, "_compiler", compiler)
+def test_cible_impossible_a_ecrire_repli_temporaire_reel(lang_dir, tmp_path, monkeypatch, capsys):
+    """Vrai échec d'écriture (la cible du .mo est un dossier) : repli effectif sur <tmp>/bsmb-i18n,
+    traduction anglaise active, rien d'affiché."""
+    (lang_dir / "en" / "LC_MESSAGES" / "bsmb.mo").mkdir()
     monkeypatch.setattr(i18n.tempfile, "gettempdir", lambda: str(tmp_path / "tmp"))
     i18n.init("en")
-    assert ecrits and ecrits[0].is_file()
-    assert not po_en.with_suffix(".mo").exists()
+    secours = tmp_path / "tmp" / "bsmb-i18n" / "en" / "bsmb.mo"
+    assert secours.is_file()
+    assert i18n._("Retour") == "Back"
     assert i18n._("Compte déconnecté") == "Account disconnected"
+    sortie = capsys.readouterr()
+    assert sortie.out == "" and sortie.err == ""
+    assert list((lang_dir / "en" / "LC_MESSAGES").glob("*.tmp")) == []
+
+
+def test_compiler_renvoie_faux_si_la_cible_est_un_dossier(lang_dir):
+    po = lang_dir / "en" / "LC_MESSAGES" / "bsmb.po"
+    mo = po.with_suffix(".mo")
+    mo.mkdir()
+    assert i18n._compiler(po, mo) is False
+    assert mo.is_dir()
+
+
+def test_ecriture_atomique_pas_de_fichier_temporaire_restant(lang_dir):
+    i18n.init("en")
+    assert [p.name for p in (lang_dir / "en" / "LC_MESSAGES").iterdir() if p.suffix == ".tmp"] == []
+
+
+# ─── .mo corrompu ────────────────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    "contenu",
+    [b"", b"\xde\x12\x04\x95\x00\x00", b"\xde\x12\x04\x95" + b"\x00" * 4 + b"\xff" * 8, b"pas un mo du tout"],
+    ids=["vide", "entete-partiel", "decalages-invalides", "texte"],
+)
+def test_mo_corrompu_est_recompile(lang_dir, contenu):
+    mo = lang_dir / "en" / "LC_MESSAGES" / "bsmb.mo"
+    mo.write_bytes(contenu)
+    futur = time.time() + 100  # plus récent que le .po : pas recompilé « à jour » sans la détection
+    os.utime(mo, (futur, futur))
+    i18n.init("en")
+    assert i18n._("Compte déconnecté") == "Account disconnected"
+    assert mo.stat().st_size > len(contenu)
+
+
+def test_mo_corrompu_et_po_absent_repli_source(tmp_path, monkeypatch):
+    racine = tmp_path / "lang"
+    dossier = racine / "en" / "LC_MESSAGES"
+    dossier.mkdir(parents=True)
+    (dossier / "bsmb.mo").write_bytes(b"")
+    monkeypatch.setattr(i18n, "LANG_DIR", racine)
+    i18n.init("en")
+    assert i18n._("Compte déconnecté") == "Compte déconnecté"

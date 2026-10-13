@@ -16,8 +16,8 @@ from core import cli, i18n
 from core.paths import PROJECT_ROOT
 
 
-def _charger_outil(nom):
-    spec = importlib.util.spec_from_file_location(nom, PROJECT_ROOT / "tools" / f"{nom}.py")
+def _charger_outil(nom, dossier="tools"):
+    spec = importlib.util.spec_from_file_location(nom, PROJECT_ROOT / dossier / f"{nom}.py")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -88,7 +88,7 @@ def test_marqueurs_identiques_a_la_source(code):
 
 @pytest.mark.parametrize("code", LANGUES)
 def test_le_po_se_compile(code, tmp_path):
-    msgfmt = _charger_outil("msgfmt")
+    msgfmt = _charger_outil("_msgfmt", "core")
     po = PROJECT_ROOT / "lang" / code / "LC_MESSAGES" / "bsmb.po"
     mo = tmp_path / "bsmb.mo"
     msgfmt.make(str(po), str(mo))

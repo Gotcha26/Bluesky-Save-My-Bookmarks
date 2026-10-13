@@ -10,17 +10,21 @@ Internationalisation de BSMB (issue #17) : gettext de la bibliothèque standard.
 Les msgid sont les textes français source : sans catalogue (ou pour la langue `fr`),
 le texte français est affiché tel quel. Les catalogues vivent dans
 `lang/<code>/LC_MESSAGES/bsmb.po` ; le `.mo` binaire est compilé au besoin par
-`tools/msgfmt.py` (Python pur) quand il manque ou qu'il est plus vieux que le `.po`.
+`core/_msgfmt.py` (Python pur) quand il manque ou qu'il est plus vieux que le `.po`.
 
 `init(language)` choisit la langue (`None` ou « auto » : détection d'après la locale du
 système). Appelé sans `init()` préalable, `_` initialise la langue détectée au premier
 usage. Aucun code ne s'exécute à l'import de ce module.
 """
 
+import contextlib
 import gettext
 import importlib.util
+import io
 import locale
+import logging
 import os
+import shutil
 import tempfile
 import threading
 from pathlib import Path
@@ -28,10 +32,11 @@ from pathlib import Path
 from core.paths import PROJECT_ROOT
 
 DOMAIN = "bsmb"
-LANG_DIR = PROJECT_ROOT / "lang"  # dossier des catalogues (patchable par les tests)
+LANG_DIR = PROJECT_ROOT / "lang"  # catalogues ; installé, le paquet `lang` est à côté de `core` (patchable)
 SUPPORTED = ("fr", "en")
 DEFAULT_LANGUAGE = "en"  # repli quand la locale n'est pas française
 
+log = logging.getLogger(__name__)  # niveau DEBUG : un échec de compilation ne doit rien afficher
 _lock = threading.Lock()
 _translation = None  # gettext.NullTranslations / GNUTranslations ; None tant que init() n'a pas eu lieu
 _current = DEFAULT_LANGUAGE
@@ -69,13 +74,20 @@ def _normaliser(language):
 
 
 def _compiler(po, mo):
-    """Compile `po` en `mo` avec tools/msgfmt.py. Renvoie True en cas de succès."""
+    """Compile `po` en `mo` avec core/_msgfmt.py. Renvoie True si un `.mo` à jour existe ensuite.
+
+    La compilation se fait dans un dossier temporaire, puis le `.mo` est posé par `os.replace`
+    (atomique : jamais de fichier tronqué visible). Les messages d'erreur de msgfmt, qui
+    n'affiche que sur stderr, sont journalisés seulement en cas d'échec.
+    """
     # Contournements du msgfmt.py de CPython, laissé tel quel :
     # - son dictionnaire MESSAGES est global : on en charge une instance neuve à chaque appel ;
     # - il décode en latin-1 le premier msgid qui suit l'en-tête (mojibake si non ASCII) :
     #   on glisse une entrée ASCII sans traduction (ignorée à la compilation) après l'en-tête.
+    erreurs = io.StringIO()
+    temporaire = None
     try:
-        spec = importlib.util.spec_from_file_location("bsmb_msgfmt", PROJECT_ROOT / "tools" / "msgfmt.py")
+        spec = importlib.util.spec_from_file_location("bsmb_msgfmt", Path(__file__).with_name("_msgfmt.py"))
         msgfmt = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(msgfmt)
 
@@ -86,43 +98,72 @@ def _compiler(po, mo):
         with tempfile.TemporaryDirectory() as tmp:
             copie = Path(tmp) / "bsmb.po"
             copie.write_text(texte, encoding="utf-8", newline="\n")
-            msgfmt.make(str(copie), str(mo))
-        return True
-    except (OSError, SystemExit, ImportError, SyntaxError, ValueError):
+            compile_tmp = Path(tmp) / "bsmb.mo"
+            with contextlib.redirect_stderr(erreurs):
+                msgfmt.make(str(copie), str(compile_tmp))
+            if not compile_tmp.is_file():
+                raise OSError("msgfmt n'a produit aucun fichier")
+            temporaire = mo.with_name(f"{mo.name}.{os.getpid()}.tmp")
+            shutil.copyfile(compile_tmp, temporaire)
+            os.replace(temporaire, mo)
+            temporaire = None
+        return _a_jour(po, mo)
+    except (OSError, SystemExit, ImportError, SyntaxError, ValueError) as e:
+        log.debug("Compilation de %s impossible : %s %s", po, e, erreurs.getvalue().strip())
         return False
+    finally:
+        if temporaire is not None:
+            with contextlib.suppress(OSError):
+                temporaire.unlink()
 
 
 def _a_jour(po, mo):
+    """Vrai si `mo` est un fichier au moins aussi récent que `po`."""
     try:
-        return mo.stat().st_mtime >= po.stat().st_mtime
+        return mo.is_file() and mo.stat().st_mtime >= po.stat().st_mtime
     except OSError:
         return False
 
 
-def _trouver_mo(code):
-    """Chemin d'un `.mo` à jour pour `code` (compilé si besoin), ou None sans catalogue."""
+def _trouver_mo(code, forcer=False):
+    """Chemin d'un `.mo` à jour pour `code` (compilé si besoin), ou None sans catalogue.
+
+    `forcer` : recompile même si le `.mo` semble à jour (fichier reconnu comme corrompu).
+    """
     po = LANG_DIR / code / "LC_MESSAGES" / f"{DOMAIN}.po"
     mo = po.with_suffix(".mo")
     if not po.is_file():
         return mo if mo.is_file() else None
-    if _a_jour(po, mo) or _compiler(po, mo):
+    if (not forcer and _a_jour(po, mo)) or _compiler(po, mo):
         return mo
     # Dossier du dépôt en lecture seule : repli sur le dossier temporaire
     secours = Path(tempfile.gettempdir()) / "bsmb-i18n" / code / f"{DOMAIN}.mo"
-    if _a_jour(po, secours) or _compiler(po, secours):
+    if (not forcer and _a_jour(po, secours)) or _compiler(po, secours):
         return secours
     return None
 
 
+def _lire_mo(mo):
+    with open(mo, "rb") as f:
+        return gettext.GNUTranslations(f)
+
+
 def _charger(code):
-    mo = _trouver_mo(code)
-    if mo is None:
-        return gettext.NullTranslations()
-    try:
-        with open(mo, "rb") as f:
-            return gettext.GNUTranslations(f)
-    except (OSError, ValueError):
-        return gettext.NullTranslations()
+    """Catalogue de `code`. Un `.mo` illisible (tronqué…) est supprimé et recompilé une fois ;
+    en dernier recours, le texte source est affiché."""
+    forcer = False
+    for _essai in range(2):
+        mo = _trouver_mo(code, forcer)
+        if mo is None:
+            break
+        try:
+            return _lire_mo(mo)
+        except Exception as e:  # struct.error, EOFError, OSError, ValueError… selon la corruption
+            log.debug("Catalogue %s illisible (%s), recompilation", mo, e)
+            with contextlib.suppress(OSError):
+                mo.unlink()
+            forcer = True
+    return gettext.NullTranslations()
 
 
 def init(language=None):

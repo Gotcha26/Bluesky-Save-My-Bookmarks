@@ -104,9 +104,11 @@ def build_parser():
     return parser
 
 
-def _preparer_config():
-    """Charge la config et prépare l'environnement (secret, dossiers, logs)."""
+def _preparer_config(lang=None):
+    """Charge la config, fixe la langue (`lang`, sinon config["language"]) puis prépare
+    l'environnement (secret, dossiers, logs)."""
     config = load_config()
+    i18n.init(lang or config.get("language") or None)  # avant tout message émis par la préparation
     migrate_secret_to_keyring(config)
     ensure_dirs(config)
     cleanup_old_logs(config)
@@ -271,7 +273,7 @@ def main(argv=None):
     if args.command is None:
         build_parser().print_help()
         return EXIT_OK
-    config = _preparer_config()
-    i18n.init(args.lang or config.get("language") or None)  # --lang l'emporte sur la configuration
+    config = _preparer_config(args.lang)
+    i18n.init(args.lang or config.get("language") or None)  # idem si _preparer_config est remplacée (tests)
     # Résolution à l'appel (et non au chargement du module) pour rester mockable
     return globals()["cmd_" + args.command](config, args)

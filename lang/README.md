@@ -22,12 +22,12 @@ lang/
 ```
 
 Les `.mo` (binaires) ne sont pas versionnés : `core/i18n.py` les compile au démarrage, avec
-`tools/msgfmt.py` (copie inchangée de `Tools/i18n/msgfmt.py` de CPython 3.13, licence PSF ;
+`core/_msgfmt.py` (copie inchangée de `Tools/i18n/msgfmt.py` de CPython 3.13, licence PSF ;
 `core/i18n.py` contourne ses défauts connus), quand ils manquent ou sont plus
 vieux que le `.po`. Pour les compiler à la main (même résultat avec `msgfmt` de GNU gettext) :
 
 ```bash
-python tools/msgfmt.py -o lang/en/LC_MESSAGES/bsmb.mo lang/en/LC_MESSAGES/bsmb.po
+python core/_msgfmt.py -o lang/en/LC_MESSAGES/bsmb.mo lang/en/LC_MESSAGES/bsmb.po
 ```
 
 ## Écrire une chaîne dans le code

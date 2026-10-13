@@ -4,6 +4,8 @@
 
 Sauvegardez automatiquement les images, vidéos et textes de vos bookmarks Bluesky.
 
+BSMB parle français et anglais. Par défaut il suit la langue de votre système ; changez-la dans **Paramètres** > **L. Langue**, ou avec `--lang en` en ligne de commande. Pour ajouter ou corriger une traduction : [lang/README.md](lang/README.md).
+
 ---
 
 ## Comment ça marche ?
@@ -125,6 +127,7 @@ Sans menu, par exemple pour une tâche planifiée (voir [ADVANCED.md](ADVANCED.m
 - `bsmb run --yes` : synchronise puis télécharge, sans aucune question
 - `bsmb status [--json]` : affiche l'état du compte et des compteurs
 - `bsmb --version` : affiche la version
+- `bsmb --lang en ...` : langue de l'interface (`fr`, `en` ou `auto`)
 
 ---
 
@@ -150,6 +153,7 @@ Sans menu, par exemple pour une tâche planifiée (voir [ADVANCED.md](ADVANCED.m
 - **Téléchargement parallèle** : configurable de 1 à 16 workers (défaut : 4)
 - **Utilisable sans menu** : sous-commandes et codes de retour pour les tâches planifiées
 - **Multi-plateforme** : Windows, macOS, Linux
+- **Interface bilingue** : français et anglais
 
 ---
 
