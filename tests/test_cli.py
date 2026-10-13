@@ -162,6 +162,23 @@ class TestDownload:
             assert cli.main(["download"]) == 0
         assert run.call_args[0][0] == ["https://bsky.app/profile/a/post/1"]
 
+    def test_post_views_du_cache_passes_a_run(self, cfg, non_interactif):
+        from core.bookmarks_cache import save_cache
+        url = "https://bsky.app/profile/a/post/1"
+        vue = {"uri": "at://did:plc:t/app.bsky.feed.post/1", "record": {}}
+        save_cache(cfg["bookmarks_cache"], [{"at_uri": vue["uri"], "url": url, "item_type": "postView",
+                                              "post_view": vue}])
+        self._urls(cfg, (url,))
+        with patch("core.cli.orchestrator.run", return_value=_stats()) as run:
+            assert cli.main(["download"]) == 0
+        assert run.call_args.kwargs["post_views"][url] == vue
+
+    def test_sans_cache_run_sans_post_views(self, cfg, non_interactif):
+        self._urls(cfg)
+        with patch("core.cli.orchestrator.run", return_value=_stats()) as run:
+            cli.main(["download"])
+        assert "post_views" not in run.call_args.kwargs
+
     def test_echecs_code_3(self, cfg, non_interactif):
         self._urls(cfg)
         with patch("core.cli.orchestrator.run", return_value=_stats(failed=["u"])):

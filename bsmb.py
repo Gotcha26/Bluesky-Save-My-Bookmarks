@@ -19,7 +19,7 @@ from core.colors import c
 from core.orchestrator import run
 from core.ui import pause, confirm, set_yes, is_interactive
 from core import cli
-from core.bookmarks_cache import load_cache, post_views_index
+from core.bookmarks_cache import post_views_from_config
 
 
 def clear_screen():
@@ -773,7 +773,7 @@ def download_media(config, force=False):
     print()
 
     # Vues hydratées de la dernière synchro : évitent un getRecord par post
-    post_views = post_views_index(load_cache(resolve_path(config, "bookmarks_cache")))
+    post_views = post_views_from_config(config)
     if post_views:
         stats = run(urls_to_process, config, post_views=post_views)
     else:
