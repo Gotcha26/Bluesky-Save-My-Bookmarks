@@ -11,7 +11,6 @@ from typing import Optional
 from urllib.parse import urlparse
 
 from core import http as bsmb_http
-
 from core.post_ref import INVALID_HANDLE, POST_COLLECTION, PostRef
 
 # `$type` de la vue hydratée -> état du record cité

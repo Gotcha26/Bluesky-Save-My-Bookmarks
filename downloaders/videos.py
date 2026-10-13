@@ -11,21 +11,19 @@ import logging
 import mimetypes
 import os
 import re
-import sys
 import subprocess
+import sys
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse
-
 
 if __package__ in (None, ""):
     # Exécution directe (python downloaders/videos.py) : rendre la racine importable
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from core.config import DEFAULT_CONFIG, get_default_paths, load_config  # noqa: E402
 from core import http as bsmb_http  # noqa: E402
+from core.config import DEFAULT_CONFIG, get_default_paths, load_config  # noqa: E402
 from downloaders import DownloadError, DownloadResult, lignes_console  # noqa: E402
-
 
 BLOB_HOST = "https://bsky.social"  # relaie (302) vers le PDS de l'auteur, quel qu'il soit
 TIMEOUT = (10, 300)  # (connexion, lecture) : jusqu'à 300 Mo

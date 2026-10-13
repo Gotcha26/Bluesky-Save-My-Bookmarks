@@ -3,12 +3,12 @@ import sqlite3
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+from api.export_bookmarks import fetch_bookmarks
 from api.post_analyzer import PostAnalyzer, PostType
 from api.quote_resolver import QuoteResolver
 from core.bookmarks import BookmarkSync
 from core.database import Database
 from core.orchestrator import process_post
-from api.export_bookmarks import fetch_bookmarks
 from downloaders import DownloadResult
 
 DID = "did:plc:abc"

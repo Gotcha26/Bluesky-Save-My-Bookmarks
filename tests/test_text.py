@@ -5,8 +5,7 @@ import pytest
 import requests
 
 from core.config import DEFAULT_CONFIG
-from downloaders import DownloadError, DownloadResult
-from downloaders import text
+from downloaders import DownloadError, DownloadResult, text
 from downloaders.text import save_text
 
 URL = "https://bsky.app/profile/user.bsky.social/post/3abc"

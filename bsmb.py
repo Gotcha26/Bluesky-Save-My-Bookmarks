@@ -3,24 +3,27 @@
 BSMB - Bsky Save My Bookmarks
 Interface novice-first pour sauvegarder vos bookmarks Bluesky
 """
-import sys
 import os
 import subprocess
-from pathlib import Path
+import sys
 from datetime import datetime
+from pathlib import Path
 
-from core.config import load_config, save_config, ensure_dirs, resolve_path, restrict_permissions
-from core.secret_store import (
-    backend_name, store_app_password, load_app_password, delete_app_password,
-    migrate_secret_to_keyring,
-)
-from core.database import Database
-from core.colors import c
-from core.orchestrator import run
-from core.ui import pause, confirm, set_yes, is_interactive
 from core import cli
-from core.version import __version__
 from core.bookmarks_cache import post_views_from_config
+from core.colors import c
+from core.config import ensure_dirs, load_config, resolve_path, restrict_permissions, save_config
+from core.database import Database
+from core.orchestrator import run
+from core.secret_store import (
+    backend_name,
+    delete_app_password,
+    load_app_password,
+    migrate_secret_to_keyring,
+    store_app_password,
+)
+from core.ui import confirm, is_interactive, pause, set_yes
+from core.version import __version__
 
 
 def clear_screen():
@@ -189,7 +192,8 @@ def get_session(config):
     Obtient une session Bluesky valide silencieusement.
     Returns: dict {"token", "refresh_jwt", "did", "pds_url"} ou None si échec.
     """
-    from core.auth import get_session as auth_get_session, has_credentials, AuthError
+    from core.auth import AuthError, has_credentials
+    from core.auth import get_session as auth_get_session
 
     if has_credentials(config):
         try:
@@ -622,7 +626,7 @@ def configure_credentials(config):
     print()
     print(c.info("Test de connexion..."))
 
-    from core.auth import create_session, AuthError
+    from core.auth import AuthError, create_session
     try:
         session = create_session(handle, app_password)
         print(c.success("Connexion réussie !"))

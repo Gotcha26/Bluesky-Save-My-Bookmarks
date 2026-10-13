@@ -4,9 +4,9 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from core.database import Database
 from core.orchestrator import (
-    format_size,
-    format_duration,
     _format_job_summary,
+    format_duration,
+    format_size,
 )
 
 

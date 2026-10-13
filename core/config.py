@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Configuration centralisée pour BSMB"""
-import os
 import json
-from pathlib import Path
+import os
 from datetime import datetime, timedelta
+from pathlib import Path
 
 from core.paths import PROJECT_ROOT
 

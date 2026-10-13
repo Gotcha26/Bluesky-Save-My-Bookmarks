@@ -6,8 +6,7 @@ import pytest
 import requests
 
 from core.config import DEFAULT_CONFIG
-from downloaders import DownloadError, DownloadResult
-from downloaders import videos
+from downloaders import DownloadError, DownloadResult, videos
 from downloaders.videos import download_video, extract_video_info, safe_filename_part
 
 URL = "https://bsky.app/profile/user.bsky.social/post/3abc"

@@ -1,9 +1,9 @@
 """Tests pour core/auth.py"""
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from core.auth import create_session, get_session, get_token, has_credentials, AuthError, DEFAULT_PDS_URL
+from core.auth import DEFAULT_PDS_URL, AuthError, create_session, get_session, get_token, has_credentials
 
 
 class TestCreateSession:

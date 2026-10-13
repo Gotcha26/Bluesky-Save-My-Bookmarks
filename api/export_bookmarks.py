@@ -2,11 +2,12 @@
 """Export des bookmarks Bluesky — module importable et script standalone."""
 import json
 import os
-import requests
-import time
 import sys
+import time
 import traceback
 from pathlib import Path
+
+import requests
 
 # Permet `python api/export_bookmarks.py` (le dossier du script est alors seul dans sys.path)
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
