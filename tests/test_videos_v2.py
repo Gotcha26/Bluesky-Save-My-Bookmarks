@@ -301,7 +301,8 @@ class TestRepliHls:
         res = _dl(tmp_path, self._echec(), view_embed=self.VIEW)
         cible = tmp_path / "user.bsky.social_20260102_3abc_01.mp4"
         premier = ffmpeg.call_args_list[0]
-        assert premier.args[0] == ["ffmpeg", "-y", "-i", PLAYLIST, "-c", "copy", str(cible)]
+        part = str(cible) + ".part"  # écrit à côté puis renommé (revue finale I6)
+        assert premier.args[0] == ["ffmpeg", "-y", "-i", PLAYLIST, "-c", "copy", "-f", "mp4", part]
         assert premier.kwargs["check"] is True
         assert premier.kwargs["timeout"] == 600
         assert res[0].cid == CID
@@ -339,6 +340,21 @@ class TestRepliHls:
             with pytest.raises(DownloadError, match="blob purgé"):
                 _dl(tmp_path, self._echec(), view_embed=self.VIEW)
         assert list(tmp_path.iterdir()) == []
+
+    def test_echec_hls_ne_supprime_pas_une_video_deja_archivee(self, tmp_path):
+        """Revue finale I6 : ffmpeg écrit dans un .part, jamais sur le fichier final."""
+        cible = tmp_path / "user.bsky.social_20260102_3abc_01.mp4"
+        cible.write_bytes(b"video archivee")
+
+        def boom(cmd, **kw):
+            Path(cmd[-1]).write_bytes(b"tronque")
+            raise subprocess.CalledProcessError(1, cmd)
+
+        with patch("downloaders.videos.subprocess.run", side_effect=boom):
+            with pytest.raises(DownloadError):
+                _dl(tmp_path, self._echec(), view_embed=self.VIEW)
+        assert cible.read_bytes() == b"video archivee"
+        assert sorted(p.name for p in tmp_path.iterdir()) == [cible.name]
 
     def test_ffmpeg_timeout_leve_download_error(self, tmp_path):
         with patch("downloaders.videos.subprocess.run", side_effect=subprocess.TimeoutExpired("ffmpeg", 600)):

@@ -180,24 +180,28 @@ def _ecrire_blob(http, url, dest, types):
 
 
 def _repli_hls(playlist, dest):
-    """Reconstruit la vidéo depuis la playlist HLS avec ffmpeg ; lève DownloadError."""
-    ok = False
+    """Reconstruit la vidéo depuis la playlist HLS avec ffmpeg ; lève DownloadError.
+
+    ffmpeg écrit dans `dest.part` (format forcé par `-f mp4`, l'extension ne le dit plus),
+    renommé en `dest` seulement après succès : un échec ne touche jamais un fichier final
+    déjà archivé.
+    """
+    part = dest.with_name(dest.name + ".part")
     try:
         subprocess.run(
-            ["ffmpeg", "-y", "-i", playlist, "-c", "copy", str(dest)],
+            ["ffmpeg", "-y", "-i", playlist, "-c", "copy", "-f", "mp4", str(part)],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             check=True,
             timeout=600,
         )
-        ok = True
+        os.replace(part, dest)
     except FileNotFoundError as e:
         raise DownloadError("ffmpeg introuvable : repli HLS impossible") from e
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as e:
         raise DownloadError(f"repli HLS en échec ({e})") from e
     finally:
-        if not ok:
-            dest.unlink(missing_ok=True)
+        part.unlink(missing_ok=True)
 
 
 def _add_metadata(filepath, video_info, handle, post_id, post_url):
