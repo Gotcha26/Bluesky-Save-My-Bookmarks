@@ -40,8 +40,8 @@ MODULES = [
     "downloaders.images",
     "downloaders.videos",
     "downloaders.text",
-    "msgfmt",  # tools/*.py : scripts autonomes, hors paquet
-    "extract_strings",
+    "core._msgfmt",
+    "extract_strings",  # tools/*.py : scripts autonomes, hors paquet
 ]
 
 SCRIPT = (

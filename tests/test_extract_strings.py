@@ -7,15 +7,15 @@ import pytest
 from core.paths import PROJECT_ROOT
 
 
-def _charger(nom):
-    spec = importlib.util.spec_from_file_location(nom, PROJECT_ROOT / "tools" / f"{nom}.py")
+def _charger(nom, chemin):
+    spec = importlib.util.spec_from_file_location(nom, chemin)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
 
 
-extract_strings = _charger("extract_strings")
-msgfmt = _charger("msgfmt")
+extract_strings = _charger("extract_strings", PROJECT_ROOT / "tools" / "extract_strings.py")
+msgfmt = _charger("msgfmt", PROJECT_ROOT / "core" / "_msgfmt.py")
 
 SOURCE = """\
 from core.i18n import _, _n

@@ -23,7 +23,10 @@ version = {attr = "core.version.__version__"}
 
 [tool.setuptools]
 py-modules = ["bsmb"]
-packages = ["core", "api", "downloaders"]
+packages = ["core", "api", "downloaders", "lang"]
+
+[tool.setuptools.package-data]
+lang = ["*/LC_MESSAGES/*.po"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -31,7 +34,7 @@ testpaths = ["tests"]
 [tool.ruff]
 line-length = 110
 # Copie telle quelle de Tools/i18n/msgfmt.py de CPython 3.13 (licence PSF) : style d'origine conservé
-extend-exclude = ["tools/msgfmt.py"]
+extend-exclude = ["core/_msgfmt.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP"]
