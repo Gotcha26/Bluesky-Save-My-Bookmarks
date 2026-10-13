@@ -9,6 +9,7 @@ input() n'est émis : pause() ne fait rien et confirm() renvoie la valeur par d�
 import sys
 
 from core.colors import c
+from core.i18n import _
 
 _etat = {"yes": False}
 
@@ -28,21 +29,21 @@ def is_interactive():
         return False
 
 
-def pause(message="Appuyez sur Entrée..."):
+def pause(message=None):
     """Attend la touche Entrée ; ne fait rien en mode non interactif."""
     if not is_interactive():
         return
-    input(f"\n{c.DIM}  {message}{c.RESET}")
+    input(f"\n{c.DIM}  {message or _('Appuyez sur Entrée...')}{c.RESET}")
 
 
 def confirm(question, default=True):
     """Pose une question oui/non ; renvoie `default` en mode non interactif.
 
-    Une réponse vide donne `default`. Réponses oui : o, oui, y, yes.
+    Une réponse vide donne `default`. Réponses oui : o, oui, y, yes (dans toutes les langues).
     """
     if not is_interactive():
         return default
-    suffixe = "[O/n]" if default else "[o/N]"
+    suffixe = _("[O/n]") if default else _("[o/N]")
     reponse = input(c.prompt(f"  {question} {suffixe}: ")).strip().lower()
     if not reponse:
         return default

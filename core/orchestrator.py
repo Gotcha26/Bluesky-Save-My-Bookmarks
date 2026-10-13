@@ -38,6 +38,7 @@ from core.config import (  # noqa: E402
     resolve_path,
 )
 from core.database import Database  # noqa: E402
+from core.i18n import _, _n  # noqa: E402
 from downloaders import DownloadError, lignes_console  # noqa: E402
 from downloaders.archive import write_sidecar, write_text  # noqa: E402
 from downloaders.external import download_external  # noqa: E402
@@ -68,11 +69,11 @@ def get_folder_size(path):
 
 
 def format_size(size_bytes):
-    for unit in ["o", "Ko", "Mo", "Go"]:
+    for unit in [_("o"), _("Ko"), _("Mo"), _("Go")]:
         if size_bytes < 1024.0:
             return f"{size_bytes:.2f} {unit}"
         size_bytes /= 1024.0
-    return f"{size_bytes:.2f} To"
+    return f"{size_bytes:.2f} {_('To')}"
 
 
 def format_duration(seconds):
@@ -113,13 +114,13 @@ def _telecharger(downloader, url, dest_dir, config, buf_print, log_func, erreurs
             erreurs.append(e)
         return []
     except Exception as e:
-        buf_print(f"       [ERR] Erreur inattendue : {e}")
+        buf_print("       [ERR] " + _("Erreur inattendue : {erreur}").format(erreur=e))
         log_func(f"   ERREUR INATTENDUE: {url} - {type(e).__name__}: {e}", to_console=False)
         if erreurs is not None:
             erreurs.append(e)
         return []
     if not results:
-        buf_print("       [!] Aucun média trouvé")
+        buf_print("       [!] " + _("Aucun média trouvé"))
     for ligne in lignes_console(results):
         buf_print(f"    {ligne}")
     return results
@@ -144,8 +145,18 @@ def _session(ctx):
     return {"session": ctx.session} if ctx.session is not None else {}
 
 
-# Libellés des états d'un record cité qui n'est plus lisible
+# Libellés (français, pour le log fichier) des états d'un record cité qui n'est plus lisible
 _ETATS_CITE_ABSENT = {"not_found": "supprimé", "blocked": "bloqué", "detached": "détaché"}
+
+
+def _etat_cite_console(etat):
+    """Libellé traduit de l'état d'un record cité qui n'est plus lisible (affichage console)."""
+    libelles = {
+        "not_found": _("supprimé"),
+        "blocked": _("bloqué"),
+        "detached": _("détaché"),
+    }
+    return libelles.get(etat, etat)
 
 
 def _chemin_par_cid(ctx):
@@ -183,7 +194,8 @@ def _contenu_propre(
     nb_erreurs = len(erreurs) if erreurs is not None else 0
 
     if post_type == PostType.IMAGES:
-        ctx.buf_print(c.info(f"{data.get('image_count', 1)} image(s) détectée(s)"))
+        nb_images = data.get("image_count", 1)
+        ctx.buf_print(c.info(_n("{n} image détectée", "{n} images détectées", nb_images).format(n=nb_images)))
         results = _telecharger(
             download_images,
             url,
@@ -196,7 +208,7 @@ def _contenu_propre(
             **options,
         )
     elif post_type == PostType.VIDEO:
-        ctx.buf_print(c.info("Vidéo détectée"))
+        ctx.buf_print(c.info(_("Vidéo détectée")))
         full = (debug_info or {}).get("full_data") or {}
         results = _telecharger(
             download_video,
@@ -212,7 +224,7 @@ def _contenu_propre(
         )
     elif post_type == PostType.EXTERNAL and not cite:
         # Embed externe : carte de lien, GIF, lien tiers
-        ctx.buf_print(c.info("Lien externe détecté"))
+        ctx.buf_print(c.info(_("Lien externe détecté")))
         donnees = {**data, "record": record} if record else data  # le record donne facets et langue au .txt
         results = _telecharger(
             lambda u, _dest, cfg: download_external(u, donnees, dirs, cfg, **_session(ctx)),
@@ -224,12 +236,12 @@ def _contenu_propre(
     elif post_type in (PostType.TEXT_ONLY, PostType.QUOTE, PostType.EXTERNAL):
         if cite and post_type == PostType.EXTERNAL:
             # Un lien externe cité n'est archivé que par son texte
-            ctx.buf_print(f"  {c.DIM}Citation : carte de lien non archivée (texte seul){c.RESET}")
+            ctx.buf_print(f"  {c.DIM}{_('Citation : carte de lien non archivée (texte seul)')}{c.RESET}")
             ctx.log_func(
                 f"   NOTE: citation : carte de lien non archivée (texte seul) ({url})", to_console=False
             )
         ctx.buf_print(
-            c.info("Texte seul détecté" if post_type == PostType.TEXT_ONLY else "Texte du post détecté")
+            c.info(_("Texte seul détecté") if post_type == PostType.TEXT_ONLY else _("Texte du post détecté"))
         )
         results = _telecharger(
             save_text, url, dirs["text_dir"], *args, erreurs=erreurs, **_session(ctx), **options
@@ -319,12 +331,15 @@ def _archiver_citation(url, quote_uri, depth, base, ctx, post_view=None):
     cible = ctx.resolver.resolve(url) if post_view is None else ctx.resolver.resolve(url, post_view=post_view)
     if cible is None:
         ref = quote_uri or url
-        ctx.buf_print(c.warning("Citation non résolue"))
+        ctx.buf_print(c.warning(_("Citation non résolue")))
         ctx.log_func(f"   CITATION NON ARCHIVÉE: {ref}", to_console=False)
         return [], [("failed", ref)]
 
     if cible.state == "not_post":
-        ctx.buf_print(f"  {c.DIM}Le record cité n'est pas un post ({cible.collection}) : ignoré{c.RESET}")
+        ignore = _("Le record cité n'est pas un post ({collection}) : ignoré").format(
+            collection=cible.collection
+        )
+        ctx.buf_print(f"  {c.DIM}{ignore}{c.RESET}")
         ctx.log_func(
             f"   CITATION IGNORÉE: {url} - le record cité n'est pas un post ({cible.collection})",
             to_console=False,
@@ -333,26 +348,27 @@ def _archiver_citation(url, quote_uri, depth, base, ctx, post_view=None):
 
     if cible.state != "post":
         etat = _ETATS_CITE_ABSENT.get(cible.state, cible.state)
-        ctx.buf_print(f"  {c.DIM}Post cité {etat}{c.RESET}")
+        absent = _("Post cité {etat}").format(etat=_etat_cite_console(cible.state))
+        ctx.buf_print(f"  {c.DIM}{absent}{c.RESET}")
         ctx.log_func(f"   NOTE: post cité {etat} ({cible.url or cible.at_uri}) pour {url}", to_console=False)
         return [], [(cible.state, cible.url or cible.at_uri)]
 
     profondeur = depth + 1
-    ctx.buf_print(f"  {c.OK}>{c.RESET} Post cité : {c.VALUE}{cible.url}{c.RESET}")
+    ctx.buf_print(f"  {c.OK}>{c.RESET} {_('Post cité :')} {c.VALUE}{cible.url}{c.RESET}")
     post_type, data, debug_info = ctx.analyzer.analyze(cible.url)
 
     if post_type == PostType.ERROR_400:
-        ctx.buf_print(f"  {c.DIM}Post cité supprimé{c.RESET}")
+        ctx.buf_print(f"  {c.DIM}{_('Post cité supprimé')}{c.RESET}")
         ctx.log_func(f"   NOTE: post cité supprimé ({cible.url}) pour {url}", to_console=False)
         return [], [("not_found", cible.url)]
     if post_type in (PostType.ERROR_500, PostType.ERROR_429) or (
         post_type == PostType.UNKNOWN and "error" in debug_info
     ):
-        ctx.buf_print(c.warning("Post cité inaccessible"))
+        ctx.buf_print(c.warning(_("Post cité inaccessible")))
         ctx.log_func(f"   CITATION NON ARCHIVÉE: {cible.url}", to_console=False)
         return [], [("failed", cible.url)]
     if post_type == PostType.UNKNOWN:
-        ctx.buf_print(f"  {c.DIM}Contenu du post cité non reconnu : ignoré{c.RESET}")
+        ctx.buf_print(f"  {c.DIM}{_('Contenu du post cité non reconnu : ignoré')}{c.RESET}")
         ctx.log_func(f"   NOTE: contenu du post cité non reconnu ({cible.url})", to_console=False)
         return [], []
 
@@ -436,7 +452,7 @@ def process_post(
         post_type, data, debug_info = analyzer.analyze(url)
     else:
         post_type, data, debug_info = analyzer.analyze(url, post_view=post_view)
-    buf_print(f"  {c.KEY}Type détecté :{c.RESET} {c.VALUE}{post_type.value}{c.RESET}")
+    buf_print(f"  {c.KEY}{_('Type détecté :')}{c.RESET} {c.VALUE}{post_type.value}{c.RESET}")
 
     # Tracking DB
     if db:
@@ -447,7 +463,7 @@ def process_post(
 
     # Erreur 500
     if post_type == PostType.ERROR_500:
-        buf_print(c.warning("Erreur serveur (500)"))
+        buf_print(c.warning(_("Erreur serveur (500)")))
         log_func(f"   ERREUR 500: {url}", to_console=False)
         if db:
             db.update_last_check(url)
@@ -456,7 +472,7 @@ def process_post(
 
     # Limite de débit (429) persistante après les reprises : retenté à la prochaine exécution
     if post_type == PostType.ERROR_429:
-        buf_print(c.warning("Limite de débit (429)"))
+        buf_print(c.warning(_("Limite de débit (429)")))
         log_func(f"   LIMITE DE DÉBIT 429: {url}", to_console=False)
         if db:
             db.update_last_check(url)
@@ -465,7 +481,7 @@ def process_post(
 
     # Post supprimé
     if post_type == PostType.ERROR_400:
-        buf_print(c.error("Post supprimé ou inaccessible (400)"))
+        buf_print(c.error(_("Post supprimé ou inaccessible (400)")))
         log_func(f"   POST SUPPRIMÉ: {url}", to_console=False)
         if db:
             db.mark_post_status(url, "deleted")
@@ -473,12 +489,13 @@ def process_post(
 
     # Cas inconnu - MODE DEBUG
     if post_type == PostType.UNKNOWN:
-        buf_print(c.warning("Type de post non reconnu"))
+        buf_print(c.warning(_("Type de post non reconnu")))
         debug_file = save_debug_info(post_id, debug_info, logs_dir)
-        buf_print(f"  {c.DIM}Debug sauvegardé : {debug_file.name}{c.RESET}")
+        debug_msg = _("Debug sauvegardé : {fichier}").format(fichier=debug_file.name)
+        buf_print(f"  {c.DIM}{debug_msg}{c.RESET}")
         buf_print(c.config_line("Embed type", debug_info.get("embed_type", "N/A")))
         buf_print(c.config_line("Has embed", str(debug_info.get("has_embed", False))))
-        buf_print(c.config_line("Texte", data.get("text", "")[:80] + "..."))
+        buf_print(c.config_line(_("Texte"), data.get("text", "")[:80] + "..."))
 
         log_func(f"   TYPE INCONNU: {url} - Debug: {debug_file.name}", to_console=False)
         if db:
@@ -499,7 +516,7 @@ def process_post(
 
     # 1. Le post bookmarké, d'après son propre contenu
     if est_citation:
-        buf_print(c.info("Citation détectée, résolution du post cité..."))
+        buf_print(c.info(_("Citation détectée, résolution du post cité...")))
     erreurs = []
     results = _contenu_propre(
         post_type, data, url, ctx, erreurs=erreurs, debug_info=debug_info, post_view=post_view
@@ -526,7 +543,7 @@ def process_post(
     text_count = sum(r.media_type == "text" for r in a_enregistrer)
     if compteurs is not None:
         compteurs["sidecars"] = sum(r.media_type == "sidecar" for r in a_enregistrer)
-    echec_citation = any(genre == "failed" for genre, _ in problemes)
+    echec_citation = any(genre == "failed" for genre, _ref in problemes)
 
     # Bilan
     if erreurs:
@@ -554,7 +571,7 @@ def process_post(
     # Rien d'archivé : le citant n'a pas de contenu propre et son cité est supprimé,
     # bloqué ou détaché -> rien à conserver, comme un post supprimé
     if est_citation and not erreurs and problemes and not echec_citation:
-        buf_print(c.error("Post cité supprimé ou inaccessible"))
+        buf_print(c.error(_("Post cité supprimé ou inaccessible")))
         log_func(f"   POST SUPPRIMÉ: {url}", to_console=False)
         if db:
             db.mark_post_status(url, "deleted")
@@ -575,26 +592,31 @@ def _format_job_summary(idx, total, url, status, img_count, vid_count, text_coun
     if status == "success":
         details = []
         if img_count:
-            details.append(f"{img_count} image{'s' if img_count > 1 else ''}")
+            details.append(_n("{n} image", "{n} images", img_count).format(n=img_count))
         if vid_count:
-            details.append(f"{vid_count} vidéo{'s' if vid_count > 1 else ''}")
+            details.append(_n("{n} vidéo", "{n} vidéos", vid_count).format(n=vid_count))
         if text_count:
-            details.append(f"{text_count} texte{'s' if text_count > 1 else ''}")
+            details.append(_n("{n} texte", "{n} textes", text_count).format(n=text_count))
         detail_str = ", ".join(details) if details else "OK"
         return (
             f"  {c.DIM}{counter}{c.RESET} {c.GREEN}OK{c.RESET} "
             f"{c.VALUE}{handle}/{post_id}{c.RESET} {c.DIM}{detail_str}{c.RESET}"
         )
     elif status == "error_400":
-        return f"  {c.DIM}{counter}{c.RESET} {c.RED}--{c.RESET} {c.DIM}post supprimé (400){c.RESET}"
+        libelle = _("post supprimé (400)")
+        return f"  {c.DIM}{counter}{c.RESET} {c.RED}--{c.RESET} {c.DIM}{libelle}{c.RESET}"
     elif status == "error_500":
-        return f"  {c.DIM}{counter}{c.RESET} {c.RED}--{c.RESET} {c.DIM}erreur serveur (500){c.RESET}"
+        libelle = _("erreur serveur (500)")
+        return f"  {c.DIM}{counter}{c.RESET} {c.RED}--{c.RESET} {c.DIM}{libelle}{c.RESET}"
     elif status == "error_429":
-        return f"  {c.DIM}{counter}{c.RESET} {c.YELLOW}--{c.RESET} {c.DIM}limite de débit (429){c.RESET}"
+        libelle = _("limite de débit (429)")
+        return f"  {c.DIM}{counter}{c.RESET} {c.YELLOW}--{c.RESET} {c.DIM}{libelle}{c.RESET}"
     elif status == "unknown":
-        return f"  {c.DIM}{counter}{c.RESET} {c.YELLOW}??{c.RESET} {c.DIM}type inconnu{c.RESET}"
+        libelle = _("type inconnu")
+        return f"  {c.DIM}{counter}{c.RESET} {c.YELLOW}??{c.RESET} {c.DIM}{libelle}{c.RESET}"
     else:
-        return f"  {c.DIM}{counter}{c.RESET} {c.RED}!!{c.RESET} {c.DIM}échec{c.RESET}"
+        libelle = _("échec")
+        return f"  {c.DIM}{counter}{c.RESET} {c.RED}!!{c.RESET} {c.DIM}{libelle}{c.RESET}"
 
 
 def _print_progress_bar(completed, total, img_total, vid_total, text_total):
@@ -606,14 +628,15 @@ def _print_progress_bar(completed, total, img_total, vid_total, text_total):
 
     details = []
     if img_total:
-        details.append(f"{img_total} img")
+        details.append(_("{n} img").format(n=img_total))
     if vid_total:
-        details.append(f"{vid_total} vid")
+        details.append(_("{n} vid").format(n=vid_total))
     if text_total:
-        details.append(f"{text_total} txt")
+        details.append(_("{n} txt").format(n=text_total))
     detail_str = f" ({', '.join(details)})" if details else ""
 
-    line = f"  {c.DIM}Progression :{c.RESET} [{c.CYAN}{bar}{c.RESET}] {completed}/{total} {pct}%{detail_str}"
+    progression = _("Progression :")
+    line = f"  {c.DIM}{progression}{c.RESET} [{c.CYAN}{bar}{c.RESET}] {completed}/{total} {pct}%{detail_str}"
     sys.stdout.write(f"\r{line}  ")
     sys.stdout.flush()
 
@@ -622,18 +645,18 @@ def print_report(stats, duration, total_size, no_db_mode, log_file, max_workers,
     """Affiche le rapport final structuré (generated_files : sortie de _save_problem_logs)."""
     border = "=" * 80
     print(f"\n  {c.HEADER}{border}{c.RESET}")
-    print(f"  {c.HEADER}{'RAPPORT DE TÉLÉCHARGEMENT':^80}{c.RESET}")
+    print(f"  {c.HEADER}{_('RAPPORT DE TÉLÉCHARGEMENT'):^80}{c.RESET}")
     print(f"  {c.HEADER}{border}{c.RESET}")
     print()
 
     # Résultats
-    print(c.title("  RÉSULTATS"))
+    print(c.title("  " + _("RÉSULTATS")))
     print(c.separator(width=78))
-    print(c.config_line("Posts traités", f"{stats['success']}/{stats['total']}", 28))
-    print(c.config_line("Images téléchargées", str(stats["images"]), 28))
-    print(c.config_line("Vidéos téléchargées", str(stats["videos"]), 28))
-    print(c.config_line("Textes sauvegardés", str(stats["texts"]), 28))
-    print(c.config_line("Fiches JSON", str(stats.get("sidecars", 0)), 28))
+    print(c.config_line(_("Posts traités"), f"{stats['success']}/{stats['total']}", 28))
+    print(c.config_line(_("Images téléchargées"), str(stats["images"]), 28))
+    print(c.config_line(_("Vidéos téléchargées"), str(stats["videos"]), 28))
+    print(c.config_line(_("Textes sauvegardés"), str(stats["texts"]), 28))
+    print(c.config_line(_("Fiches JSON"), str(stats.get("sidecars", 0)), 28))
     print()
 
     # Problèmes (seulement si présents)
@@ -650,32 +673,32 @@ def print_report(stats, duration, total_size, no_db_mode, log_file, max_workers,
     )
 
     if has_problems:
-        print(c.title("  PROBLÈMES"))
+        print(c.title("  " + _("PROBLÈMES")))
         print(c.separator(width=78))
         if stats["error_400"]:
-            print(c.config_line("Posts supprimés (400)", str(len(stats["error_400"])), 28))
+            print(c.config_line(_("Posts supprimés (400)"), str(len(stats["error_400"])), 28))
         if stats["error_500"]:
-            print(c.config_line("Erreurs serveur (500)", str(len(stats["error_500"])), 28))
+            print(c.config_line(_("Erreurs serveur (500)"), str(len(stats["error_500"])), 28))
         if stats.get("error_429"):
-            print(c.config_line("Limite de débit (429)", str(len(stats["error_429"])), 28))
+            print(c.config_line(_("Limite de débit (429)"), str(len(stats["error_429"])), 28))
         if non_resolues:
-            print(c.config_line("Citations non archivées", str(len(non_resolues)), 28))
+            print(c.config_line(_("Citations non archivées"), str(len(non_resolues)), 28))
         if stats["unknown"]:
-            print(c.config_line("Types inconnus", str(len(stats["unknown"])), 28))
+            print(c.config_line(_("Types inconnus"), str(len(stats["unknown"])), 28))
         if stats["failed"]:
-            print(c.config_line("Échecs", str(len(stats["failed"])), 28))
+            print(c.config_line(_("Échecs"), str(len(stats["failed"])), 28))
         print()
 
     # Métriques
-    print(c.title("  MÉTRIQUES"))
+    print(c.title("  " + _("MÉTRIQUES")))
     print(c.separator(width=78))
-    print(c.config_line("Durée totale", format_duration(duration), 28))
-    print(c.config_line("Workers parallèles", str(max_workers), 28))
-    print(c.config_line("Poids total du dossier", format_size(total_size), 28))
+    print(c.config_line(_("Durée totale"), format_duration(duration), 28))
+    print(c.config_line(_("Workers parallèles"), str(max_workers), 28))
+    print(c.config_line(_("Poids total du dossier"), format_size(total_size), 28))
 
     if no_db_mode:
         print()
-        print(c.warning("Mode dev : Base de données non mise à jour"))
+        print(c.warning(_("Mode dev : Base de données non mise à jour")))
 
     print()
     print(f"  {c.HEADER}{border}{c.RESET}")
@@ -683,12 +706,13 @@ def print_report(stats, duration, total_size, no_db_mode, log_file, max_workers,
     # Fichiers de log générés
     if generated_files:
         print()
-        print(c.title("  FICHIERS GÉNÉRÉS"))
+        print(c.title("  " + _("FICHIERS GÉNÉRÉS")))
         print(c.separator(width=78))
         for name, detail in generated_files:
             print(f"  {c.YELLOW}>{c.RESET} {c.VALUE}{name}{c.RESET}  ({detail})")
 
-    print(f"\n  {c.DIM}Log détaillé : {log_file}{c.RESET}")
+    log_detail = _("Log détaillé : {fichier}").format(fichier=log_file)
+    print(f"\n  {c.DIM}{log_detail}{c.RESET}")
 
 
 def _save_problem_logs(stats, logs_dir):
@@ -697,12 +721,12 @@ def _save_problem_logs(stats, logs_dir):
     generated = []
 
     entries = [
-        ("error_400", "deleted_posts", "posts supprimés"),
-        ("quotes_unresolved", "quotes_unresolved", "citations non archivées"),
-        ("error_500", "error_500", "erreurs 500"),
-        ("error_429", "rate_limited", "limites de débit (429)"),
-        ("unknown", "unknown_types", "types inconnus"),
-        ("failed", "failed_downloads", "échecs"),
+        ("error_400", "deleted_posts", _("posts supprimés")),
+        ("quotes_unresolved", "quotes_unresolved", _("citations non archivées")),
+        ("error_500", "error_500", _("erreurs 500")),
+        ("error_429", "rate_limited", _("limites de débit (429)")),
+        ("unknown", "unknown_types", _("types inconnus")),
+        ("failed", "failed_downloads", _("échecs")),
     ]
 
     for key, prefix, label in entries:
@@ -792,7 +816,17 @@ def _run(urls, config, media_dirs, no_db=False, on_progress=None, quiet=False, p
             with _print_lock:
                 print(msg)
 
-    log(f"=== Début du téléchargement : {total_jobs} posts à traiter ({max_workers} workers) ===")
+    log(
+        f"=== Début du téléchargement : {total_jobs} posts à traiter ({max_workers} workers) ===",
+        to_console=False,
+    )
+    if not quiet:
+        with _print_lock:
+            print(
+                _("=== Début du téléchargement : {n} posts à traiter ({workers} workers) ===").format(
+                    n=total_jobs, workers=max_workers
+                )
+            )
     # Nettoyage après création du nouveau log : max_logs fichiers au total, celui-ci compris
     cleanup_old_logs(config)
     if no_db:
@@ -802,10 +836,9 @@ def _run(urls, config, media_dirs, no_db=False, on_progress=None, quiet=False, p
     if not quiet:
         print()
         print(f"  {c.HEADER}{'─' * 78}{c.RESET}")
-        print(
-            f"  {c.BOLD}{total_jobs} posts à traiter{c.RESET} "
-            f"{c.DIM}({max_workers} workers parallèles){c.RESET}"
-        )
+        a_traiter = _n("{n} post à traiter", "{n} posts à traiter", total_jobs).format(n=total_jobs)
+        paralleles = _("({workers} workers parallèles)").format(workers=max_workers)
+        print(f"  {c.BOLD}{a_traiter}{c.RESET} {c.DIM}{paralleles}{c.RESET}")
         print(f"  {c.HEADER}{'─' * 78}{c.RESET}")
         print()
 
