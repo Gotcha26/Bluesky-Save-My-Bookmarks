@@ -18,7 +18,7 @@ DEFAULT_CONFIG = {
     "max_logs": 5,  # nombre maximal de logs download_*.log conservés
     "max_filename_len": 64,
     "min_postid_short": 4,
-    "index_digits": 1,
+    "index_digits": 2,  # chiffres de l'index d'image (_01) ; les fichiers existants ne sont pas renommés
     "bsky_handle": "",
     "bsky_app_password": "",
     "pds_url": "",  # PDS du compte ("" = inconnu, bsky.social utilisé)
@@ -32,7 +32,8 @@ DEFAULT_CONFIG = {
     "skip_existing_cid": True,  # ne pas retélécharger un blob dont le cid est en base avec un fichier présent
     "bookmarks_cache": "bookmarks.json",  # dernière réponse getBookmarks (postView bruts)
     "gif_subfolder": False,  # GIF (vidéo presentation=gif) rangés dans videos/gifs/ au lieu du suffixe _gif
-    "download_video_thumbnail": False  # télécharge aussi la miniature de la vidéo (_01_thumb.jpg)
+    "download_video_thumbnail": False,  # télécharge aussi la miniature de la vidéo (_01_thumb.jpg)
+    "save_sidecar": True  # écrit texts/<base>.json (record brut + postView) pour chaque post archivé
 }
 
 def get_default_paths():

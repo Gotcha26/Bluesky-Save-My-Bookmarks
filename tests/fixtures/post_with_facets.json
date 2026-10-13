@@ -1,0 +1,88 @@
+{
+  "uri": "at://did:plc:testauteur0000000000000/app.bsky.feed.post/3ktestfacets",
+  "cid": "bafyreitestfacets",
+  "value": {
+    "$type": "app.bsky.feed.post",
+    "text": "🎉🔥 Voir libidex.example/article-tres-lo... avec @alice.example.com et #bluesky é",
+    "facets": [
+      {
+        "index": {
+          "byteStart": 14,
+          "byteEnd": 48
+        },
+        "features": [
+          {
+            "$type": "app.bsky.richtext.facet#link",
+            "uri": "https://libidex.example/article-tres-long-titre"
+          }
+        ]
+      },
+      {
+        "index": {
+          "byteStart": 54,
+          "byteEnd": 72
+        },
+        "features": [
+          {
+            "$type": "app.bsky.richtext.facet#mention",
+            "did": "did:plc:testalice00000000000000"
+          }
+        ]
+      },
+      {
+        "index": {
+          "byteStart": 76,
+          "byteEnd": 84
+        },
+        "features": [
+          {
+            "$type": "app.bsky.richtext.facet#tag",
+            "tag": "bluesky"
+          }
+        ]
+      }
+    ],
+    "langs": [
+      "fr",
+      "en"
+    ],
+    "createdAt": "2026-02-03T09:08:07.123Z",
+    "reply": {
+      "root": {
+        "uri": "at://did:plc:testauteur0000000000000/app.bsky.feed.post/3ktestracine",
+        "cid": "bafyreiracine"
+      },
+      "parent": {
+        "uri": "at://did:plc:testauteur0000000000000/app.bsky.feed.post/3ktestparent",
+        "cid": "bafyreiparent"
+      }
+    },
+    "embed": {
+      "$type": "app.bsky.embed.images",
+      "images": [
+        {
+          "alt": "Un chat noir sur un canapé",
+          "image": {
+            "$type": "blob",
+            "ref": {
+              "$link": "bafkreichat1"
+            },
+            "mimeType": "image/jpeg",
+            "size": 1234
+          }
+        },
+        {
+          "alt": "",
+          "image": {
+            "$type": "blob",
+            "ref": {
+              "$link": "bafkreichat2"
+            },
+            "mimeType": "image/jpeg",
+            "size": 1234
+          }
+        }
+      ]
+    }
+  }
+}
