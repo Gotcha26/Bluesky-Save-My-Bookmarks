@@ -6,7 +6,6 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import pytest
 import requests
-from requests.adapters import HTTPAdapter
 
 from core import http as bsmb_http
 from core.version import __version__

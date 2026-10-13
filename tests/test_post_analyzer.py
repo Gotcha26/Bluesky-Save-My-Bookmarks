@@ -1,5 +1,5 @@
 """Tests pour api/post_analyzer.py"""
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -282,7 +282,7 @@ class TestAnalyzeAvecPostView:
         assert data["external"]["uri"] == "https://example.com/a"
 
     def test_citation(self, sans_reseau):
-        cite = f"at://did:plc:test2000000000000000000000/app.bsky.feed.post/3kcited0001"
+        cite = "at://did:plc:test2000000000000000000000/app.bsky.feed.post/3kcited0001"
         embed = {"$type": "app.bsky.embed.record", "record": {"uri": cite, "cid": "c"}}
         t, data, _ = self.analyzer.analyze(URL_PV, post_view=_post_view(embed))
         assert t == PostType.QUOTE

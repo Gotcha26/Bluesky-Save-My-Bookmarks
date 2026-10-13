@@ -17,7 +17,7 @@ if __package__ in (None, ""):
 
 from core import http as bsmb_http  # noqa: E402
 from core.config import get_default_paths, load_config  # noqa: E402
-from downloaders import DownloadError, DownloadResult, lignes_console  # noqa: E402
+from downloaders import DownloadError, lignes_console  # noqa: E402
 
 
 def fetch_post(handle, post_id, http=None):

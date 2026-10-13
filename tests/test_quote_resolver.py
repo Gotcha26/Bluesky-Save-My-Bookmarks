@@ -4,7 +4,7 @@ import json
 import sys
 import warnings
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import requests
 

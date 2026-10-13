@@ -1,7 +1,6 @@
 """Tests pour core/config.py"""
 import json
-from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from core.config import (
     CONFIG_FILE,

@@ -1,5 +1,5 @@
 """Tests pour core/post_ref.py (identité des posts par AT-URI)."""
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 import requests
