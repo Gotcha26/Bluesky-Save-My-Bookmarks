@@ -138,6 +138,11 @@ class TestSync:
             sync_cls.return_value.sync.return_value = _sync_ok(error="expired", expired=True)
             assert cli.main(["sync"]) == 1
 
+    def test_echec_reseau_a_l_authentification_code_2(self, cfg):
+        from core.auth import NetworkError
+        with patch("core.cli.get_session", side_effect=NetworkError("hors ligne")):
+            assert cli.main(["sync"]) == 2
+
     def test_erreur_reseau_code_2(self, cfg):
         with patch("core.cli.get_session", return_value=SESSION), \
              patch("core.cli.BookmarkSync") as sync_cls:

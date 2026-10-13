@@ -8,6 +8,11 @@ import pytest
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from core import ui as _ui  # noqa: E402
+
+# Vraie fonction, conservée avant que la fixture autouse ne la remplace
+IS_INTERACTIVE_REEL = _ui.is_interactive
+
 
 @pytest.fixture(autouse=True)
 def _sans_keyring_reel(monkeypatch):
