@@ -1,4 +1,5 @@
 """Tests de l'orchestrateur : process_post() et run() avec downloaders mockés (issues #8, #10)."""
+import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -12,6 +13,12 @@ from downloaders import DownloadError, DownloadResult
 
 URL = "https://bsky.app/profile/user.bsky.social/post/3k1"
 URL2 = "https://bsky.app/profile/user.bsky.social/post/3k2"
+
+
+@pytest.fixture(autouse=True)
+def _dossier_courant_isole(tmp_path, monkeypatch):
+    """Les dossiers « IMG » / « TXT » sont relatifs : tout fichier écrit va dans un dossier temporaire."""
+    monkeypatch.chdir(tmp_path)
 
 
 def _res(nom, media_type, cid=None):
@@ -118,7 +125,7 @@ class TestProcessPostMedias:
                            debug_info={"full_data": {"uri": "at://x", "value": record}})
         kwargs = mocks["download_images"].call_args.kwargs
         assert kwargs["record"] is record
-        assert _medias(tmp_db) == [("image", "a_1.png", "bafy1")]
+        assert _medias(tmp_db)[0] == ("image", "a_1.png", "bafy1")  # suivi du .txt et de la fiche JSON
 
     def test_callback_existing_cid_resout_le_chemin_via_la_base(self, tmp_db, tmp_path):
         tmp_db.add_post(URL, "3k1", "user.bsky.social")
@@ -204,7 +211,7 @@ class TestRun:
         _types(analyzer, {URL: PostType.IMAGES, URL2: PostType.ERROR_400})
         stats = run([URL, URL2], config, quiet=True)
         assert stats == {
-            "total": 2, "success": 1, "images": 1, "videos": 0, "texts": 0,
+            "total": 2, "success": 1, "images": 1, "videos": 0, "texts": 0, "sidecars": 0,
             "error_500": [], "error_400": [URL2], "quotes_unresolved": [], "reposts": [],
             "unknown": [], "failed": [],
         }
@@ -367,3 +374,127 @@ class TestPostViews:
                          tmp_path, lambda *a, **k: None, config={"max_filename_len": 64}, post_view=vue)
         analyseur.analyze.assert_called_once_with(URL, post_view=vue)
         resolveur.resolve.assert_called_once_with(URL, post_view=vue)
+
+
+# ------------------------------------------------------- archive fidèle (issue #7)
+
+POST_FACETS = json.loads((Path(__file__).parent / "fixtures" / "post_with_facets.json").read_text(encoding="utf-8"))
+URL_F = "https://bsky.app/profile/auteur.example.com/post/3ktestfacets"
+BASE_F = "auteur_example_com_20260203_3ktestfacets"
+VUE_F = {"uri": POST_FACETS["uri"], "cid": POST_FACETS["cid"], "record": POST_FACETS["value"],
+         "author": {"handle": "auteur.example.com"}, "labels": []}
+
+
+def _lancer_archive(db, tmp_path, config=None, post_type=PostType.IMAGES, full_data=None, post_view=None,
+                    erreur=None, compteurs=None, **retours):
+    """process_post() sur le post de la fixture (record réel), downloaders mockés, fichiers texte réels."""
+    config = {"max_filename_len": 64, **(config or {})}
+    full_data = POST_FACETS if full_data is None else full_data
+    data = {"handle": "auteur.example.com", "at_uri": POST_FACETS["uri"], "image_count": 2}
+    mocks = {
+        "download_images": MagicMock(return_value=retours.get("images", [_res("a_01.jpg", "image", "bafkreichat1")]),
+                                     side_effect=erreur),
+        "download_video": MagicMock(return_value=retours.get("video", []), side_effect=erreur),
+        "save_text": MagicMock(return_value=retours.get("texte", []), side_effect=erreur),
+    }
+    with patch.multiple("core.orchestrator", **mocks):
+        resultat = process_post(
+            URL_F, "IMG", "VID", str(tmp_path / "texts"), db,
+            _analyseur(post_type, data, {"full_data": full_data}), MagicMock(),
+            tmp_path, lambda *a, **k: None, config=config, post_view=post_view, compteurs=compteurs,
+        )
+    return resultat
+
+
+class TestArchiveFidele:
+    def test_post_image_ecrit_txt_et_sidecar_enregistres_en_base(self, tmp_db, tmp_path):
+        compteurs = {}
+        resultat = _lancer_archive(tmp_db, tmp_path, compteurs=compteurs, post_view=VUE_F)
+
+        assert resultat[:5] == (True, 1, 0, 1, "success")  # text_count : le .txt
+        assert compteurs == {"sidecars": 1}
+        texts = tmp_path / "texts"
+        assert sorted(p.name for p in texts.iterdir()) == [f"{BASE_F}.json", f"{BASE_F}.txt"]
+        assert _medias(tmp_db) == [("image", "a_01.jpg", "bafkreichat1"), ("text", f"{BASE_F}.txt", None),
+                                   ("sidecar", f"{BASE_F}.json", None)]
+        assert tmp_db.get_stats()["texts"] == 1
+
+    def test_txt_contient_le_texte_a_facets_resolues_et_l_alt(self, tmp_db, tmp_path):
+        _lancer_archive(tmp_db, tmp_path)
+        texte = (tmp_path / "texts" / f"{BASE_F}.txt").read_text(encoding="utf-8")
+        assert "libidex.example/article-tres-lo... (https://libidex.example/article-tres-long-titre)" in texte
+        assert "[Image 1 : Un chat noir sur un canapé]" in texte
+
+    def test_sidecar_avec_record_et_post_view(self, tmp_db, tmp_path):
+        _lancer_archive(tmp_db, tmp_path, post_view=VUE_F)
+        fiche = json.loads((tmp_path / "texts" / f"{BASE_F}.json").read_text(encoding="utf-8"))
+        assert fiche["record"] == POST_FACETS["value"]
+        assert fiche["post_view"] == VUE_F
+        assert fiche["at_uri"] == POST_FACETS["uri"] and fiche["url"] == URL_F
+
+    def test_sans_cache_post_view_null(self, tmp_db, tmp_path):
+        _lancer_archive(tmp_db, tmp_path)
+        fiche = json.loads((tmp_path / "texts" / f"{BASE_F}.json").read_text(encoding="utf-8"))
+        assert fiche["post_view"] is None
+
+    def test_record_lu_dans_la_vue_du_cache(self, tmp_db, tmp_path):
+        """Avec postView (sans getRecord), le record est celui de la vue."""
+        _lancer_archive(tmp_db, tmp_path, full_data=VUE_F, post_view=VUE_F)
+        fiche = json.loads((tmp_path / "texts" / f"{BASE_F}.json").read_text(encoding="utf-8"))
+        assert fiche["record"] == POST_FACETS["value"]
+
+    def test_save_sidecar_false_pas_de_json(self, tmp_db, tmp_path):
+        compteurs = {}
+        _lancer_archive(tmp_db, tmp_path, config={"save_sidecar": False}, compteurs=compteurs)
+        assert [p.name for p in (tmp_path / "texts").iterdir()] == [f"{BASE_F}.txt"]
+        assert compteurs == {"sidecars": 0}
+        assert all(m[0] != "sidecar" for m in _medias(tmp_db))
+
+    def test_video_a_aussi_son_texte_et_sa_fiche(self, tmp_db, tmp_path):
+        _lancer_archive(tmp_db, tmp_path, post_type=PostType.VIDEO, video=[_res("v_01.mp4", "video")])
+        assert sorted(p.name for p in (tmp_path / "texts").iterdir()) == [f"{BASE_F}.json", f"{BASE_F}.txt"]
+
+    def test_texte_seul_n_ecrit_pas_deux_fois_le_txt(self, tmp_db, tmp_path):
+        """save_text écrit déjà le .txt : l'orchestrateur n'ajoute que la fiche JSON."""
+        compteurs = {}
+        resultat = _lancer_archive(tmp_db, tmp_path, post_type=PostType.TEXT_ONLY, compteurs=compteurs,
+                                   texte=[_res(f"{BASE_F}.txt", "text")])
+        assert resultat[:5] == (True, 0, 0, 1, "success")
+        assert compteurs == {"sidecars": 1}
+        assert [m for m in _medias(tmp_db) if m[0] == "text"] == [("text", f"{BASE_F}.txt", None)]
+
+    def test_echec_du_telechargement_n_ecrit_rien(self, tmp_db, tmp_path):
+        resultat = _lancer_archive(tmp_db, tmp_path, erreur=DownloadError("réseau"))
+        assert resultat[:5] == (False, 0, 0, 0, "failed")
+        assert not (tmp_path / "texts").exists()
+
+    def test_sans_record_aucun_fichier(self, tmp_db, tmp_path):
+        _lancer_archive(tmp_db, tmp_path, full_data={})
+        assert not (tmp_path / "texts").exists()
+
+    def test_ecriture_impossible_donne_failed(self, tmp_db, tmp_path):
+        (tmp_path / "texts").write_text("un fichier, pas un dossier", encoding="utf-8")
+        resultat = _lancer_archive(tmp_db, tmp_path)
+        assert resultat[4] == "failed"
+
+
+class TestArchiveFideleRun:
+    def test_run_compte_les_fiches_json(self, env_run):
+        config, analyzer, _ = env_run
+        analyzer.analyze.side_effect = lambda url: (
+            PostType.IMAGES, {"handle": "auteur.example.com", "image_count": 1, "at_uri": POST_FACETS["uri"]},
+            {"full_data": POST_FACETS})
+        stats = run([URL_F], config, quiet=True)
+        assert (stats["texts"], stats["sidecars"]) == (1, 1)
+        db = Database(config["db_file"])
+        try:
+            assert db.conn.execute("SELECT COUNT(*) FROM media WHERE media_type = 'sidecar'").fetchone()[0] == 1
+        finally:
+            db.close()
+
+    def test_rapport_affiche_les_fiches_json(self, env_run, capsys):
+        config, analyzer, _ = env_run
+        analyzer.analyze.side_effect = lambda url: (
+            PostType.IMAGES, {"handle": "auteur.example.com", "image_count": 1}, {"full_data": POST_FACETS})
+        run([URL_F], config)
+        assert "Fiches JSON" in capsys.readouterr().out

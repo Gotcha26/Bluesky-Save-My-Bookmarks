@@ -37,6 +37,7 @@ from downloaders.images import download_images  # noqa: E402
 from downloaders.videos import download_video  # noqa: E402
 from downloaders.text import nom_base_texte, save_text  # noqa: E402
 from downloaders.external import download_external  # noqa: E402
+from downloaders.archive import write_sidecar, write_text  # noqa: E402
 
 # Lock global pour l'affichage console (évite les lignes entrelacées)
 _print_lock = threading.Lock()
@@ -144,13 +145,16 @@ def _chemin_par_cid(ctx):
     return chemin
 
 
-def _contenu_propre(post_type, data, url, ctx, name_prefix=None, erreurs=None, debug_info=None):
+def _contenu_propre(post_type, data, url, ctx, name_prefix=None, erreurs=None, debug_info=None, post_view=None):
     """
-    Télécharge le contenu propre d'un post selon son type (sans suivre sa citation).
+    Télécharge le contenu propre d'un post selon son type (sans suivre sa citation), puis
+    écrit son texte lisible (.txt) et sa fiche JSON.
 
     name_prefix : base de nom des fichiers d'un post cité (None pour le post bookmarké).
     erreurs : liste complétée avec les erreurs de téléchargement rencontrées.
-    debug_info : informations de l'analyseur ; son record brut donne les CID des images.
+    debug_info : informations de l'analyseur ; son record brut donne les CID et l'alt des
+        images, le texte et la fiche JSON.
+    post_view : vue hydratée du post (cache des bookmarks), conservée dans la fiche JSON.
     Returns: la liste de DownloadResult.
     """
     cite = name_prefix is not None
@@ -158,10 +162,11 @@ def _contenu_propre(post_type, data, url, ctx, name_prefix=None, erreurs=None, d
     dirs = ctx.dirs
     args = (ctx.config, ctx.buf_print, ctx.log_func)
     results = []
+    record = _record_brut(debug_info)
+    nb_erreurs = len(erreurs) if erreurs is not None else 0
 
     if post_type == PostType.IMAGES:
         ctx.buf_print(c.info(f"{data.get('image_count', 1)} image(s) détectée(s)"))
-        record = ((debug_info or {}).get("full_data") or {}).get("value")
         results = _telecharger(download_images, url, dirs["img_dir"], *args, erreurs=erreurs,
                                record=record, existing_cid=_chemin_par_cid(ctx), **options)
     elif post_type == PostType.VIDEO:
@@ -173,8 +178,9 @@ def _contenu_propre(post_type, data, url, ctx, name_prefix=None, erreurs=None, d
     elif post_type == PostType.EXTERNAL and not cite:
         # Embed externe : carte de lien, GIF, lien tiers
         ctx.buf_print(c.info("Lien externe détecté"))
+        donnees = {**data, "record": record} if record else data  # le record donne facets et langue au .txt
         results = _telecharger(
-            lambda u, _dest, cfg: download_external(u, data, dirs, cfg),
+            lambda u, _dest, cfg: download_external(u, donnees, dirs, cfg),
             url, dirs["text_dir"], *args, erreurs=erreurs)
     elif post_type in (PostType.TEXT_ONLY, PostType.QUOTE, PostType.EXTERNAL):
         if cite and post_type == PostType.EXTERNAL:
@@ -184,10 +190,42 @@ def _contenu_propre(post_type, data, url, ctx, name_prefix=None, erreurs=None, d
         ctx.buf_print(c.info("Texte seul détecté" if post_type == PostType.TEXT_ONLY else "Texte du post détecté"))
         results = _telecharger(save_text, url, dirs["text_dir"], *args, erreurs=erreurs, **options)
 
-    # Le texte d'une citation avec média n'est pas dans le média : on le garde aussi
-    if data.get("is_quote") and post_type in (PostType.IMAGES, PostType.VIDEO):
-        results = results + _telecharger(save_text, url, dirs["text_dir"], *args, erreurs=erreurs, **options)
+    # Archive fidèle : texte lisible (hors types dont le downloader l'a déjà écrit) et fiche JSON
+    if results and not (erreurs is not None and len(erreurs) > nb_erreurs):
+        results = results + _archiver_post(results, url, data, ctx, record, post_view, name_prefix, erreurs)
     return results
+
+
+def _record_brut(debug_info):
+    """Record brut du post dans les informations de l'analyseur (getRecord ou postView), ou None."""
+    full = (debug_info or {}).get("full_data")
+    if not isinstance(full, dict):
+        return None
+    record = full.get("value") or full.get("record")
+    return record if isinstance(record, dict) and record else None
+
+
+def _archiver_post(results, url, data, ctx, record, post_view, name_prefix, erreurs):
+    """
+    Écrit le .txt lisible (sauf si `results` en contient déjà un) puis, avec
+    config["save_sidecar"], la fiche JSON du post. Sans record, rien n'est écrit.
+    Returns: la liste des DownloadResult ajoutés.
+    """
+    if record is None:
+        return []
+    text_dir = ctx.dirs["text_dir"]
+    args = (ctx.config, ctx.buf_print, ctx.log_func)
+    ajoutes = []
+    if not any(r.media_type == "text" for r in results):
+        ajoutes += _telecharger(
+            lambda u, d, cfg: write_text(u, record, d, cfg, name_prefix=name_prefix),
+            url, text_dir, *args, erreurs=erreurs)
+    if ctx.config.get("save_sidecar", DEFAULT_CONFIG["save_sidecar"]):
+        ajoutes += _telecharger(
+            lambda u, d, cfg: write_sidecar(u, record, post_view, d, cfg, name_prefix=name_prefix,
+                                            at_uri=data.get("at_uri")),
+            url, text_dir, *args, erreurs=erreurs)
+    return ajoutes
 
 
 def _base_de_nom(url, data):
@@ -265,10 +303,11 @@ def _archiver_citation(url, quote_uri, depth, base, ctx, post_view=None):
 
 
 def process_post(url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_dir, log_func, config=None,
-                 depth=0, quotes_unresolved=None, post_view=None):
+                 depth=0, quotes_unresolved=None, post_view=None, compteurs=None):
     """
     Traite un post unique et retourne les stats.
     Returns: (has_success, img_count, vid_count, text_count, status, output_lines)
+    compteurs : dict (optionnel) complété avec « sidecars », le nombre de fiches JSON écrites.
 
     output_lines contient les lignes à afficher (buffered pour le mode parallèle).
     config : transmise aux downloaders (DEFAULT_CONFIG si None).
@@ -283,6 +322,8 @@ def process_post(url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_d
     puis le post cité l'est à son tour ; tous les fichiers sont enregistrés sous `url`.
     """
     config = DEFAULT_CONFIG if config is None else config
+    if compteurs is not None:
+        compteurs["sidecars"] = 0
     output = []
 
     def buf_print(msg):
@@ -345,7 +386,8 @@ def process_post(url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_d
     if est_citation:
         buf_print(c.info("Citation détectée, résolution du post cité..."))
     erreurs = []
-    results = _contenu_propre(post_type, data, url, ctx, erreurs=erreurs, debug_info=debug_info)
+    results = _contenu_propre(post_type, data, url, ctx, erreurs=erreurs, debug_info=debug_info,
+                              post_view=post_view)
 
     # 2. Le post qu'il cite (profondeur max PROFONDEUR_MAX)
     problemes = []
@@ -359,6 +401,8 @@ def process_post(url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_d
     img_count = sum(r.media_type == "image" for r in a_enregistrer)
     vid_count = sum(r.media_type == "video" for r in a_enregistrer)
     text_count = sum(r.media_type == "text" for r in a_enregistrer)
+    if compteurs is not None:
+        compteurs["sidecars"] = sum(r.media_type == "sidecar" for r in a_enregistrer)
     echec_citation = any(genre == "failed" for genre, _ in problemes)
 
     # Bilan
@@ -461,6 +505,7 @@ def print_report(stats, duration, total_size, no_db_mode, log_file, max_workers,
     print(c.config_line("Images téléchargées", str(stats['images']), 28))
     print(c.config_line("Vidéos téléchargées", str(stats['videos']), 28))
     print(c.config_line("Textes sauvegardés", str(stats['texts']), 28))
+    print(c.config_line("Fiches JSON", str(stats.get('sidecars', 0)), 28))
     print()
 
     # Problèmes (seulement si présents)
@@ -548,7 +593,7 @@ def run(urls, config, no_db=False, on_progress=None, quiet=False, post_views=Non
             qui y figurent sont analysés sans getRecord (None = mode dev, getRecord partout)
 
     Returns:
-        dict: {"total", "success", "images", "videos", "texts",
+        dict: {"total", "success", "images", "videos", "texts", "sidecars",
                "error_500", "error_400", "quotes_unresolved", "reposts", "unknown", "failed"}
         (les six dernières clés sont des listes d'URLs ; "quotes_unresolved" liste les
         bookmarks archivés dont le post cité ne l'a pas été, "reposts" est son ancien nom)
@@ -575,6 +620,7 @@ def _run(urls, config, media_dirs, no_db=False, on_progress=None, quiet=False, p
     img_count = 0
     vid_count = 0
     text_count = 0
+    sidecar_count = 0
     completed_count = 0
     failed_urls = []
     deleted_urls = []
@@ -617,11 +663,12 @@ def _run(urls, config, media_dirs, no_db=False, on_progress=None, quiet=False, p
     def worker(idx, url):
         """Worker qui traite un post et retourne le résultat."""
         log(f"Job {idx}/{total_jobs}: {url}", to_console=False)
+        compteurs = {}
         has_success, imgs, vids, texts, status, output_lines = process_post(
             url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_dir, log, config,
-            quotes_unresolved=quotes_unresolved_urls, post_view=post_views.get(url),
+            quotes_unresolved=quotes_unresolved_urls, post_view=post_views.get(url), compteurs=compteurs,
         )
-        return idx, url, has_success, imgs, vids, texts, status, output_lines
+        return idx, url, has_success, imgs, vids, texts, status, output_lines, compteurs["sidecars"]
 
     # === EXÉCUTION PARALLÈLE ===
     try:
@@ -632,7 +679,7 @@ def _run(urls, config, media_dirs, no_db=False, on_progress=None, quiet=False, p
             }
 
             for future in as_completed(futures):
-                idx, url, has_success, imgs, vids, texts, status, output_lines = future.result()
+                idx, url, has_success, imgs, vids, texts, status, output_lines, sidecars = future.result()
 
                 completed_count += 1
                 if has_success:
@@ -640,6 +687,7 @@ def _run(urls, config, media_dirs, no_db=False, on_progress=None, quiet=False, p
                     img_count += imgs
                     vid_count += vids
                     text_count += texts
+                    sidecar_count += sidecars
 
                 if status == 'error_500':
                     error_500_urls.append(url)
@@ -672,6 +720,7 @@ def _run(urls, config, media_dirs, no_db=False, on_progress=None, quiet=False, p
         'images': img_count,
         'videos': vid_count,
         'texts': text_count,
+        'sidecars': sidecar_count,
         'error_500': error_500_urls,
         'error_400': deleted_urls,
         'quotes_unresolved': quotes_unresolved_urls,
