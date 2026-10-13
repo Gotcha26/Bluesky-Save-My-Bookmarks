@@ -11,7 +11,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from core.config import resolve_path
+from core.config import resolve_path, restrict_permissions
 
 
 def save_cache(path, posts, pds_url=""):
@@ -36,6 +36,7 @@ def save_cache(path, posts, pds_url=""):
     try:
         temporaire.write_text(json.dumps(contenu, ensure_ascii=False, indent=1), encoding="utf-8")
         os.replace(temporaire, chemin)
+        restrict_permissions(chemin)  # le cache contient le texte des posts : lecture réservée au propriétaire
     finally:
         temporaire.unlink(missing_ok=True)
 
@@ -77,7 +78,7 @@ def load_cache(path):
         posts = contenu["posts"]
         if not isinstance(posts, list):
             raise ValueError("« posts » n'est pas une liste")
+        return {p["at_uri"]: p for p in posts if isinstance(p, dict) and p.get("at_uri")}
     except (OSError, ValueError, KeyError, TypeError) as e:
         print(f"[CACHE] {chemin.name} illisible, ignoré : {e}", file=sys.stderr)
         return {}
-    return {p["at_uri"]: p for p in posts if isinstance(p, dict) and p.get("at_uri")}

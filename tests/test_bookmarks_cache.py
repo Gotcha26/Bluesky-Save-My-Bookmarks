@@ -61,6 +61,13 @@ class TestCache:
         assert list(load_cache(chemin)) == [URI1]
         assert not list(tmp_path.glob("*.tmp"))
 
+    def test_permissions_restreintes(self, tmp_path, monkeypatch):
+        appels = []
+        monkeypatch.setattr("core.bookmarks_cache.restrict_permissions", appels.append)
+        chemin = tmp_path / "bookmarks.json"
+        save_cache(chemin, _posts())
+        assert appels == [chemin]
+
     def test_chemin_str_accepte(self, tmp_path):
         save_cache(str(tmp_path / "c.json"), _posts())
         assert URI1 in load_cache(str(tmp_path / "c.json"))

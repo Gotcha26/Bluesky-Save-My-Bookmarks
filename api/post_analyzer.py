@@ -6,7 +6,7 @@ import requests
 from urllib.parse import urlparse
 from enum import Enum
 
-from core.post_ref import PostRef
+from core.post_ref import PostRef, _is_valid_handle
 
 class PostType(Enum):
     ERROR_500 = "error_500"
@@ -95,7 +95,9 @@ class PostAnalyzer:
         uri_parts = uri.split("/")
         author = post_view.get("author") or {}
         did = author.get("did") or (uri_parts[2] if len(uri_parts) > 2 else None)
-        handle = author.get("handle") or parts[1]
+        handle = author.get("handle")
+        if not _is_valid_handle(handle):
+            handle = parts[1]  # handle.invalid : comme getRecord, retombe sur le segment d'URL (DID)
         post_id = uri_parts[-1] if len(uri_parts) > 4 else parts[-1]
         return self._classify(post_view["record"], uri, handle, post_id, _identity(did, post_id), post_view,
                               view_embed=post_view.get("embed"))

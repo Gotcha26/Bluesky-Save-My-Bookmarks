@@ -372,8 +372,12 @@ class TestEtatEnCache:
     def test_online_count_vient_du_cache(self, tmp_config, tmp_db):
         from core.bookmarks_cache import save_cache
         save_cache(tmp_config["bookmarks_cache"], _posts_de_la_page())
+        # urls.txt ne décrit pas la même liste : seul le cache fait foi
         Path(tmp_config["urls_file"]).write_text("https://bsky.app/profile/u/post/1", encoding="utf-8")
-        assert BookmarkSync(tmp_config, tmp_db).get_cached_state()["online_count"] == 3
+        etat = BookmarkSync(tmp_config, tmp_db).get_cached_state()
+        assert etat["online_count"] == 3
+        assert etat["new_count"] == 1  # le postView ; notFound/blocked ne sont pas à télécharger
+        assert etat["has_cache"] is True
 
     def test_sans_cache_urls_txt(self, tmp_config, tmp_db):
         Path(tmp_config["urls_file"]).write_text("https://bsky.app/profile/u/post/1", encoding="utf-8")
