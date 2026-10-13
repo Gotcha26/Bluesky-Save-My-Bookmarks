@@ -8,10 +8,24 @@ import pytest
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from unittest.mock import MagicMock  # noqa: E402
+
+from core import http as _http  # noqa: E402
 from core import ui as _ui  # noqa: E402
 
-# Vraie fonction, conservée avant que la fixture autouse ne la remplace
+# Vraies fonctions, conservées avant que les fixtures autouse ne les remplacent
 IS_INTERACTIVE_REEL = _ui.is_interactive
+GET_SESSION_REEL = _http.get_session
+
+
+@pytest.fixture(autouse=True)
+def fake_session(monkeypatch):
+    """La suite ne touche jamais au réseau : `core.http.get_session()` renvoie une session
+    factice (MagicMock). Les tests règlent `fake_session.get.return_value` (ou `.post`).
+    Les modules appellent `bsmb_http.get_session()` à chaque usage, donc ce patch suffit."""
+    session = MagicMock(name="session_factice")
+    monkeypatch.setattr(_http, "get_session", lambda: session)
+    return session
 
 
 @pytest.fixture(autouse=True)
