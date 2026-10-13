@@ -64,8 +64,9 @@ class Downloaders:
     def _fabriquer(self, nom, media_type, ext):
         def telecharger(url, dest, config, session=None, name_prefix=None):
             self.appels.append((nom, url, name_prefix))
-            if url in self.erreur:
-                raise DownloadError(self.erreur[url])
+            cle = (nom, url) if (nom, url) in self.erreur else url
+            if cle in self.erreur:
+                raise DownloadError(self.erreur[cle])
             if nom == "save_text" and self.texte_vide:
                 return []
             base = name_prefix or f"propre_{url.rsplit('/', 1)[-1]}"
@@ -159,6 +160,41 @@ class TestCitationAvecMedia:
         ]
         assert res[1] == 1 and res[3] == 2
         assert len(medias(tmp_db)) == 3
+
+
+class TestEchecDuContenuPropre:
+    """Une erreur sur le contenu du citant n'est pas masquée par un autre résultat."""
+
+    def test_images_en_erreur_texte_ok_est_failed(self, tmp_db, tmp_path):
+        url = url_citant("quote_with_media.json")
+        dl = Downloaders(erreur={("download_images", url): "API"})
+        res, _, _, _ = lancer(url, [charger("quote_with_media.json"), post_texte(D2, "3kcited0001")],
+                              tmp_db, tmp_path, downloaders=dl)
+        assert res[0] is False and res[4] == "failed"
+        # ce qui a été obtenu est conservé en base
+        assert len(medias(tmp_db)) == 2
+        assert statut(tmp_db, url) != "deleted"
+
+    def test_texte_du_citant_en_erreur_cite_archive_est_failed(self, tmp_db, tmp_path):
+        url = url_citant("quote_text.json")
+        tmp_db.add_post(url)
+        tmp_db.mark_post_status(url, "unknown")
+        dl = Downloaders(erreur={("save_text", url): "API"})
+        res, _, _, _ = lancer(url, [charger("quote_text.json"), post_texte(D2, "3kcited0001")],
+                              tmp_db, tmp_path, downloaders=dl)
+        assert res[0] is False and res[4] == "failed"
+        assert statut(tmp_db, url) == "unknown"  # reste retentable
+        assert len(medias(tmp_db)) == 1
+
+    def test_cite_externe_archive_par_son_texte_avec_note(self, tmp_db, tmp_path):
+        externe = {"$type": "app.bsky.embed.external",
+                   "external": {"uri": "https://example.com/x", "title": "t", "description": "d"}}
+        url = url_citant("quote_text.json")
+        res, dl, journal, _ = lancer(url, [charger("quote_text.json"),
+                                           post_texte(D2, "3kcited0001", embed=externe)], tmp_db, tmp_path)
+        assert res[4] == "success"
+        assert ("save_text", f"{BASE}_3kquote0001_quote") in dl.noms()
+        assert any("carte de lien non archivée (texte seul)" in m for m in journal)
 
 
 class TestRecordCiteNonArchivable:
