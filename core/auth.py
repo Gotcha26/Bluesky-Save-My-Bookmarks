@@ -96,6 +96,65 @@ def create_session(handle, app_password, session=None):
         raise AuthError(f"Erreur HTTP {status}")
 
 
+def refresh_session(refresh_jwt, pds_url, session=None):
+    """
+    Renouvelle le token d'accès via com.atproto.server.refreshSession.
+
+    Le jeton de rafraîchissement (`refreshJwt` de createSession) est envoyé en
+    `Authorization: Bearer` au PDS du compte ; la réponse apporte un nouvel accessJwt
+    ET un nouveau refreshJwt (l'ancien est alors invalide).
+
+    Args:
+        refresh_jwt: jeton de rafraîchissement (sans préfixe "Bearer")
+        pds_url: PDS du compte (le jeton n'est valable que sur celui-ci)
+        session: session HTTP (défaut : session partagée de core.http)
+
+    Returns:
+        dict: même forme que create_session() ({"token", "refresh_jwt", "did", "pds_url"})
+
+    Raises:
+        AuthError: jeton de rafraîchissement refusé ou expiré
+        NetworkError: échec réseau (connexion, timeout, HTTP 5xx)
+    """
+    base = (pds_url or DEFAULT_PDS_URL).rstrip("/")
+    try:
+        resp = (session or bsmb_http.get_session()).post(
+            f"{base}/xrpc/com.atproto.server.refreshSession",
+            headers={"Authorization": f"Bearer {refresh_jwt}"},
+            timeout=15,
+        )
+
+        if resp.status_code in (400, 401):
+            raise AuthError("Jeton de rafraîchissement refusé ou expiré : reconnectez votre compte.")
+        if resp.status_code == 429:
+            raise AuthError("Trop de tentatives. Réessayez dans quelques minutes.")
+
+        resp.raise_for_status()
+        data = resp.json()
+
+        access_jwt = data.get("accessJwt")
+        if not access_jwt:
+            raise AuthError("Réponse inattendue du serveur (pas de accessJwt).")
+
+        did_doc = data.get("didDoc")
+        return {
+            "token": f"Bearer {access_jwt}",
+            "refresh_jwt": data.get("refreshJwt"),
+            "did": data.get("did"),
+            "pds_url": _extract_pds_url(did_doc) if did_doc else base,
+        }
+
+    except requests.exceptions.ConnectionError:
+        raise NetworkError("Impossible de se connecter au serveur Bluesky. Vérifiez votre connexion.")
+    except requests.exceptions.Timeout:
+        raise NetworkError("Timeout lors du renouvellement de la session.")
+    except requests.exceptions.HTTPError as e:
+        status = e.response.status_code
+        if status >= 500:
+            raise NetworkError(f"Erreur HTTP {status}")
+        raise AuthError(f"Erreur HTTP {status}")
+
+
 def get_session(config):
     """
     Obtient une session complète, par ordre de priorité :

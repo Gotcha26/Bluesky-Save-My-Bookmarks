@@ -347,7 +347,7 @@ def do_sync(config):
     def progress(page, count):
         print(f"  {c.DIM}Page {page}... {count} bookmarks{c.RESET}")
 
-    result = sync.sync(token, on_progress=progress)
+    result = sync.sync(token, on_progress=progress, session_info=session)
     db.close()
 
     if result["error"]:
