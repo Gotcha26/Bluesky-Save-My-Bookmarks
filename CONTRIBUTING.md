@@ -1,321 +1,228 @@
-# 🤝 Guide de contribution
+# Guide de contribution
 
-Merci de l'intérêt pour BSMB! Ce guide explique comment contribuer au projet.
-
----
-
-## 📋 Types de contributions
-
-### 🐛 Signaler un bug
-1. Vérifiez que le bug n'existe pas déjà dans [GitHub Issues](https://github.com/Gotcha26/Bluesky-Save-My-Bookmarks/issues)
-2. Créez une nouvelle issue avec :
-   - **Titre clair** : ex. "Erreur 500 sur posts avec vidéos"
-   - **Description** : Contexte et étapes pour reproduire
-   - **Environnement** : OS, version Python, version BSMB
-   - **Message d'erreur** : Copiez la stacktrace complète
-   - **Screenshots** : Si applicable
-
-### 💡 Proposer une fonctionnalité
-1. Ouvrez une issue avec le label `enhancement`
-2. Décrivez :
-   - **Problème** : Quel besoin cela résout?
-   - **Solution** : Comment ca devrait fonctionner?
-   - **Alternatives** : Y a-t-il d'autres solutions?
-3. Attendez les retours avant de coder
-
-### 📚 Améliorer la documentation
-- Corrigez les typos
-- Clarifiez les explications
-- Ajoutez des examples
-- Traduisez (FR/EN)
-
-### 💻 Soumettre du code
+Merci de l'intérêt pour BSMB ! Ce guide explique comment contribuer au projet. Pour comprendre le code, lisez d'abord le schéma d'architecture d'[ADVANCED.md](ADVANCED.md#architecture-technique) (le seul du dépôt), puis [DEVELOPMENT.md](DEVELOPMENT.md).
 
 ---
 
-## 🔧 Configuration de développement
+## Types de contributions
+
+### Signaler un bug
+
+1. Vérifiez que le bug n'existe pas déjà dans les [issues GitHub](https://github.com/Gotcha26/Bluesky-Save-My-Bookmarks/issues).
+2. Créez une issue (le modèle « Signaler un bug » est proposé) avec :
+   - un **titre clair** (ex. « Erreur 500 sur posts avec vidéos ») ;
+   - le **contexte** et les étapes pour reproduire ;
+   - la sortie de `python bsmb.py --version` (ou `bsmb --version`) et de `python bsmb.py status --json` (état du compte et compteurs, sans appel réseau ; vérifiez qu'elle ne contient rien de personnel que vous ne voulez pas publier) ;
+   - la **version de Python** et votre système (Windows, macOS, Linux) ;
+   - le **message d'erreur** complet et, si possible, les extraits utiles de `logs/` ;
+   - une capture d'écran si cela aide.
+
+Ne publiez jamais votre App Password, un token, `config.json` ni vos fichiers `urls*.txt` / `bookmarks.json`.
+
+### Proposer une fonctionnalité
+
+1. Ouvrez une issue avec le label `enhancement`.
+2. Décrivez le **problème** résolu, la **solution** envisagée et les **alternatives**.
+3. Attendez les retours avant de coder.
+
+### Améliorer la documentation
+
+Corrigez, clarifiez, ajoutez des exemples. Toute modification qui change le comportement doit mettre à jour `README.md`, `ADVANCED.md` et `CHANGELOG.md`. Le schéma d'architecture ne vit que dans `ADVANCED.md` : ne le recopiez pas ailleurs, faites-y un renvoi.
+
+### Soumettre du code
+
+Voir les sections suivantes.
+
+---
+
+## Configuration de développement
 
 ### Cloner le dépôt
+
 ```bash
 git clone https://github.com/Gotcha26/Bluesky-Save-My-Bookmarks.git
 cd Bluesky-Save-My-Bookmarks
 git checkout dev
 ```
 
-### Installer les dépendances dev
+### Installer les dépendances
+
+Python 3.11 ou plus récent est requis.
+
 ```bash
-pip install -r requirements.txt  # À créer
-pip install -e .                 # Mode éditable
+python -m venv .venv
+source .venv/bin/activate          # Windows : .venv\Scripts\activate
+pip install -r requirements-dev.txt   # requests + pytest, pytest-cov, ruff
+pip install -r requirements-optional.txt   # facultatif : keyring
 ```
 
-### Structure de branche
+`python bsmb.py` se lance depuis la racine du dépôt. `pip install -e .` installe aussi la commande `bsmb` (paquet défini dans `pyproject.toml`).
+
+### Branches
+
 ```
-main              ← Production (releases)
-└── dev           ← Développement (PRs ici)
-    ├── feature/* ← Nouvelles fonctionnalités
-    └── bugfix/*  ← Corrections de bugs
+main              <- production (releases)
+└── dev           <- développement (PR ici)
+    ├── feature/* <- nouvelles fonctionnalités
+    └── bugfix/*  <- corrections
 ```
 
-### Créer une branche de feature
 ```bash
 git checkout -b feature/ma-fonctionnalite
 git checkout -b bugfix/ma-correction
 ```
 
+### Fichiers locaux à ne pas commiter
+
+`.gitignore` écarte les données personnelles et les fichiers de travail ; ne les ajoutez pas de force (`git add -f`) :
+
+- `config.json` (peut contenir l'App Password), `Token-Bearer.txt`, `bsmb.db`, `bookmarks.json`, `urls*.txt`, `logs/` ;
+- les sauvegardes et notes locales à la racine : `urls.bak`, `urls.txt.bak`, `ToDo.md`, les raccourcis `*.lnk` (ex. `Téléchargements.lnk`) et les fichiers `*.code-workspace` de votre éditeur.
+
+Vérifiez `git status` avant chaque commit.
+
 ---
 
-## 📝 Guidelines de code
+## Guidelines de code
 
 ### Style Python
+
 ```python
-# ✅ BON
+# BON
 def obtenir_token(config):
     """Récupère un token Bearer valide."""
-    if not config.get("bsky_handle"):
-        return None
-    return create_session(config["bsky_handle"], config["bsky_app_password"])
+    return get_token(config)
 
 
-# ❌ MAUVAIS
+# MAUVAIS
 def getToken(cfg):
-    if not cfg["bsky_handle"]:
-        return None
-    return create_session(cfg["bsky_handle"], cfg["bsky_app_password"])
+    return get_token(cfg)
 ```
 
-**Règles:**
-- Noms de fonction en snake_case
-- Variables explicites (pas `x`, `tmp`, etc.)
-- Docstrings sur toutes les fonctions
-- Commentaires pour la logique complexe
-- 4 espaces d'indentation (jamais de tabs)
-- Ligne max 100 caractères
+- Noms de fonctions en `snake_case`, variables explicites (pas `x`, `tmp`).
+- Docstrings sur les fonctions publiques ; commentaires pour la logique non évidente.
+- 4 espaces d'indentation, **110 colonnes** au maximum (`ruff` : règles E, F, W, I, B, UP).
+- Chemins avec `pathlib.Path` ; les chemins relatifs de la config passent par `resolve_path(config, clé)`.
+- Tout appel HTTP passe par la session partagée : `from core import http as bsmb_http`, puis `bsmb_http.get_session()` (jamais `requests.get/post` directement).
+- Pas de code exécuté à l'import dans `core/`, `api/` et `downloaders/` (pas d'affichage, d'`input()` ni de fichier créé) ; un nouveau module s'ajoute à `MODULES` dans `tests/test_imports.py`.
+- Les confirmations passent par `core.ui.confirm()` et les pauses par `core.ui.pause()`, pour rester utilisables en mode non interactif.
 
-### French text (UTF-8)
-- ✅ Texte français avec accents complets
-- ✅ "Télécharger", "Récupérer", "Vérifiez"
-- ❌ Jamais "Telecharger", "Recuperer"
-- ✅ UTF-8 encoding déclaré en header
+### Texte français (UTF-8)
+
+Tous les textes (interface, docstrings, commentaires, documentation, commits) sont en français **avec accents** : « Télécharger », « Récupérer », « Vérifiez », jamais « Telecharger ». Les fichiers sont en UTF-8.
 
 ### Commits
+
+Un préfixe conventionnel suivi d'une description en français :
+
 ```bash
-# ✅ BON
-git commit -m "feat: Ajouter support pour App Passwords
-
-Description détaillée du changement."
-
-# ❌ MAUVAIS
-git commit -m "fix stuff"
-git commit -m "blabla"
+git commit -m "feat: Ajouter la prise en charge des sous-titres"
 ```
 
-Format:
-- `feat:` - Nouvelle fonctionnalité
-- `fix:` - Correction de bug
-- `docs:` - Documentation
-- `refactor:` - Refactorisation sans changement fonctionnel
-- `test:` - Tests
-- `perf:` - Performance
-- `chore:` - Maintenance
+- `feat:` nouvelle fonctionnalité
+- `fix:` correction de bug
+- `docs:` documentation
+- `refactor:` refactorisation sans changement fonctionnel
+- `test:` tests
+- `perf:` performance
+- `chore:` maintenance (CI, dépendances)
+
+Mentionnez l'issue traitée dans le corps du message (`Fixes #N`).
 
 ---
 
-## 🧪 Tests
+## Tests
 
-### Structure de tests
-```
-tests/
-├── test_auth.py           # Tests authentication
-├── test_config.py         # Tests configuration
-├── test_database.py       # Tests database
-├── test_post_analyzer.py  # Tests analysis
-└── conftest.py            # Fixtures communes
-```
+Aucun test ne fait d'appel réseau : `tests/conftest.py` remplace la session HTTP par un faux et une barrière réseau fait échouer toute connexion externe. Les réponses d'API réelles se trouvent dans `tests/fixtures/`. Écrivez les nouveaux tests dans le même esprit (fixtures `tmp_config`, `tmp_db`, `fake_session` ; voir l'exemple dans [DEVELOPMENT.md](DEVELOPMENT.md#tests)).
 
-### Écrire un test
-```python
-import pytest
-from core.auth import has_credentials, AuthError
-
-
-def test_has_credentials_with_valid_config():
-    """Vérifie que has_credentials() retourne True avec config valide."""
-    config = {"bsky_handle": "user.bsky.social", "bsky_app_password": "xxxx-xxxx-xxxx-xxxx"}
-    assert has_credentials(config) is True
-
-
-def test_has_credentials_empty():
-    """Vérifie que has_credentials() retourne False avec config vide."""
-    config = {"bsky_handle": "", "bsky_app_password": ""}
-    assert has_credentials(config) is False
-
-
-@pytest.mark.asyncio
-async def test_create_session_invalid_credentials():
-    """Vérifie que create_session() lève AuthError avec identifiants invalides."""
-    with pytest.raises(AuthError) as exc_info:
-        create_session("invalid.handle", "invalid-password")
-    assert "invalides" in str(exc_info.value).lower()
-```
-
-### Lancer les tests
 ```bash
-pytest                    # Tous les tests
-pytest -v                 # Verbose
-pytest tests/test_auth.py # Un fichier spécifique
-pytest -k "create_session"# Tests matching
+python -m pytest tests/ -q                        # tous les tests
+python -m pytest tests/test_database.py -v        # un fichier
+python -m pytest tests/test_auth.py -k "expired"  # un motif
 ```
 
 ### Qualité
-La CI (job `lint` puis `test`) refuse tout ce qui ne passe pas ces commandes ; lance-les avant de pousser :
+
+La CI (`.github/workflows/ci.yml`, job `lint` puis `test`) refuse tout ce qui ne passe pas ces commandes ; lancez-les avant de pousser :
+
 ```bash
-pip install -r requirements-dev.txt   # pytest, pytest-cov, ruff
-ruff check .                          # analyse statique (E, F, W, I, B, UP ; 110 colonnes)
+ruff check .                          # analyse statique
 ruff format .                         # formatage (ruff format --check . en CI)
-pytest --cov=core --cov=api --cov=downloaders --cov-report=term-missing --cov-fail-under=70
+python -m pytest tests/ --cov=core --cov=api --cov=downloaders --cov-report=term-missing --cov-fail-under=70
 ```
+
 La CI teste Python 3.11 à 3.14 sur Ubuntu et Windows. Dependabot propose chaque semaine les mises à jour de `pip` et de `github-actions`.
 
 ---
 
-## 🏗️ Architecture à connaître
+## Points d'attention
 
-### Modules clés
+### Windows
 
-**core/auth.py** - Authentification
-```python
-create_session(handle, app_password)  # API createSession
-get_token(config)  # Mode auto ou fallback
-has_credentials(config)  # Vérification
-```
+- Console en UTF-8 : `chcp 65001` en `cmd` (`Start.bat` le fait).
+- Couleurs ANSI : détectées automatiquement (`NO_COLOR` / `FORCE_COLOR` pour forcer).
+- Chemins : `Path()` de `pathlib`, jamais de chaînes concaténées.
 
-**core/config.py** - Configuration
-```python
-load_config()  # Charge JSON
-save_config(config)  # Sauvegarde
-ensure_dirs(config)  # Crée répertoires
-get_media_dirs(config)  # Chemins médias
-```
+### Programmes externes
 
-**core/database.py** - Tracking
-```python
-db.add_post(url, post_id, handle)
-db.get_new_posts(urls)  # Nouveaux uniquement
-db.add_media(url, type, filename)
-db.get_stats()
-```
-
-**api/export_bookmarks.py** - Export
-- Lit token depuis env var `BSMB_TOKEN`
-- Fallback sur `Token-Bearer.txt`
-- Pagine via getBookmarks
-
-**api/post_analyzer.py** - Analyse
-```python
-analyzer.analyze(url)  # Retourne (PostType, data, debug_info)
-```
-
-**downloaders/** - Téléchargement
-- `images.py` - Images avec EXIF
-- `videos.py` - Vidéos avec ffmpeg
-- `text.py` - Texte seul
-
-### Flux principal
-```
-bsmb.py (menu TUI)
-  ↓ Option 1: export_bookmarks.py (subprocess)
-  ↓ Option 2: orchestrator.py (subprocess)
-      ├→ post_analyzer.py (analyse type)
-      ├→ repost_resolver.py (résout reposts)
-      └→ downloaders/* (télécharge média)
-```
-
----
-
-## 🔍 Points d'attention
-
-### Développement Windows
-- Forcer UTF-8 : `chcp 65001` en cmd
-- ColorS ANSI : Auto-détecté via kernel32 VTP
-- Chemins : Utiliser `Path()` de pathlib, pas strings
-
-### Appels subprocess
-- Toujours utiliser `subprocess.run()` avec `capture_output=True`
-- Passer `encoding="utf-8", errors="replace"`
-- Pour export_bookmarks.py, passer token via env var
+Seuls `exiftool` et `ffmpeg` sont lancés en sous-processus (`subprocess.run` avec `capture_output=True, encoding="utf-8", errors="replace"`). Leur absence ne doit jamais faire échouer un téléchargement : le média est enregistré sans métadonnées.
 
 ### Base de données
-- SQLite verrouille pendant écriture
-- Appeler `db.close()` à la fin
-- Pas de migrations (créer schema à fresh)
 
-### Métadonnées
-- **Images** : EXIF via PIL.Image
-- **Vidéos** : ffmpeg metadata
-- **Fallback** : Continuer même si EXIF/ffmpeg absent
+- Le schéma est versionné (`meta.schema_version`) : une évolution du schéma s'écrit comme une migration `_migrate_vN`, avec son test, jamais comme une recréation de la base.
+- La connexion est partagée entre threads, protégée par un verrou ; fermez-la avec `db.close()`.
 
-### Colors
-- Importer : `from core.colors import c`
-- Instance globale (singleton)
-- Supporté sur Windows/Mac/Linux
+### Secrets
+
+L'App Password ne doit jamais apparaître dans un log, un message d'erreur ou un test ; `core/secret_store.py` est le seul module qui le lit ou l'écrit.
 
 ---
 
-## 📤 Soumettre une Pull Request
+## Soumettre une Pull Request
 
 ### Checklist
+
 - [ ] Branche créée depuis `dev`
-- [ ] Tests ajoutés/passent (`pytest`)
-- [ ] Documentation mise à jour
-- [ ] Accents français ✓
-- [ ] Pas de fichiers non-nécessaires (config.json, .db, logs/)
-- [ ] Message de commit clair
+- [ ] Tests ajoutés, `python -m pytest tests/ -q` passe
+- [ ] `ruff check .` et `ruff format --check .` propres
+- [ ] Documentation mise à jour (`README.md`, `ADVANCED.md`, `CHANGELOG.md` si le comportement change)
+- [ ] Accents français respectés
+- [ ] Aucun fichier personnel ajouté (`config.json`, `*.db`, `urls*.txt`, `logs/`…)
+- [ ] Message de commit clair, avec `Fixes #N`
 
 ### Processus
-1. **Push votre branche** :
-   ```bash
-   git push origin feature/ma-fonctionnalite
-   ```
 
-2. **Ouvrir une PR** sur GitHub
-   - Titre clair
-   - Description du changement
-   - Lien vers issue si applicable
-   - Screenshots si UI change
-
-3. **Révision** :
-   - Code review
-   - Tests
-   - Documentation
-
-4. **Merge** sur dev (puis main via release)
+1. Poussez votre branche : `git push origin feature/ma-fonctionnalite`.
+2. Ouvrez une PR vers `dev` : titre clair, description du changement, lien vers l'issue, capture d'écran si l'interface change.
+3. Révision : relecture du code, tests et documentation.
+4. Merge sur `dev`, puis sur `main` lors d'une release.
 
 ---
 
-## 🚀 Processus de release
+## Processus de release
 
-### Version scheme
+La version vit à **un seul endroit** : `core/version.py` (`__version__`). `pyproject.toml` la lit en dynamique, le menu l'affiche dans son en-tête (`BSMB v3.1.0`), `bsmb --version` et les fiches JSON (`bsmb_version`) la reprennent.
+
 ```
-Version X.Y (ex: 2.1)
-  X = Major (architecture break)
-  Y = Minor (features/fixes)
+X.Y.Z
+  X = majeur (rupture : architecture, format de données)
+  Y = mineur (fonctionnalités)
+  Z = correctif
 ```
 
-### Créer une release
+Pour publier : mettre à jour `core/version.py` et `CHANGELOG.md`, fusionner dans `main`, puis poser le tag (opération réservée au mainteneur) :
+
 ```bash
-# Sur main
-git tag -a v2.1 -m "Version 2.1 - February 2026"
-git push origin v2.1
+git tag -a v3.1.0 -m "Version 3.1.0"
+git push origin v3.1.0
 ```
 
 ---
 
-## ❓ Questions?
+## Questions ?
 
-- Ouvrez une issue avec label `question`
-- Consultez [README.md](README.md) et [MEMORY.md](.claude/memory/MEMORY.md)
-- Regardez les issues existantes
+- Ouvrez une issue avec le label `question`.
+- Consultez le [README](README.md), [ADVANCED.md](ADVANCED.md) et [DEVELOPMENT.md](DEVELOPMENT.md).
+- Regardez les issues existantes.
 
----
-
-**Merci de contribuer! 🙏**
+Merci de contribuer !
