@@ -52,7 +52,8 @@ class BookmarkSync:
             }
 
         self._online_urls = result["urls"]
-        new_urls = [p["url"] for p in self.db.get_new_refs(result["posts"])]
+        retry_after_days = self.config.get("retry_after_days", 7)
+        new_urls = [p["url"] for p in self.db.get_pending_refs(result["posts"], retry_after_days)]
 
         # Sauvegarder dans urls.txt (rétrocompatibilité)
         urls_file = Path(self.config["urls_file"])
@@ -100,7 +101,7 @@ class BookmarkSync:
             with open(urls_file, "r", encoding="utf-8") as f:
                 urls = [line.strip() for line in f if line.strip()]
             online_count = len(urls)
-            new_urls = self.db.get_new_posts(urls)
+            new_urls = self.db.get_pending_posts(urls, self.config.get("retry_after_days", 7))
             new_count = len(new_urls)
             has_cache = True
 

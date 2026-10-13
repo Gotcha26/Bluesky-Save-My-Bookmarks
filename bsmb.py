@@ -79,7 +79,7 @@ def get_app_state(config):
         with open(urls_file, "r", encoding="utf-8") as f:
             urls = [line.strip() for line in f if line.strip()]
         url_count = len(urls)
-        new_urls = db.get_new_posts(urls)
+        new_urls = db.get_pending_posts(urls, config.get("retry_after_days", 7))
         new_count = len(new_urls)
 
     from core.auth import has_credentials
@@ -696,7 +696,7 @@ def download_media(config, force=False):
         print()
         print(c.warning(f"Mode FORCE : {len(urls)} posts seront tous traités"))
     else:
-        urls_to_process = db.get_new_posts(urls)
+        urls_to_process = db.get_pending_posts(urls, config.get("retry_after_days", 7))
         new = len(urls_to_process)
         total = len(urls)
         print()
