@@ -137,6 +137,15 @@ def fetch_post_json(handle: str, post_id: str, http=None):
     return resp.json()
 
 
+VUES_IMAGES = ("app.bsky.embed.images#view", "app.bsky.embed.gallery#view")
+
+
+def _fullsize(vue: dict) -> list[str]:
+    """URLs `fullsize` d'une vue d'images (`images`) ou de galerie (`items`)."""
+    cle = "images" if vue.get("$type") == "app.bsky.embed.images#view" else "items"
+    return [img["fullsize"] for img in vue.get(cle) or [] if img.get("fullsize")]
+
+
 def extract_images_from_bsky(post_url: str, http=None, details: dict | None = None):
     """
     Lit le post via getPostThread et extrait les URLs des images.
@@ -188,21 +197,15 @@ def extract_images_from_bsky(post_url: str, http=None, details: dict | None = No
 
     # ORDRE : 1. Images directes, 2. RecordWithMedia, 3. Repost
 
-    # 1. Images directes
-    if embed_type == "app.bsky.embed.images#view":
-        for img in embed.get("images", []):
-            full_url = img.get("fullsize")
-            if full_url:
-                images.append(full_url)
+    # 1. Images directes (4 au plus) ou galerie (20 au plus, `items`)
+    if embed_type in VUES_IMAGES:
+        images = _fullsize(embed)
 
     # 2. Record avec média (quote post + image)
     elif embed_type == "app.bsky.embed.recordWithMedia#view":
         media = embed.get("media", {})
-        if media.get("$type") == "app.bsky.embed.images#view":
-            for img in media.get("images", []):
-                full_url = img.get("fullsize")
-                if full_url:
-                    images.append(full_url)
+        if media.get("$type") in VUES_IMAGES:
+            images = _fullsize(media)
 
     # 3. Repost pur (dernier recours)
     elif embed_type == "app.bsky.embed.record#view":
@@ -224,7 +227,9 @@ def extract_images_from_bsky(post_url: str, http=None, details: dict | None = No
 def images_du_record(record: dict | None) -> list[dict]:
     """Images du record brut d'un post : [{"cid", "mime", "alt"}], dans l'ordre du post."""
     embed = (record or {}).get("embed") or {}
-    liste = embed.get("images") or (embed.get("media") or {}).get("images") or []
+    media = embed.get("media") or {}
+    # `images` (4 au plus) ou `items` d'une galerie (20 au plus), directs ou via recordWithMedia
+    liste = embed.get("images") or embed.get("items") or media.get("images") or media.get("items") or []
     resultat = []
     for img in liste:
         blob = img.get("image") or {}

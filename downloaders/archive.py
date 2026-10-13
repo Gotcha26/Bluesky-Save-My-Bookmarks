@@ -111,6 +111,9 @@ def _lignes_alt(record, alts):
     if type_media.startswith("app.bsky.embed.images"):
         libelle = "Image {n}"
         valeurs = [img.get("alt", "") for img in media.get("images") or []]
+    elif type_media.startswith("app.bsky.embed.gallery"):
+        libelle = "Image {n}"
+        valeurs = [item.get("alt", "") for item in media.get("items") or []]
     elif type_media.startswith("app.bsky.embed.video"):
         libelle = "Vidéo"
         valeurs = [media.get("alt", "")]
