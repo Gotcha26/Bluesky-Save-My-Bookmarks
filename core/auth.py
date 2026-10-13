@@ -85,15 +85,15 @@ def create_session(handle, app_password, session=None):
             "pds_url": _extract_pds_url(data.get("didDoc")),
         }
 
-    except requests.exceptions.ConnectionError:
-        raise NetworkError("Impossible de se connecter à bsky.social. Vérifiez votre connexion.")
-    except requests.exceptions.Timeout:
-        raise NetworkError("Timeout lors de la connexion à bsky.social.")
+    except requests.exceptions.ConnectionError as e:
+        raise NetworkError("Impossible de se connecter à bsky.social. Vérifiez votre connexion.") from e
+    except requests.exceptions.Timeout as e:
+        raise NetworkError("Timeout lors de la connexion à bsky.social.") from e
     except requests.exceptions.HTTPError as e:
         status = e.response.status_code
         if status >= 500:
-            raise NetworkError(f"Erreur HTTP {status}")
-        raise AuthError(f"Erreur HTTP {status}")
+            raise NetworkError(f"Erreur HTTP {status}") from e
+        raise AuthError(f"Erreur HTTP {status}") from e
 
 
 def refresh_session(refresh_jwt, pds_url, session=None):
@@ -144,15 +144,15 @@ def refresh_session(refresh_jwt, pds_url, session=None):
             "pds_url": _extract_pds_url(did_doc) if did_doc else base,
         }
 
-    except requests.exceptions.ConnectionError:
-        raise NetworkError("Impossible de se connecter au serveur Bluesky. Vérifiez votre connexion.")
-    except requests.exceptions.Timeout:
-        raise NetworkError("Timeout lors du renouvellement de la session.")
+    except requests.exceptions.ConnectionError as e:
+        raise NetworkError("Impossible de se connecter au serveur Bluesky. Vérifiez votre connexion.") from e
+    except requests.exceptions.Timeout as e:
+        raise NetworkError("Timeout lors du renouvellement de la session.") from e
     except requests.exceptions.HTTPError as e:
         status = e.response.status_code
         if status >= 500:
-            raise NetworkError(f"Erreur HTTP {status}")
-        raise AuthError(f"Erreur HTTP {status}")
+            raise NetworkError(f"Erreur HTTP {status}") from e
+        raise AuthError(f"Erreur HTTP {status}") from e
 
 
 def get_session(config):

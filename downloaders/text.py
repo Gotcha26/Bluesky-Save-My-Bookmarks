@@ -73,7 +73,6 @@ def save_text(post_url, dest_dir, config, session=None, name_prefix=None):
     post = data.get("thread", {}).get("post", {})
     record = post.get("record", {})
     text = record.get("text", "")
-    created_at = record.get("createdAt", "")
 
     if not text:
         return []
