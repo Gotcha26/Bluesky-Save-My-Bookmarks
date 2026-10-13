@@ -4,7 +4,8 @@ Authentification Bluesky via createSession
 Obtient un token Bearer automatiquement à partir du handle + App Password.
 """
 import requests
-from pathlib import Path
+
+from core.config import resolve_path
 
 ENDPOINT = "https://bsky.social/xrpc/com.atproto.server.createSession"
 
@@ -101,7 +102,7 @@ def get_session(config):
         return create_session(handle, app_password)
 
     # Mode 2 : Fichier Token-Bearer.txt (fallback)
-    token_file = Path(config.get("token_file", "Token-Bearer.txt"))
+    token_file = resolve_path(config, "token_file")
     if token_file.exists():
         content = token_file.read_text(encoding="utf-8").strip()
         if content.startswith("Bearer "):

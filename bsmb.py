@@ -9,7 +9,7 @@ import subprocess
 from pathlib import Path
 from datetime import datetime
 
-from core.config import load_config, save_config, ensure_dirs, get_media_dirs
+from core.config import load_config, save_config, ensure_dirs, get_media_dirs, resolve_path
 from core.database import Database
 from core.colors import c
 
@@ -67,10 +67,10 @@ def format_last_sync(iso_str):
 
 def get_app_state(config):
     """Récupère l'état complet de l'application."""
-    db = Database(config["db_file"])
+    db = Database(resolve_path(config, "db_file"))
     stats = db.get_stats()
 
-    urls_file = Path(config["urls_file"])
+    urls_file = resolve_path(config, "urls_file")
     has_urls = urls_file.exists() and urls_file.stat().st_size > 0
     url_count = 0
     new_count = 0
@@ -189,7 +189,7 @@ def get_session(config):
             return None
 
     # Fallback fichier token
-    token_file = Path(config.get("token_file", "Token-Bearer.txt"))
+    token_file = resolve_path(config, "token_file")
     if token_file.exists():
         content = token_file.read_text(encoding="utf-8").strip()
         if content.startswith("Bearer "):
@@ -296,7 +296,7 @@ def do_sync(config):
     print(c.success("Authentification réussie"))
     print(c.info("Récupération des bookmarks..."))
 
-    db = Database(config["db_file"])
+    db = Database(resolve_path(config, "db_file"))
     from core.bookmarks import BookmarkSync
     sync = BookmarkSync(config, db)
 
@@ -390,7 +390,7 @@ def menu_local_storage(config, state):
 
 def cleanup_dead_links(config):
     """Supprime les liens morts de la base de données."""
-    db = Database(config["db_file"])
+    db = Database(resolve_path(config, "db_file"))
     dead_posts = db.get_dead_posts()
 
     clear_screen()
@@ -439,7 +439,7 @@ def reset_database(config):
 
     confirm = input(c.prompt("  Confirmer ? (tapez 'RESET'): ")).strip()
     if confirm == "RESET":
-        db_file = Path(config["db_file"])
+        db_file = resolve_path(config, "db_file")
         if db_file.exists():
             db_file.unlink()
             print(c.success("Base de données réinitialisée"))
@@ -676,7 +676,7 @@ def menu_download_new(config, state):
 
 def download_media(config, force=False):
     """Télécharge les médias via l'orchestrateur."""
-    urls_file = Path(config["urls_file"])
+    urls_file = resolve_path(config, "urls_file")
     if not urls_file.exists():
         print(c.error(f"Fichier {config['urls_file']} introuvable"))
         return False
@@ -689,7 +689,7 @@ def download_media(config, force=False):
         return False
 
     media_dirs = get_media_dirs(config)
-    db = Database(config["db_file"])
+    db = Database(resolve_path(config, "db_file"))
 
     if force:
         urls_to_process = urls
@@ -729,7 +729,7 @@ def download_media(config, force=False):
 
 def download_media_dev(config):
     """Mode dev : télécharge depuis urls.txt sans token ni DB."""
-    urls_file = Path(config["urls_file"])
+    urls_file = resolve_path(config, "urls_file")
     if not urls_file.exists() or urls_file.stat().st_size == 0:
         print(c.warning("Aucune URL disponible dans urls.txt"))
         return False
