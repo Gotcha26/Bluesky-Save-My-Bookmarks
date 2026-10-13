@@ -1,4 +1,5 @@
 """Tests de core/secret_store.py : App Password via keyring, repli sur config.json (issue #12)."""
+
 import sys
 import types
 from unittest.mock import patch

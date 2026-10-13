@@ -1,4 +1,5 @@
 """Tests pour core/database.py"""
+
 from core.database import Database
 
 
@@ -31,8 +32,9 @@ class TestAddPost:
         tmp_db.add_post("https://bsky.app/profile/user/post/123", "123", "user1")
         tmp_db.add_post("https://bsky.app/profile/user/post/123", "123", "user2")
         cursor = tmp_db.conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM posts WHERE url = ?",
-                        ("https://bsky.app/profile/user/post/123",))
+        cursor.execute(
+            "SELECT COUNT(*) FROM posts WHERE url = ?", ("https://bsky.app/profile/user/post/123",)
+        )
         assert cursor.fetchone()[0] == 1
 
 
@@ -138,6 +140,7 @@ class TestUpdateLastCheck:
         first_check = cursor.fetchone()[0]
 
         import time
+
         time.sleep(0.01)
         tmp_db.update_last_check(url)
 
@@ -241,8 +244,8 @@ class TestCleanupDeadPosts:
 class TestMigration:
     def test_status_column_exists(self, tmp_db):
         cursor = tmp_db.conn.cursor()
-        columns = [row[1] for row in cursor.execute('PRAGMA table_info(posts)').fetchall()]
-        assert 'status' in columns
+        columns = [row[1] for row in cursor.execute("PRAGMA table_info(posts)").fetchall()]
+        assert "status" in columns
 
 
 class TestStatutBlocked:
@@ -265,8 +268,13 @@ class TestStatutBlocked:
         assert tmp_db.get_pending_posts([url], 7) == []
 
     def test_mark_unavailable_cree_et_marque(self, tmp_db):
-        ref = {"url": "https://bsky.app/profile/u/post/2", "at_uri": "at://did:plc:t/app.bsky.feed.post/2",
-               "did": "did:plc:t", "rkey": "2", "handle": "u"}
+        ref = {
+            "url": "https://bsky.app/profile/u/post/2",
+            "at_uri": "at://did:plc:t/app.bsky.feed.post/2",
+            "did": "did:plc:t",
+            "rkey": "2",
+            "handle": "u",
+        }
         assert tmp_db.mark_unavailable(ref, "blocked") is True
         ligne = tmp_db.conn.execute("SELECT status, at_uri, did, rkey, handle FROM posts").fetchone()
         assert tuple(ligne) == ("blocked", ref["at_uri"], "did:plc:t", "2", "u")
@@ -274,7 +282,9 @@ class TestStatutBlocked:
     def test_mark_unavailable_sans_at_uri(self, tmp_db):
         url = "https://bsky.app/profile/u/post/2"
         assert tmp_db.mark_unavailable({"url": url}, "deleted") is True
-        assert tmp_db.conn.execute("SELECT status FROM posts WHERE url = ?", (url,)).fetchone()[0] == "deleted"
+        assert (
+            tmp_db.conn.execute("SELECT status FROM posts WHERE url = ?", (url,)).fetchone()[0] == "deleted"
+        )
 
     def test_mark_unavailable_ne_touche_que_la_ligne_identifiee(self, tmp_db):
         at_uri = "at://did:plc:t/app.bsky.feed.post/2"

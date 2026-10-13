@@ -10,6 +10,7 @@ GIF Tenor, lien tiers). Écrit, dans les dossiers médias :
 Les liens vers des plateformes tierces (x.com, YouTube…) ne sont pas téléchargés.
 Pas d'usage manuel : la fonction reçoit le dict de PostAnalyzer.analyze().
 """
+
 import logging
 import os
 from pathlib import Path
@@ -85,10 +86,18 @@ def _record_de(data, external):
     """Record brut fourni par l'orchestrateur (data["record"]), sinon reconstitué depuis `data`."""
     if data.get("record"):
         return data["record"]
-    return {"text": data.get("text", ""), "createdAt": data.get("created_at", ""),
-            "embed": {"$type": "app.bsky.embed.external",
-                      "external": {"uri": external.get("uri", ""), "title": external.get("title", ""),
-                                   "description": external.get("description", "")}}}
+    return {
+        "text": data.get("text", ""),
+        "createdAt": data.get("created_at", ""),
+        "embed": {
+            "$type": "app.bsky.embed.external",
+            "external": {
+                "uri": external.get("uri", ""),
+                "title": external.get("title", ""),
+                "description": external.get("description", ""),
+            },
+        },
+    }
 
 
 def _resultat(filepath, media_type, cid=None):
@@ -119,15 +128,19 @@ def download_external(post_url, data, dirs, config, session=None):
     resultats = []
 
     # write_text lève DownloadError si l'écriture est impossible
-    resultats += write_text(post_url, _record_de(data, external), dirs["text_dir"], config,
-                            auteur=data.get("handle") or None)
+    resultats += write_text(
+        post_url, _record_de(data, external), dirs["text_dir"], config, auteur=data.get("handle") or None
+    )
 
     # Vignette : blob Bluesky servi par le CDN
     cid, did = external.get("thumb_cid"), data.get("did")
     if cid and did:
         try:
-            thumb = _telecharger_fichier(http, URL_VIGNETTE.format(did=did, cid=cid),
-                                         lambda ct: Path(dirs["img_dir"]) / f"{base}_thumb.jpg")
+            thumb = _telecharger_fichier(
+                http,
+                URL_VIGNETTE.format(did=did, cid=cid),
+                lambda ct: Path(dirs["img_dir"]) / f"{base}_thumb.jpg",
+            )
             resultats.append(_resultat(thumb, "image", cid))
         except Exception as e:
             log.warning("Vignette non téléchargée pour %s : %s", post_url, e)
@@ -136,6 +149,7 @@ def download_external(post_url, data, dirs, config, session=None):
     uri = external.get("uri", "")
     if est_media_direct(uri):
         try:
+
             def choisir(content_type):
                 ext = extension_media_direct(uri, content_type)
                 dossier = dirs["vid_dir"] if ext in EXTENSIONS_VIDEOS else dirs["img_dir"]

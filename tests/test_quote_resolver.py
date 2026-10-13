@@ -1,4 +1,5 @@
 """Tests de api/quote_resolver.py : record cité d'une citation (issue #5)."""
+
 import importlib
 import json
 import sys
@@ -57,8 +58,11 @@ class TestResolveCitation:
         cible = self.resolver.resolve(URL)
         assert cible == QuoteTarget(
             url="https://bsky.app/profile/cite.example.com/post/3kcited0001",
-            did=D2, rkey="3kcited0001", handle="cite.example.com",
-            collection="app.bsky.feed.post", state="post",
+            did=D2,
+            rkey="3kcited0001",
+            handle="cite.example.com",
+            collection="app.bsky.feed.post",
+            state="post",
         )
 
     def test_recordwithmedia_lit_le_record_imbrique(self, mock_get):
@@ -84,8 +88,13 @@ class TestResolveCitation:
         assert mock_get.side_effect.appels[0][1]["repo"] == "did:plc:test1000000000000000000000"
 
     def test_post_sans_citation(self, mock_get):
-        mock_get.return_value = _reponse(200, {"uri": "at://did:plc:x/app.bsky.feed.post/n1", "value": {
-            "embed": {"$type": "app.bsky.embed.images", "images": []}}})
+        mock_get.return_value = _reponse(
+            200,
+            {
+                "uri": "at://did:plc:x/app.bsky.feed.post/n1",
+                "value": {"embed": {"$type": "app.bsky.embed.images", "images": []}},
+            },
+        )
         assert self.resolver.resolve("https://bsky.app/profile/u.example.com/post/n1") is None
 
     def test_erreur_reseau(self, mock_get):
@@ -124,8 +133,11 @@ class TestEtatsDuRecordCite:
 
     def test_etats_de_la_vue_hydratee(self, mock_get):
         mock_get.return_value = _reponse(200, {"handle": "cite.example.com"})
-        for suffixe, etat in (("viewNotFound", "not_found"), ("viewBlocked", "blocked"),
-                              ("viewDetached", "detached")):
+        for suffixe, etat in (
+            ("viewNotFound", "not_found"),
+            ("viewBlocked", "blocked"),
+            ("viewDetached", "detached"),
+        ):
             vue = self._vue(f"app.bsky.embed.record#{suffixe}")
             cible = self.resolver.resolve(URL, post_view=vue)
             assert cible.state == etat
@@ -134,7 +146,9 @@ class TestEtatsDuRecordCite:
         assert not mock_get.called
 
     def test_etat_dans_recordwithmedia_vue(self, mock_get):
-        cible = self.resolver.resolve(URL, post_view=self._vue("app.bsky.embed.record#viewBlocked", imbrique=True))
+        cible = self.resolver.resolve(
+            URL, post_view=self._vue("app.bsky.embed.record#viewBlocked", imbrique=True)
+        )
         assert cible.state == "blocked"
         assert not mock_get.called
 

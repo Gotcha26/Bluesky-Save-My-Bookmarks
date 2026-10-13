@@ -75,10 +75,12 @@ def obtenir_token(config):
         return None
     return create_session(config["bsky_handle"], config["bsky_app_password"])
 
+
 # ❌ MAUVAIS
 def getToken(cfg):
-    if not cfg['bsky_handle']: return None
-    return create_session(cfg['bsky_handle'],cfg['bsky_app_password'])
+    if not cfg["bsky_handle"]:
+        return None
+    return create_session(cfg["bsky_handle"], cfg["bsky_app_password"])
 ```
 
 **Règles:**
@@ -135,18 +137,18 @@ tests/
 import pytest
 from core.auth import has_credentials, AuthError
 
+
 def test_has_credentials_with_valid_config():
     """Vérifie que has_credentials() retourne True avec config valide."""
-    config = {
-        "bsky_handle": "user.bsky.social",
-        "bsky_app_password": "xxxx-xxxx-xxxx-xxxx"
-    }
+    config = {"bsky_handle": "user.bsky.social", "bsky_app_password": "xxxx-xxxx-xxxx-xxxx"}
     assert has_credentials(config) is True
+
 
 def test_has_credentials_empty():
     """Vérifie que has_credentials() retourne False avec config vide."""
     config = {"bsky_handle": "", "bsky_app_password": ""}
     assert has_credentials(config) is False
+
 
 @pytest.mark.asyncio
 async def test_create_session_invalid_credentials():
@@ -173,13 +175,13 @@ pytest -k "create_session"# Tests matching
 **core/auth.py** - Authentification
 ```python
 create_session(handle, app_password)  # API createSession
-get_token(config)                      # Mode auto ou fallback
-has_credentials(config)                # Vérification
+get_token(config)  # Mode auto ou fallback
+has_credentials(config)  # Vérification
 ```
 
 **core/config.py** - Configuration
 ```python
-load_config()        # Charge JSON
+load_config()  # Charge JSON
 save_config(config)  # Sauvegarde
 ensure_dirs(config)  # Crée répertoires
 get_media_dirs(config)  # Chemins médias
@@ -188,7 +190,7 @@ get_media_dirs(config)  # Chemins médias
 **core/database.py** - Tracking
 ```python
 db.add_post(url, post_id, handle)
-db.get_new_posts(urls)              # Nouveaux uniquement
+db.get_new_posts(urls)  # Nouveaux uniquement
 db.add_media(url, type, filename)
 db.get_stats()
 ```

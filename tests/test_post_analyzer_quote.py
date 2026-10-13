@@ -1,4 +1,5 @@
 """Analyse des citations (quote posts, issue #5) avec des fixtures getRecord."""
+
 import copy
 import json
 from pathlib import Path

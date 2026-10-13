@@ -3,6 +3,7 @@
 Synchronisation des bookmarks Bluesky.
 Pont entre l'API (export_bookmarks) et la base de données locale.
 """
+
 from datetime import datetime
 
 from api.export_bookmarks import DEFAULT_PDS_URL, fetch_bookmarks
@@ -59,8 +60,11 @@ class BookmarkSync:
                 nouvelle = refresh_session(session_info["refresh_jwt"], pds_url)
             except NetworkError as e:
                 # Panne réseau pendant le renouvellement : erreur réseau, pas « token expiré »
-                result = {**result, "error": f"Erreur réseau pendant le renouvellement de la session : {e}",
-                          "expired": False}
+                result = {
+                    **result,
+                    "error": f"Erreur réseau pendant le renouvellement de la session : {e}",
+                    "expired": False,
+                }
             except AuthError:
                 pass  # jeton de rafraîchissement refusé : on rend le résultat « expiré » d'origine
             else:

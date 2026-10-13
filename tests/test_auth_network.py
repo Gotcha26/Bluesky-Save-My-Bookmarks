@@ -1,4 +1,5 @@
 """Distinction erreur réseau / erreur d'authentification dans core/auth.py."""
+
 from unittest.mock import MagicMock
 
 import pytest

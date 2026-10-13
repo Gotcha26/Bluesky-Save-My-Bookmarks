@@ -2,6 +2,7 @@
 """
 Gestion de la base de données SQLite pour BSMB
 """
+
 import sqlite3
 import threading
 from datetime import datetime, timedelta
@@ -11,7 +12,7 @@ from datetime import datetime, timedelta
 SCHEMA_VERSION = 2
 
 # Statuts d'un post qui méritent une nouvelle tentative après un délai
-STATUTS_A_RETENTER = ('error_500', 'error_429', 'unknown', 'repost')
+STATUTS_A_RETENTER = ("error_500", "error_429", "unknown", "repost")
 
 
 class Database:
@@ -30,16 +31,17 @@ class Database:
     def _init_db(self):
         """Crée le schéma d'une base neuve ou applique les migrations manquantes."""
         cursor = self.conn.cursor()
-        existe = cursor.execute(
-            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'posts'"
-        ).fetchone() is not None
+        existe = (
+            cursor.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'posts'").fetchone()
+            is not None
+        )
 
-        cursor.execute('''
+        cursor.execute("""
             CREATE TABLE IF NOT EXISTS meta (
                 key TEXT PRIMARY KEY,
                 value TEXT
             )
-        ''')
+        """)
 
         if not existe:
             self._create_schema()
@@ -47,13 +49,13 @@ class Database:
             return
 
         for version in range(self._get_version() + 1, SCHEMA_VERSION + 1):
-            getattr(self, f'_migrate_v{version}')()
+            getattr(self, f"_migrate_v{version}")()
             self._set_version(version)
 
     def _create_schema(self):
         """Crée directement le schéma courant (base neuve)."""
         cursor = self.conn.cursor()
-        cursor.execute('''
+        cursor.execute("""
             CREATE TABLE posts (
                 url TEXT PRIMARY KEY,
                 post_id TEXT,
@@ -65,14 +67,14 @@ class Database:
                 did TEXT,
                 rkey TEXT
             )
-        ''')
+        """)
         cursor.execute("CREATE UNIQUE INDEX idx_posts_at_uri ON posts(at_uri)")
-        cursor.execute(self._sql_table_media('media'))
+        cursor.execute(self._sql_table_media("media"))
         self.conn.commit()
 
     @staticmethod
     def _sql_table_media(nom):
-        return f'''
+        return f"""
             CREATE TABLE {nom} (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 post_url TEXT,
@@ -84,36 +86,37 @@ class Database:
                 FOREIGN KEY(post_url) REFERENCES posts(url)
                     ON DELETE CASCADE ON UPDATE CASCADE
             )
-        '''
+        """
 
     def _get_version(self):
         """Version du schéma : table `meta`, sinon déduite des colonnes (bases d'avant `meta`)."""
-        row = self.conn.execute(
-            "SELECT value FROM meta WHERE key = 'schema_version'"
-        ).fetchone()
+        row = self.conn.execute("SELECT value FROM meta WHERE key = 'schema_version'").fetchone()
         if row:
             return int(row[0])
-        colonnes = {r[1] for r in self.conn.execute('PRAGMA table_info(posts)')}
-        if {'status', 'at_uri', 'did', 'rkey'} <= colonnes:
+        colonnes = {r[1] for r in self.conn.execute("PRAGMA table_info(posts)")}
+        if {"status", "at_uri", "did", "rkey"} <= colonnes:
             return 1
         return 0
 
     def _set_version(self, version):
-        self.conn.execute('''
+        self.conn.execute(
+            """
             INSERT INTO meta (key, value) VALUES ('schema_version', ?)
             ON CONFLICT(key) DO UPDATE SET value = excluded.value
-        ''', (str(version),))
+        """,
+            (str(version),),
+        )
         self.conn.commit()
 
     def _migrate_v1(self):
         """v1 : colonne `status` et identité par AT-URI (`at_uri`, `did`, `rkey`)."""
         cursor = self.conn.cursor()
-        colonnes = [row[1] for row in cursor.execute('PRAGMA table_info(posts)').fetchall()]
-        if 'status' not in colonnes:
+        colonnes = [row[1] for row in cursor.execute("PRAGMA table_info(posts)").fetchall()]
+        if "status" not in colonnes:
             cursor.execute("ALTER TABLE posts ADD COLUMN status TEXT DEFAULT 'ok'")
         # Les anciennes lignes gardent NULL, complétées lors de leur prochain
         # traitement, sans appel réseau
-        for colonne in ('at_uri', 'did', 'rkey'):
+        for colonne in ("at_uri", "did", "rkey"):
             if colonne not in colonnes:
                 cursor.execute(f"ALTER TABLE posts ADD COLUMN {colonne} TEXT")
         # SQLite n'accepte pas ADD COLUMN ... UNIQUE : l'unicité passe par un index
@@ -128,28 +131,28 @@ class Database:
         médias orphelins (sans post) sont écartés. Opération atomique.
         """
         cursor = self.conn.cursor()
-        cursor.execute('BEGIN')
+        cursor.execute("BEGIN")
         try:
-            cursor.execute('DROP TABLE IF EXISTS media_v2')
-            cursor.execute(self._sql_table_media('media_v2'))
+            cursor.execute("DROP TABLE IF EXISTS media_v2")
+            cursor.execute(self._sql_table_media("media_v2"))
             ancienne = cursor.execute(
                 "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'media'"
             ).fetchone()
             if ancienne:
                 orphelins = cursor.execute(
-                    'SELECT COUNT(*) FROM media WHERE post_url IS NULL '
-                    'OR post_url NOT IN (SELECT url FROM posts)'
+                    "SELECT COUNT(*) FROM media WHERE post_url IS NULL "
+                    "OR post_url NOT IN (SELECT url FROM posts)"
                 ).fetchone()[0]
                 if orphelins:
                     print(f"Migration v2 : {orphelins} média(s) orphelin(s) écarté(s) (post absent).")
-                cursor.execute('''
+                cursor.execute("""
                     INSERT OR IGNORE INTO media_v2 (post_url, media_type, filename, downloaded_at)
                     SELECT post_url, media_type, filename, downloaded_at FROM media
                     WHERE post_url IN (SELECT url FROM posts)
                     ORDER BY id
-                ''')
-                cursor.execute('DROP TABLE media')
-            cursor.execute('ALTER TABLE media_v2 RENAME TO media')
+                """)
+                cursor.execute("DROP TABLE media")
+            cursor.execute("ALTER TABLE media_v2 RENAME TO media")
             self.conn.commit()
         except Exception:
             self.conn.rollback()
@@ -175,33 +178,33 @@ class Database:
             now = datetime.now().isoformat()
 
             if at_uri:
-                existante = cursor.execute(
-                    'SELECT url FROM posts WHERE at_uri = ?', (at_uri,)
-                ).fetchone()
+                existante = cursor.execute("SELECT url FROM posts WHERE at_uri = ?", (at_uri,)).fetchone()
                 if existante and existante[0] != url:
                     ancienne_url = existante[0]
                     # La nouvelle URL est peut-être déjà prise par une ancienne ligne
                     # sans at_uri : on ne renomme pas (pas de fusion), on rafraîchit seulement
-                    occupee = cursor.execute(
-                        'SELECT 1 FROM posts WHERE url = ?', (url,)
-                    ).fetchone()
+                    occupee = cursor.execute("SELECT 1 FROM posts WHERE url = ?", (url,)).fetchone()
                     nouvelle_url = ancienne_url if occupee else url
                     # Les médias suivent via ON UPDATE CASCADE
                     try:
-                        cursor.execute('''
+                        cursor.execute(
+                            """
                             UPDATE posts SET url = ?, last_check = ?,
                                 post_id = COALESCE(?, post_id),
                                 handle = COALESCE(?, handle),
                                 did = COALESCE(?, did)
                             WHERE at_uri = ?
-                        ''', (nouvelle_url, now, post_id, handle, did, at_uri))
+                        """,
+                            (nouvelle_url, now, post_id, handle, did, at_uri),
+                        )
                         self.conn.commit()
                     except Exception:
                         self.conn.rollback()
                         raise
                     return
 
-            cursor.execute('''
+            cursor.execute(
+                """
                 INSERT INTO posts (url, post_id, handle, added_at, last_check, at_uri, did, rkey)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(url) DO UPDATE SET
@@ -211,7 +214,9 @@ class Database:
                     at_uri = COALESCE(excluded.at_uri, at_uri),
                     did = COALESCE(excluded.did, did),
                     rkey = COALESCE(excluded.rkey, rkey)
-            ''', (url, post_id, handle, now, now, at_uri, did, rkey))
+            """,
+                (url, post_id, handle, now, now, at_uri, did, rkey),
+            )
             self.conn.commit()
 
     def add_media(self, post_url, media_type, filename, cid=None):
@@ -229,10 +234,13 @@ class Database:
         with self._lock:
             cursor = self.conn.cursor()
             now = datetime.now().isoformat()
-            cursor.execute('''
+            cursor.execute(
+                """
                 INSERT OR IGNORE INTO media (post_url, media_type, filename, downloaded_at, cid)
                 VALUES (?, ?, ?, ?, ?)
-            ''', (post_url, media_type, filename, now, cid))
+            """,
+                (post_url, media_type, filename, now, cid),
+            )
             self.conn.commit()
 
     def find_media_by_cid(self, cid):
@@ -250,9 +258,12 @@ class Database:
         with self._lock:
             cursor = self.conn.cursor()
             now = datetime.now().isoformat()
-            cursor.execute('''
+            cursor.execute(
+                """
                 UPDATE posts SET last_check = ? WHERE url = ?
-            ''', (now, url))
+            """,
+                (now, url),
+            )
             self.conn.commit()
 
     def get_new_posts(self, urls):
@@ -261,7 +272,7 @@ class Database:
             cursor = self.conn.cursor()
             new_posts = []
             for url in urls:
-                cursor.execute('SELECT url FROM posts WHERE url = ?', (url,))
+                cursor.execute("SELECT url FROM posts WHERE url = ?", (url,))
                 if not cursor.fetchone():
                     new_posts.append(url)
             return new_posts
@@ -274,8 +285,8 @@ class Database:
         dont `at_uri` est encore NULL.
         """
         return cursor.execute(
-            'SELECT status, last_check FROM posts WHERE at_uri = ? OR (at_uri IS NULL AND url = ?)',
-            (ref.get('at_uri'), ref['url']),
+            "SELECT status, last_check FROM posts WHERE at_uri = ? OR (at_uri IS NULL AND url = ?)",
+            (ref.get("at_uri"), ref["url"]),
         ).fetchone()
 
     @staticmethod
@@ -307,7 +318,7 @@ class Database:
             pending = []
             for url in urls:
                 ligne = cursor.execute(
-                    'SELECT status, last_check FROM posts WHERE url = ?', (url,)
+                    "SELECT status, last_check FROM posts WHERE url = ?", (url,)
                 ).fetchone()
                 if ligne is None or self._est_a_retenter(ligne, limite):
                     pending.append(url)
@@ -339,7 +350,7 @@ class Database:
         """
         with self._lock:
             cursor = self.conn.cursor()
-            cursor.execute('SELECT COUNT(*) FROM posts')
+            cursor.execute("SELECT COUNT(*) FROM posts")
             posts_count = cursor.fetchone()[0]
             cursor.execute("SELECT COUNT(*) FROM media WHERE media_type = 'image'")
             images_count = cursor.fetchone()[0]
@@ -350,11 +361,11 @@ class Database:
             cursor.execute("SELECT COUNT(*) FROM posts WHERE status != 'ok'")
             dead_count = cursor.fetchone()[0]
             return {
-                'posts': posts_count,
-                'images': images_count,
-                'videos': videos_count,
-                'texts': texts_count,
-                'dead': dead_count,
+                "posts": posts_count,
+                "images": images_count,
+                "videos": videos_count,
+                "texts": texts_count,
+                "dead": dead_count,
             }
 
     def mark_post_status(self, url, status):
@@ -367,7 +378,7 @@ class Database:
         """
         with self._lock:
             cursor = self.conn.cursor()
-            cursor.execute('UPDATE posts SET status = ? WHERE url = ?', (status, url))
+            cursor.execute("UPDATE posts SET status = ? WHERE url = ?", (status, url))
             self.conn.commit()
 
     def mark_unavailable(self, ref, status):
@@ -383,27 +394,37 @@ class Database:
         Returns:
             bool: True si le statut a été posé, False si le post était déjà `ok`.
         """
-        url = ref['url']
-        at_uri = ref.get('at_uri')
+        url = ref["url"]
+        at_uri = ref.get("at_uri")
         with self._lock:
             cursor = self.conn.cursor()
             # La ligne est identifiée par at_uri d'abord (l'URL a pu changer), puis par url
             ligne = None
             if at_uri:
-                ligne = cursor.execute('SELECT url, status FROM posts WHERE at_uri = ?', (at_uri,)).fetchone()
+                ligne = cursor.execute("SELECT url, status FROM posts WHERE at_uri = ?", (at_uri,)).fetchone()
             if ligne is None:
-                ligne = cursor.execute('SELECT url, status FROM posts WHERE url = ?', (url,)).fetchone()
+                ligne = cursor.execute("SELECT url, status FROM posts WHERE url = ?", (url,)).fetchone()
             if ligne is not None:
-                if ligne[1] == 'ok':
+                if ligne[1] == "ok":
                     return False
-                cursor.execute('UPDATE posts SET status = ? WHERE url = ?', (status, ligne[0]))
+                cursor.execute("UPDATE posts SET status = ? WHERE url = ?", (status, ligne[0]))
             else:
                 now = datetime.now().isoformat()
-                rkey = ref.get('rkey') or url.rstrip('/').rsplit('/', 1)[-1]
+                rkey = ref.get("rkey") or url.rstrip("/").rsplit("/", 1)[-1]
                 cursor.execute(
-                    'INSERT INTO posts (url, post_id, handle, added_at, last_check, status, at_uri, did, rkey) '
-                    'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                    (url, rkey, ref.get('handle'), now, now, status, at_uri, ref.get('did'), rkey if at_uri else None),
+                    "INSERT INTO posts (url, post_id, handle, added_at, last_check, status, at_uri, did, rkey) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (
+                        url,
+                        rkey,
+                        ref.get("handle"),
+                        now,
+                        now,
+                        status,
+                        at_uri,
+                        ref.get("did"),
+                        rkey if at_uri else None,
+                    ),
                 )
             self.conn.commit()
         return True

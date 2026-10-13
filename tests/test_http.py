@@ -1,4 +1,5 @@
 """Session HTTP partagée (core/http.py) : User-Agent, retries, limiteur de débit."""
+
 import logging
 import threading
 import time
@@ -62,6 +63,7 @@ def _session_factice(reponses, horloge=None, **kw):
 
 # ---------------------------------------------------------------- session
 
+
 def test_user_agent_identifie_bsmb():
     session = bsmb_http.build_session()
     assert session.headers["User-Agent"] == (
@@ -119,6 +121,7 @@ def test_get_session_singleton_sous_concurrence(monkeypatch):
 
 # ---------------------------------------------------------------- retries
 
+
 class _Serveur(BaseHTTPRequestHandler):
     sequence = []
     vus = []
@@ -174,11 +177,13 @@ def test_429_final_est_rendu_sans_exception(serveur_local):
 
 # ---------------------------------------------------------------- limiteur
 
+
 def test_pause_quand_remaining_sous_le_seuil(caplog):
     horloge = Horloge()
     entetes = {"RateLimit-Remaining": "10", "RateLimit-Reset": str(int(horloge.t) + 5)}
     session, limiteur, adaptateur, horloge = _session_factice(
-        [_reponse(200, entetes), _reponse(200)], horloge)
+        [_reponse(200, entetes), _reponse(200)], horloge
+    )
     with caplog.at_level(logging.INFO, logger="bsmb.http"):
         session.get("http://exemple.test/a")
         assert horloge.pauses == []  # rien à attendre avant la première réponse
@@ -208,11 +213,14 @@ def test_pause_bornee():
 
 def test_entetes_absents_ou_invalides_ignores():
     horloge = Horloge()
-    session, _, _, horloge = _session_factice([
-        _reponse(200, {"RateLimit-Remaining": "abc", "RateLimit-Reset": "x"}),
-        _reponse(200, {"RateLimit-Remaining": "3"}),
-        _reponse(200),
-    ], horloge)
+    session, _, _, horloge = _session_factice(
+        [
+            _reponse(200, {"RateLimit-Remaining": "abc", "RateLimit-Reset": "x"}),
+            _reponse(200, {"RateLimit-Remaining": "3"}),
+            _reponse(200),
+        ],
+        horloge,
+    )
     for _ in range(3):
         session.get("http://exemple.test/")
     assert horloge.pauses == []
@@ -280,7 +288,8 @@ def test_redirection_avec_un_seul_creneau_ne_bloque_pas():
         resultat = []
         fil = threading.Thread(
             target=lambda: resultat.append(session.get(f"http://127.0.0.1:{srv.server_port}/a", timeout=5)),
-            daemon=True)
+            daemon=True,
+        )
         fil.start()
         fil.join(timeout=10)
         assert not fil.is_alive(), "interblocage : le créneau est retenu pendant la redirection"

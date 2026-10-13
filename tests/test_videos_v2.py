@@ -1,4 +1,5 @@
 """Tests de downloaders/videos.py (issue #6) : .part, sous-titres, GIF, mimeType, repli HLS, miniature."""
+
 import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -19,14 +20,20 @@ THUMB = "https://video.bsky.app/watch/did%3Aplc%3Aabc/bafkreividcid/thumbnail.jp
 
 
 def _embed(**extra):
-    return {"$type": "app.bsky.embed.video",
-            "video": {"$type": "blob", "ref": {"$link": CID}, "mimeType": "video/mp4", "size": 6},
-            **extra}
+    return {
+        "$type": "app.bsky.embed.video",
+        "video": {"$type": "blob", "ref": {"$link": CID}, "mimeType": "video/mp4", "size": 6},
+        **extra,
+    }
 
 
 def _value(embed=None, **extra):
-    return {"text": "Ma vidéo", "createdAt": "2026-01-02T10:00:00.000Z",
-            "embed": embed if embed is not None else _embed(), **extra}
+    return {
+        "text": "Ma vidéo",
+        "createdAt": "2026-01-02T10:00:00.000Z",
+        "embed": embed if embed is not None else _embed(),
+        **extra,
+    }
 
 
 def _record(embed=None):
@@ -119,12 +126,15 @@ class TestPart:
         assert appel.kwargs["stream"] is True
         assert appel.kwargs["allow_redirects"] is True
 
-    @pytest.mark.parametrize("rep", [
-        _rep(chunks=()),
-        _rep(chunks=(b"",)),
-        _rep(ctype="text/html"),
-        _rep(status=404),
-    ])
+    @pytest.mark.parametrize(
+        "rep",
+        [
+            _rep(chunks=()),
+            _rep(chunks=(b"",)),
+            _rep(ctype="text/html"),
+            _rep(status=404),
+        ],
+    )
     def test_reponse_invalide_est_un_echec_sans_fichier(self, tmp_path, ffmpeg, rep):
         with pytest.raises(DownloadError):
             _dl(tmp_path, _session(_record(), blobs={CID: rep}))
@@ -133,21 +143,33 @@ class TestPart:
     def test_octet_stream_et_sans_content_type_acceptes(self, tmp_path, ffmpeg):
         for ctype in ("application/octet-stream", None):
             dest = tmp_path / str(ctype).replace("/", "_")
-            res = download_video(URL, dest, DEFAULT_CONFIG,
-                                 session=_session(_record(), blobs={CID: _rep(ctype=ctype)}))
+            res = download_video(
+                URL, dest, DEFAULT_CONFIG, session=_session(_record(), blobs={CID: _rep(ctype=ctype)})
+            )
             assert len(res) == 1
 
 
 class TestSousTitres:
     def _embed_vtt(self, *langs):
-        caps = [{"lang": lang, "file": {"$type": "blob", "ref": {"$link": f"{CID_VTT}{i}"},
-                                        "mimeType": "text/vtt", "size": 9}}
-                for i, lang in enumerate(langs)]
+        caps = [
+            {
+                "lang": lang,
+                "file": {
+                    "$type": "blob",
+                    "ref": {"$link": f"{CID_VTT}{i}"},
+                    "mimeType": "text/vtt",
+                    "size": 9,
+                },
+            }
+            for i, lang in enumerate(langs)
+        ]
         return _embed(captions=caps)
 
     def test_vtt_ecrit_a_cote_de_la_video(self, tmp_path, ffmpeg):
-        blobs = {f"{CID_VTT}0": _rep((b"WEBVTT\n",), ctype="text/vtt"),
-                 f"{CID_VTT}1": _rep((b"WEBVTT\nfr",), ctype="text/vtt; charset=utf-8")}
+        blobs = {
+            f"{CID_VTT}0": _rep((b"WEBVTT\n",), ctype="text/vtt"),
+            f"{CID_VTT}1": _rep((b"WEBVTT\nfr",), ctype="text/vtt; charset=utf-8"),
+        }
         res = _dl(tmp_path, _session(_record(self._embed_vtt("en", "fr")), blobs=blobs))
         assert [r.media_type for r in res] == ["video", "subtitle", "subtitle"]
         assert res[1].filename == "user.bsky.social_20260102_3abc_01.en.vtt"
@@ -157,8 +179,10 @@ class TestSousTitres:
         assert not list(tmp_path.glob("*.part"))
 
     def test_echec_d_un_sous_titre_n_echoue_pas_la_video(self, tmp_path, ffmpeg, caplog):
-        blobs = {f"{CID_VTT}0": requests.ConnectionError("vtt coupé"),
-                 f"{CID_VTT}1": _rep((b"WEBVTT",), ctype="text/vtt")}
+        blobs = {
+            f"{CID_VTT}0": requests.ConnectionError("vtt coupé"),
+            f"{CID_VTT}1": _rep((b"WEBVTT",), ctype="text/vtt"),
+        }
         with caplog.at_level("WARNING"):
             res = _dl(tmp_path, _session(_record(self._embed_vtt("en", "fr")), blobs=blobs))
         assert [r.filename.rsplit(".", 2)[-2] for r in res if r.media_type == "subtitle"] == ["fr"]
@@ -185,8 +209,7 @@ class TestGif:
         assert res[0].path.exists()
 
     def test_video_normale_n_est_pas_un_gif(self, tmp_path, ffmpeg):
-        res = _dl(tmp_path, _session(_record(_embed(presentation="default"))),
-                  config={"gif_subfolder": True})
+        res = _dl(tmp_path, _session(_record(_embed(presentation="default"))), config={"gif_subfolder": True})
         assert res[0].path.parent == tmp_path
 
     def test_gif_avec_name_prefix(self, tmp_path, ffmpeg):
@@ -199,10 +222,16 @@ class TestGif:
 
 
 class TestExtension:
-    @pytest.mark.parametrize("mime, ext", [
-        ("video/mp4", ".mp4"), ("video/webm", ".webm"), ("video/quicktime", ".mov"),
-        ("", ".mp4"), ("x/inconnu", ".mp4"),
-    ])
+    @pytest.mark.parametrize(
+        "mime, ext",
+        [
+            ("video/mp4", ".mp4"),
+            ("video/webm", ".webm"),
+            ("video/quicktime", ".mov"),
+            ("", ".mp4"),
+            ("x/inconnu", ".mp4"),
+        ],
+    )
     def test_extension_depuis_mimetype(self, tmp_path, ffmpeg, mime, ext):
         embed = _embed()
         embed["video"]["mimeType"] = mime
@@ -254,9 +283,11 @@ class TestAlt:
         assert res[0].alt in (None, "")
 
     def test_alt_dans_un_post_cite_avec_media(self, tmp_path, ffmpeg):
-        embed = {"$type": "app.bsky.embed.recordWithMedia",
-                 "record": {"$type": "app.bsky.embed.record", "record": {"uri": "at://x/y/z"}},
-                 "media": _embed(alt="alt média")}
+        embed = {
+            "$type": "app.bsky.embed.recordWithMedia",
+            "record": {"$type": "app.bsky.embed.record", "record": {"uri": "at://x/y/z"}},
+            "media": _embed(alt="alt média"),
+        }
         assert _dl(tmp_path, _session(_record(embed)))[0].alt == "alt média"
 
 
@@ -310,8 +341,7 @@ class TestRepliHls:
         assert list(tmp_path.iterdir()) == []
 
     def test_ffmpeg_timeout_leve_download_error(self, tmp_path):
-        with patch("downloaders.videos.subprocess.run",
-                   side_effect=subprocess.TimeoutExpired("ffmpeg", 600)):
+        with patch("downloaders.videos.subprocess.run", side_effect=subprocess.TimeoutExpired("ffmpeg", 600)):
             with pytest.raises(DownloadError):
                 _dl(tmp_path, self._echec(), view_embed=self.VIEW)
 
@@ -333,8 +363,9 @@ class TestMiniature:
         assert all(c.args[0] != THUMB for c in session.get.call_args_list)
 
     def test_telechargee_si_activee(self, tmp_path, ffmpeg):
-        res = _dl(tmp_path, _session(_record()), config={"download_video_thumbnail": True},
-                  view_embed=self.VIEW)
+        res = _dl(
+            tmp_path, _session(_record()), config={"download_video_thumbnail": True}, view_embed=self.VIEW
+        )
         thumb = res[-1]
         assert thumb.media_type == "image"
         assert thumb.filename == "user.bsky.social_20260102_3abc_01_thumb.jpg"
@@ -348,8 +379,12 @@ class TestMiniature:
     def test_echec_de_la_miniature_n_echoue_pas_la_video(self, tmp_path, ffmpeg, caplog):
         thumb = _rep((b"<html>",), ctype="text/html")
         with caplog.at_level("WARNING"):
-            res = _dl(tmp_path, _session(_record(), thumb=thumb),
-                      config={"download_video_thumbnail": True}, view_embed=self.VIEW)
+            res = _dl(
+                tmp_path,
+                _session(_record(), thumb=thumb),
+                config={"download_video_thumbnail": True},
+                view_embed=self.VIEW,
+            )
         assert [r.media_type for r in res] == ["video"]
         assert not list(tmp_path.glob("*thumb*"))
         assert "miniature" in caplog.text.lower()

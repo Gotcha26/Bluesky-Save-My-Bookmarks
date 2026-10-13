@@ -1,4 +1,5 @@
 """Tests pour core/post_ref.py (identité des posts par AT-URI)."""
+
 from unittest.mock import MagicMock
 
 import pytest
@@ -53,12 +54,15 @@ class TestFromBskyUrl:
     def test_slash_final_toleré(self):
         assert PostRef.from_bsky_url("https://bsky.app/profile/a.b/post/3k1/").rkey == "3k1"
 
-    @pytest.mark.parametrize("url", [
-        "https://bsky.app/bad",
-        "https://bsky.app/profile/a.b",
-        "https://bsky.app/profile/a.b/feed/3k1",
-        "",
-    ])
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "https://bsky.app/bad",
+            "https://bsky.app/profile/a.b",
+            "https://bsky.app/profile/a.b/feed/3k1",
+            "",
+        ],
+    )
     def test_url_invalide(self, url):
         with pytest.raises(ValueError):
             PostRef.from_bsky_url(url)
@@ -73,12 +77,15 @@ class TestFromAtUri:
         ref = PostRef.from_at_uri("at://did:plc:abc/app.bsky.feed.post/3k1", handle="u.bsky.social")
         assert ref.web_url == "https://bsky.app/profile/u.bsky.social/post/3k1"
 
-    @pytest.mark.parametrize("uri", [
-        "",
-        "https://bsky.app/profile/a/post/b",
-        "at://did:plc:abc",
-        "at://did:plc:abc/app.bsky.feed.like/3k1",
-    ])
+    @pytest.mark.parametrize(
+        "uri",
+        [
+            "",
+            "https://bsky.app/profile/a/post/b",
+            "at://did:plc:abc",
+            "at://did:plc:abc/app.bsky.feed.like/3k1",
+        ],
+    )
     def test_at_uri_invalide(self, uri):
         with pytest.raises(ValueError):
             PostRef.from_at_uri(uri)

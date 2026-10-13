@@ -1,4 +1,5 @@
 """Tests de l'orchestrateur : process_post() et run() avec downloaders mockés (issues #8, #10)."""
+
 import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -31,8 +32,9 @@ def _analyseur(post_type, data=None, debug_info=None):
     return analyzer
 
 
-def _lancer(db, tmp_path, post_type, data=None, *, images=None, video=None, texte=None, erreur=None,
-            debug_info=None):
+def _lancer(
+    db, tmp_path, post_type, data=None, *, images=None, video=None, texte=None, erreur=None, debug_info=None
+):
     """process_post() avec les trois downloaders mockés ; renvoie (résultat, mocks)."""
     mocks = {
         "download_images": MagicMock(return_value=images or [], side_effect=erreur),
@@ -41,8 +43,16 @@ def _lancer(db, tmp_path, post_type, data=None, *, images=None, video=None, text
     }
     with patch.multiple("core.orchestrator", **mocks):
         resultat = process_post(
-            URL, "IMG", "VID", "TXT", db, _analyseur(post_type, data, debug_info), MagicMock(),
-            tmp_path, lambda *a, **k: None, config={"max_filename_len": 64},
+            URL,
+            "IMG",
+            "VID",
+            "TXT",
+            db,
+            _analyseur(post_type, data, debug_info),
+            MagicMock(),
+            tmp_path,
+            lambda *a, **k: None,
+            config={"max_filename_len": 64},
         )
     return resultat, mocks
 
@@ -76,22 +86,34 @@ class TestProcessPostExternal:
         dl = MagicMock(return_value=resultats or [], side_effect=erreur)
         with patch("core.orchestrator.download_external", dl):
             resultat = process_post(
-                URL, "IMG", "VID", "TXT", db, _analyseur(PostType.EXTERNAL, self.DATA), MagicMock(),
-                tmp_path, lambda *a, **k: None, config={"max_filename_len": 64},
+                URL,
+                "IMG",
+                "VID",
+                "TXT",
+                db,
+                _analyseur(PostType.EXTERNAL, self.DATA),
+                MagicMock(),
+                tmp_path,
+                lambda *a, **k: None,
+                config={"max_filename_len": 64},
             )
         return resultat, dl
 
     def test_arguments_transmis_au_downloader(self, tmp_db, tmp_path):
         _, dl = self._lancer(tmp_db, tmp_path, [_res("t.txt", "text")])
         dl.assert_called_once_with(
-            URL, self.DATA, {"img_dir": "IMG", "vid_dir": "VID", "text_dir": "TXT"}, {"max_filename_len": 64})
+            URL, self.DATA, {"img_dir": "IMG", "vid_dir": "VID", "text_dir": "TXT"}, {"max_filename_len": 64}
+        )
 
     def test_comptage_par_type_et_base(self, tmp_db, tmp_path):
         res = [_res("t.txt", "text"), _res("t_thumb.jpg", "image", "bafkrei"), _res("t_01.mp4", "video")]
         resultat, _ = self._lancer(tmp_db, tmp_path, res)
         assert resultat[:5] == (True, 1, 1, 1, "success")
-        assert _medias(tmp_db) == [("text", "t.txt", None), ("image", "t_thumb.jpg", "bafkrei"),
-                                   ("video", "t_01.mp4", None)]
+        assert _medias(tmp_db) == [
+            ("text", "t.txt", None),
+            ("image", "t_thumb.jpg", "bafkrei"),
+            ("video", "t_01.mp4", None),
+        ]
 
     def test_lignes_console(self, tmp_db, tmp_path):
         res = [_res("t.txt", "text"), _res("t_thumb.jpg", "image")]
@@ -113,7 +135,9 @@ class TestProcessPostErreur429:
     def test_statut_error_429_et_aucun_telechargement(self, tmp_db, tmp_path):
         resultat, mocks = _lancer(tmp_db, tmp_path, PostType.ERROR_429)
         assert resultat[:5] == (False, 0, 0, 0, "error_429")
-        assert tmp_db.conn.execute("SELECT status FROM posts WHERE url = ?", (URL,)).fetchone()[0] == "error_429"
+        assert (
+            tmp_db.conn.execute("SELECT status FROM posts WHERE url = ?", (URL,)).fetchone()[0] == "error_429"
+        )
         assert not any(m.called for m in mocks.values())
 
     def test_message_dans_la_sortie(self, tmp_db, tmp_path):
@@ -126,15 +150,26 @@ class TestProcessPostMedias:
         res = [_res("a_1.jpg", "image"), _res("a_2.png", "image")]
         resultat, mocks = _lancer(tmp_db, tmp_path, PostType.IMAGES, {"image_count": 2}, images=res)
         mocks["download_images"].assert_called_once_with(
-            URL, "IMG", {"max_filename_len": 64}, record=None, existing_cid=mocks["download_images"].call_args.kwargs["existing_cid"])
+            URL,
+            "IMG",
+            {"max_filename_len": 64},
+            record=None,
+            existing_cid=mocks["download_images"].call_args.kwargs["existing_cid"],
+        )
         assert resultat[:5] == (True, 2, 0, 0, "success")
         assert _medias(tmp_db) == [("image", "a_1.jpg", None), ("image", "a_2.png", None)]
 
     def test_record_brut_et_cid_transmis_a_download_images(self, tmp_db, tmp_path):
         record = {"embed": {"images": []}}
         res = [_res("a_1.png", "image", "bafy1")]
-        _, mocks = _lancer(tmp_db, tmp_path, PostType.IMAGES, {"image_count": 1}, images=res,
-                           debug_info={"full_data": {"uri": "at://x", "value": record}})
+        _, mocks = _lancer(
+            tmp_db,
+            tmp_path,
+            PostType.IMAGES,
+            {"image_count": 1},
+            images=res,
+            debug_info={"full_data": {"uri": "at://x", "value": record}},
+        )
         kwargs = mocks["download_images"].call_args.kwargs
         assert kwargs["record"] is record
         assert _medias(tmp_db)[0] == ("image", "a_1.png", "bafy1")  # suivi du .txt et de la fiche JSON
@@ -142,14 +177,18 @@ class TestProcessPostMedias:
     def test_callback_existing_cid_resout_le_chemin_via_la_base(self, tmp_db, tmp_path):
         tmp_db.add_post(URL, "3k1", "user.bsky.social")
         tmp_db.add_media(URL, "image", "deja.png", cid="bafy1")
-        _, mocks = _lancer(tmp_db, tmp_path, PostType.IMAGES, {"image_count": 1}, images=[_res("a.jpg", "image")])
+        _, mocks = _lancer(
+            tmp_db, tmp_path, PostType.IMAGES, {"image_count": 1}, images=[_res("a.jpg", "image")]
+        )
         existing = mocks["download_images"].call_args.kwargs["existing_cid"]
         assert existing("bafy1") == str(Path("IMG") / "deja.png")
         assert existing("inconnu") is None
 
     def test_image_sautee_affichee_mais_ni_comptee_ni_enregistree(self, tmp_db, tmp_path):
-        res = [DownloadResult("deja.png", Path("deja.png"), "image", 5, "bafy1", skipped=True),
-               _res("b_2.jpg", "image", "bafy2")]
+        res = [
+            DownloadResult("deja.png", Path("deja.png"), "image", 5, "bafy1", skipped=True),
+            _res("b_2.jpg", "image", "bafy2"),
+        ]
         resultat, _ = _lancer(tmp_db, tmp_path, PostType.IMAGES, {"image_count": 2}, images=res)
         assert resultat[:5] == (True, 1, 0, 0, "success")
         assert _medias(tmp_db) == [("image", "b_2.jpg", "bafy2")]
@@ -162,7 +201,9 @@ class TestProcessPostMedias:
         assert _medias(tmp_db) == []
 
     def test_sans_base_pas_de_callback(self, tmp_path):
-        _, mocks = _lancer(None, tmp_path, PostType.IMAGES, {"image_count": 1}, images=[_res("a.jpg", "image")])
+        _, mocks = _lancer(
+            None, tmp_path, PostType.IMAGES, {"image_count": 1}, images=[_res("a.jpg", "image")]
+        )
         assert mocks["download_images"].call_args.kwargs["existing_cid"] is None
 
     def test_lignes_console_produites_par_l_orchestrateur(self, tmp_db, tmp_path):
@@ -173,14 +214,20 @@ class TestProcessPostMedias:
     def test_video_avec_cid(self, tmp_db, tmp_path):
         resultat, mocks = _lancer(tmp_db, tmp_path, PostType.VIDEO, video=[_res("v.mp4", "video", "bafy")])
         mocks["download_video"].assert_called_once_with(
-            URL, "VID", {"max_filename_len": 64}, record=None, did=None, view_embed=None)
+            URL, "VID", {"max_filename_len": 64}, record=None, did=None, view_embed=None
+        )
         assert resultat[:5] == (True, 0, 1, 0, "success")
         assert _medias(tmp_db) == [("video", "v.mp4", "bafy")]
         assert any("[OK] Fichier enregistré : v.mp4" in ligne for ligne in resultat[5])
 
     def test_download_error_donne_failed(self, tmp_db, tmp_path):
-        resultat, _ = _lancer(tmp_db, tmp_path, PostType.IMAGES, {"image_count": 1},
-                              erreur=DownloadError("Post supprimé ou inaccessible"))
+        resultat, _ = _lancer(
+            tmp_db,
+            tmp_path,
+            PostType.IMAGES,
+            {"image_count": 1},
+            erreur=DownloadError("Post supprimé ou inaccessible"),
+        )
         assert resultat[:5] == (False, 0, 0, 0, "failed")
         assert _medias(tmp_db) == []
         assert any("[ERR] Post supprimé ou inaccessible" in ligne for ligne in resultat[5])
@@ -192,12 +239,22 @@ class TestProcessPostMedias:
 
     def test_config_par_defaut(self, tmp_db, tmp_path):
         with patch("core.orchestrator.save_text", return_value=[]) as st:
-            process_post(URL, "IMG", "VID", "TXT", tmp_db, _analyseur(PostType.TEXT_ONLY),
-                         MagicMock(), tmp_path, lambda *a, **k: None)
+            process_post(
+                URL,
+                "IMG",
+                "VID",
+                "TXT",
+                tmp_db,
+                _analyseur(PostType.TEXT_ONLY),
+                MagicMock(),
+                tmp_path,
+                lambda *a, **k: None,
+            )
         assert st.call_args.args[2]["max_filename_len"] == 64
 
 
 # --------------------------------------------------------------------- run()
+
 
 @pytest.fixture
 def env_run(tmp_config):
@@ -208,13 +265,18 @@ def env_run(tmp_config):
         "download_video": MagicMock(return_value=[_res("v.mp4", "video", "cidv")]),
         "save_text": MagicMock(return_value=[_res("t.txt", "text")]),
     }
-    with patch.multiple("core.orchestrator", PostAnalyzer=MagicMock(return_value=analyzer),
-                        QuoteResolver=MagicMock(), **mocks):
+    with patch.multiple(
+        "core.orchestrator", PostAnalyzer=MagicMock(return_value=analyzer), QuoteResolver=MagicMock(), **mocks
+    ):
         yield tmp_config, analyzer, mocks
 
 
 def _types(analyzer, par_url):
-    analyzer.analyze.side_effect = lambda url: (par_url[url], {"handle": "user.bsky.social", "image_count": 1}, {})
+    analyzer.analyze.side_effect = lambda url: (
+        par_url[url],
+        {"handle": "user.bsky.social", "image_count": 1},
+        {},
+    )
 
 
 class TestRun:
@@ -223,9 +285,19 @@ class TestRun:
         _types(analyzer, {URL: PostType.IMAGES, URL2: PostType.ERROR_400})
         stats = run([URL, URL2], config, quiet=True)
         assert stats == {
-            "total": 2, "success": 1, "images": 1, "videos": 0, "texts": 0, "sidecars": 0,
-            "error_500": [], "error_429": [], "error_400": [URL2], "quotes_unresolved": [], "reposts": [],
-            "unknown": [], "failed": [],
+            "total": 2,
+            "success": 1,
+            "images": 1,
+            "videos": 0,
+            "texts": 0,
+            "sidecars": 0,
+            "error_500": [],
+            "error_429": [],
+            "error_400": [URL2],
+            "quotes_unresolved": [],
+            "reposts": [],
+            "unknown": [],
+            "failed": [],
         }
         assert capsys.readouterr().out == ""
 
@@ -360,8 +432,10 @@ class TestRun:
 
 class TestMainCli:
     def test_main_appelle_run_avec_les_dossiers_et_no_db(self, tmp_config):
-        with patch.object(orchestrator, "load_config", return_value=tmp_config), \
-             patch.object(orchestrator, "_run", return_value={"success": 0}) as run_:
+        with (
+            patch.object(orchestrator, "load_config", return_value=tmp_config),
+            patch.object(orchestrator, "_run", return_value={"success": 0}) as run_,
+        ):
             orchestrator.main(["I", "V", "T", "--no-db", URL, URL2])
         args, kwargs = run_.call_args
         assert args[0] == [URL, URL2]
@@ -401,41 +475,85 @@ class TestPostViews:
         vue = {"uri": "at://did:plc:test/app.bsky.feed.post/3k1", "record": {}}
         resolveur = MagicMock()
         resolveur.resolve.return_value = None
-        analyseur = _analyseur(PostType.QUOTE, {"handle": "user.bsky.social", "is_quote": True,
-                                                "quote_uri": "at://did:plc:x/app.bsky.feed.post/3kc"})
+        analyseur = _analyseur(
+            PostType.QUOTE,
+            {
+                "handle": "user.bsky.social",
+                "is_quote": True,
+                "quote_uri": "at://did:plc:x/app.bsky.feed.post/3kc",
+            },
+        )
         with patch.multiple("core.orchestrator", save_text=MagicMock(return_value=[_res("t.txt", "text")])):
-            process_post(URL, "IMG", "VID", "TXT", tmp_db, analyseur, resolveur,
-                         tmp_path, lambda *a, **k: None, config={"max_filename_len": 64}, post_view=vue)
+            process_post(
+                URL,
+                "IMG",
+                "VID",
+                "TXT",
+                tmp_db,
+                analyseur,
+                resolveur,
+                tmp_path,
+                lambda *a, **k: None,
+                config={"max_filename_len": 64},
+                post_view=vue,
+            )
         analyseur.analyze.assert_called_once_with(URL, post_view=vue)
         resolveur.resolve.assert_called_once_with(URL, post_view=vue)
 
 
 # ------------------------------------------------------- archive fidèle (issue #7)
 
-POST_FACETS = json.loads((Path(__file__).parent / "fixtures" / "post_with_facets.json").read_text(encoding="utf-8"))
+POST_FACETS = json.loads(
+    (Path(__file__).parent / "fixtures" / "post_with_facets.json").read_text(encoding="utf-8")
+)
 URL_F = "https://bsky.app/profile/auteur.example.com/post/3ktestfacets"
 BASE_F = "auteur_example_com_20260203_3ktestfacets"
-VUE_F = {"uri": POST_FACETS["uri"], "cid": POST_FACETS["cid"], "record": POST_FACETS["value"],
-         "author": {"handle": "auteur.example.com"}, "labels": []}
+VUE_F = {
+    "uri": POST_FACETS["uri"],
+    "cid": POST_FACETS["cid"],
+    "record": POST_FACETS["value"],
+    "author": {"handle": "auteur.example.com"},
+    "labels": [],
+}
 
 
-def _lancer_archive(db, tmp_path, config=None, post_type=PostType.IMAGES, full_data=None, post_view=None,
-                    erreur=None, compteurs=None, **retours):
+def _lancer_archive(
+    db,
+    tmp_path,
+    config=None,
+    post_type=PostType.IMAGES,
+    full_data=None,
+    post_view=None,
+    erreur=None,
+    compteurs=None,
+    **retours,
+):
     """process_post() sur le post de la fixture (record réel), downloaders mockés, fichiers texte réels."""
     config = {"max_filename_len": 64, **(config or {})}
     full_data = POST_FACETS if full_data is None else full_data
     data = {"handle": "auteur.example.com", "at_uri": POST_FACETS["uri"], "image_count": 2}
     mocks = {
-        "download_images": MagicMock(return_value=retours.get("images", [_res("a_01.jpg", "image", "bafkreichat1")]),
-                                     side_effect=erreur),
+        "download_images": MagicMock(
+            return_value=retours.get("images", [_res("a_01.jpg", "image", "bafkreichat1")]),
+            side_effect=erreur,
+        ),
         "download_video": MagicMock(return_value=retours.get("video", []), side_effect=erreur),
         "save_text": MagicMock(return_value=retours.get("texte", []), side_effect=erreur),
     }
     with patch.multiple("core.orchestrator", **mocks):
         resultat = process_post(
-            URL_F, "IMG", "VID", str(tmp_path / "texts"), db,
-            _analyseur(post_type, data, {"full_data": full_data}), MagicMock(),
-            tmp_path, lambda *a, **k: None, config=config, post_view=post_view, compteurs=compteurs,
+            URL_F,
+            "IMG",
+            "VID",
+            str(tmp_path / "texts"),
+            db,
+            _analyseur(post_type, data, {"full_data": full_data}),
+            MagicMock(),
+            tmp_path,
+            lambda *a, **k: None,
+            config=config,
+            post_view=post_view,
+            compteurs=compteurs,
         )
     return resultat
 
@@ -449,8 +567,11 @@ class TestArchiveFidele:
         assert compteurs == {"sidecars": 1}
         texts = tmp_path / "texts"
         assert sorted(p.name for p in texts.iterdir()) == [f"{BASE_F}.json", f"{BASE_F}.txt"]
-        assert _medias(tmp_db) == [("image", "a_01.jpg", "bafkreichat1"), ("text", f"{BASE_F}.txt", None),
-                                   ("sidecar", f"{BASE_F}.json", None)]
+        assert _medias(tmp_db) == [
+            ("image", "a_01.jpg", "bafkreichat1"),
+            ("text", f"{BASE_F}.txt", None),
+            ("sidecar", f"{BASE_F}.json", None),
+        ]
         assert tmp_db.get_stats()["texts"] == 1
 
     def test_txt_contient_le_texte_a_facets_resolues_et_l_alt(self, tmp_db, tmp_path):
@@ -491,8 +612,13 @@ class TestArchiveFidele:
     def test_texte_seul_n_ecrit_pas_deux_fois_le_txt(self, tmp_db, tmp_path):
         """save_text écrit déjà le .txt : l'orchestrateur n'ajoute que la fiche JSON."""
         compteurs = {}
-        resultat = _lancer_archive(tmp_db, tmp_path, post_type=PostType.TEXT_ONLY, compteurs=compteurs,
-                                   texte=[_res(f"{BASE_F}.txt", "text")])
+        resultat = _lancer_archive(
+            tmp_db,
+            tmp_path,
+            post_type=PostType.TEXT_ONLY,
+            compteurs=compteurs,
+            texte=[_res(f"{BASE_F}.txt", "text")],
+        )
         assert resultat[:5] == (True, 0, 0, 1, "success")
         assert compteurs == {"sidecars": 1}
         assert [m for m in _medias(tmp_db) if m[0] == "text"] == [("text", f"{BASE_F}.txt", None)]
@@ -516,19 +642,26 @@ class TestArchiveFideleRun:
     def test_run_compte_les_fiches_json(self, env_run):
         config, analyzer, _ = env_run
         analyzer.analyze.side_effect = lambda url: (
-            PostType.IMAGES, {"handle": "auteur.example.com", "image_count": 1, "at_uri": POST_FACETS["uri"]},
-            {"full_data": POST_FACETS})
+            PostType.IMAGES,
+            {"handle": "auteur.example.com", "image_count": 1, "at_uri": POST_FACETS["uri"]},
+            {"full_data": POST_FACETS},
+        )
         stats = run([URL_F], config, quiet=True)
         assert (stats["texts"], stats["sidecars"]) == (1, 1)
         db = Database(config["db_file"])
         try:
-            assert db.conn.execute("SELECT COUNT(*) FROM media WHERE media_type = 'sidecar'").fetchone()[0] == 1
+            assert (
+                db.conn.execute("SELECT COUNT(*) FROM media WHERE media_type = 'sidecar'").fetchone()[0] == 1
+            )
         finally:
             db.close()
 
     def test_rapport_affiche_les_fiches_json(self, env_run, capsys):
         config, analyzer, _ = env_run
         analyzer.analyze.side_effect = lambda url: (
-            PostType.IMAGES, {"handle": "auteur.example.com", "image_count": 1}, {"full_data": POST_FACETS})
+            PostType.IMAGES,
+            {"handle": "auteur.example.com", "image_count": 1},
+            {"full_data": POST_FACETS},
+        )
         run([URL_F], config)
         assert "Fiches JSON" in capsys.readouterr().out

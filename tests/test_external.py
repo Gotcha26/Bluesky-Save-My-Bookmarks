@@ -1,4 +1,5 @@
 """Tests de download_external() (downloaders/external.py) : requests mocké, fichiers réels (issue #4)."""
+
 from unittest.mock import MagicMock
 
 import pytest
@@ -20,8 +21,11 @@ BASE = "auteur_test_20260105_3ktest000001"
 
 def _data(uri="https://example.com/article", thumb_cid=CID, title="Titre", description="Desc", **extra):
     return {
-        "handle": "auteur.test", "post_id": "3ktest000001", "did": DID,
-        "created_at": "2026-01-05T17:24:26.493Z", "text": "Un texte à archiver",
+        "handle": "auteur.test",
+        "post_id": "3ktest000001",
+        "did": DID,
+        "created_at": "2026-01-05T17:24:26.493Z",
+        "text": "Un texte à archiver",
         "embed_type": "app.bsky.embed.external",
         "external": {"uri": uri, "title": title, "description": description, "thumb_cid": thumb_cid},
         **extra,
@@ -30,8 +34,11 @@ def _data(uri="https://example.com/article", thumb_cid=CID, title="Titre", descr
 
 @pytest.fixture
 def dirs(tmp_path):
-    return {"img_dir": str(tmp_path / "images"), "vid_dir": str(tmp_path / "videos"),
-            "text_dir": str(tmp_path / "texts")}
+    return {
+        "img_dir": str(tmp_path / "images"),
+        "vid_dir": str(tmp_path / "videos"),
+        "text_dir": str(tmp_path / "texts"),
+    }
 
 
 def _reponse(contenu=b"DONNEES", content_type="image/jpeg", erreur=None):
@@ -57,44 +64,60 @@ class TestNomDuTexteExternal:
     def test_meme_base_que_la_fiche_json_et_auteur_du_data(self, dirs):
         """Le .txt prend sa base de l'URL, comme write_sidecar ; « Auteur: » reste le handle de data."""
         from downloaders.archive import write_sidecar
+
         url_did = "https://bsky.app/profile/did:plc:abcdefghijklmnopqrstuvwx/post/3ktest000001"
         res = download_external(url_did, _data(thumb_cid=None), dirs, DEFAULT_CONFIG, session=_session())
-        fiche = write_sidecar(url_did, {"createdAt": "2026-01-05T17:24:26.493Z"}, None, dirs["text_dir"],
-                              DEFAULT_CONFIG)[0]
+        fiche = write_sidecar(
+            url_did, {"createdAt": "2026-01-05T17:24:26.493Z"}, None, dirs["text_dir"], DEFAULT_CONFIG
+        )[0]
         assert res[0].path.stem == fiche.path.stem
         assert "Auteur: auteur.test\n" in res[0].path.read_text(encoding="utf-8")
 
 
 class TestTexteDuRecord:
     def test_le_record_fourni_prime_sur_data(self, dirs):
-        record = {"text": "Voir ici", "createdAt": "2026-01-05T17:24:26.493Z", "langs": ["fr"],
-                  "facets": [{"index": {"byteStart": 5, "byteEnd": 8},
-                              "features": [{"$type": "app.bsky.richtext.facet#link", "uri": "https://x.test"}]}]}
+        record = {
+            "text": "Voir ici",
+            "createdAt": "2026-01-05T17:24:26.493Z",
+            "langs": ["fr"],
+            "facets": [
+                {
+                    "index": {"byteStart": 5, "byteEnd": 8},
+                    "features": [{"$type": "app.bsky.richtext.facet#link", "uri": "https://x.test"}],
+                }
+            ],
+        }
         res = download_external(URL, _data(record=record), dirs, DEFAULT_CONFIG, session=_session())
         contenu = res[0].path.read_text(encoding="utf-8")
         assert "Langue: fr\n" in contenu and "Voir ici (https://x.test)" in contenu
 
 
 class TestDetectionMediaDirect:
-    @pytest.mark.parametrize("uri", [
-        "https://media.tenor.com/abc/tenor.gif",
-        "https://media.tenor.com/abc/tenor",
-        "https://exemple.org/a/b.GIF",
-        "https://exemple.org/a/b.mp4?x=1",
-        "https://exemple.org/a/b.webp#frag",
-    ])
+    @pytest.mark.parametrize(
+        "uri",
+        [
+            "https://media.tenor.com/abc/tenor.gif",
+            "https://media.tenor.com/abc/tenor",
+            "https://exemple.org/a/b.GIF",
+            "https://exemple.org/a/b.mp4?x=1",
+            "https://exemple.org/a/b.webp#frag",
+        ],
+    )
     def test_media_direct(self, uri):
         assert est_media_direct(uri)
 
-    @pytest.mark.parametrize("uri", [
-        "https://tenor.com/view/chat-gif-123",
-        "https://example.com/article",
-        "https://example.com/page.html?f=a.gif",
-        "https://example.com/",
-        "",
-        "ftp://exemple.org/a.gif",
-        "https://media.tenor.com.evil.org/a",
-    ])
+    @pytest.mark.parametrize(
+        "uri",
+        [
+            "https://tenor.com/view/chat-gif-123",
+            "https://example.com/article",
+            "https://example.com/page.html?f=a.gif",
+            "https://example.com/",
+            "",
+            "ftp://exemple.org/a.gif",
+            "https://media.tenor.com.evil.org/a",
+        ],
+    )
     def test_pas_un_media_direct(self, uri):
         assert not est_media_direct(uri)
 
@@ -124,6 +147,7 @@ class TestTexte:
 
     def test_meme_nom_que_save_text(self, dirs):
         from downloaders.text import nom_fichier_texte
+
         assert nom_fichier_texte("auteur.test", "3ktest000001", "2026-01-05T17:24:26.493Z") == f"{BASE}.txt"
 
     def test_sans_vignette_ni_media_aucun_appel_reseau(self, dirs):
@@ -172,8 +196,13 @@ class TestVignette:
 
     def test_echec_ne_laisse_pas_de_part(self, dirs, tmp_path):
         reponse = _reponse(erreur=requests.HTTPError("404"))
-        download_external(URL, _data(), dirs, DEFAULT_CONFIG, session=_session({
-            f"https://cdn.bsky.app/img/feed_thumbnail/plain/{DID}/{CID}@jpeg": reponse}))
+        download_external(
+            URL,
+            _data(),
+            dirs,
+            DEFAULT_CONFIG,
+            session=_session({f"https://cdn.bsky.app/img/feed_thumbnail/plain/{DID}/{CID}@jpeg": reponse}),
+        )
         assert not list(tmp_path.rglob("*.part"))
         assert not list(tmp_path.rglob("*_thumb.jpg"))
 
@@ -183,7 +212,10 @@ class TestMediaDirect:
         uri = "https://media.tenor.com/abc/tenor.gif"
         session = _session({uri: _reponse(b"GIF89a-xyz", "image/gif")})
         res = download_external(URL, _data(uri=uri, thumb_cid=None), dirs, DEFAULT_CONFIG, session=session)
-        assert [(r.filename, r.media_type) for r in res] == [(f"{BASE}.txt", "text"), (f"{BASE}_01.gif", "image")]
+        assert [(r.filename, r.media_type) for r in res] == [
+            (f"{BASE}.txt", "text"),
+            (f"{BASE}_01.gif", "image"),
+        ]
         gif = res[1]
         assert gif.path.parent.name == "images"
         assert gif.path.read_bytes() == b"GIF89a-xyz"
@@ -213,15 +245,17 @@ class TestMediaDirect:
 
     def test_page_tenor_html_vignette_seulement(self, dirs):
         session = _session()
-        res = download_external(URL, _data(uri="https://tenor.com/view/chat-gif-123"), dirs,
-                                DEFAULT_CONFIG, session=session)
+        res = download_external(
+            URL, _data(uri="https://tenor.com/view/chat-gif-123"), dirs, DEFAULT_CONFIG, session=session
+        )
         assert [r.media_type for r in res] == ["text", "image"]
         assert session.get.call_count == 1  # la vignette seule
 
     def test_lien_tiers_non_telecharge(self, dirs):
         session = _session()
-        res = download_external(URL, _data(uri="https://x.com/u/status/1", thumb_cid=None), dirs,
-                                DEFAULT_CONFIG, session=session)
+        res = download_external(
+            URL, _data(uri="https://x.com/u/status/1", thumb_cid=None), dirs, DEFAULT_CONFIG, session=session
+        )
         assert [r.media_type for r in res] == ["text"]
         session.get.assert_not_called()
 

@@ -7,6 +7,7 @@ Ajoute titre, commentaire, date et auteur (si ffmpeg est installé).
 Usage manuel : python downloaders/videos.py <dossier> <url_post>
 Codes de sortie : 0 = vidéo téléchargée, 1 = erreur technique, 2 = aucune vidéo.
 """
+
 import logging
 import mimetypes
 import os
@@ -45,11 +46,7 @@ def get_post_data(post_url, http=None):
     post_id = parts[-1]
 
     api_url = "https://bsky.social/xrpc/com.atproto.repo.getRecord"
-    params = {
-        "repo": handle_from_url,
-        "collection": "app.bsky.feed.post",
-        "rkey": post_id
-    }
+    params = {"repo": handle_from_url, "collection": "app.bsky.feed.post", "rkey": post_id}
 
     try:
         resp = http.get(api_url, params=params, timeout=15)
@@ -57,6 +54,7 @@ def get_post_data(post_url, http=None):
         return resp.json()
     except Exception as e:
         raise DownloadError(f"Post supprimé ou inaccessible ({e})") from e
+
 
 def extract_video_info(data):
     """Extrait les infos vidéo du JSON"""
@@ -119,11 +117,13 @@ def extract_video_info(data):
         "captions": captions,
     }, is_repost
 
+
 def safe_filename_part(s):
     """Nettoie une chaîne pour nom de fichier"""
-    s = re.sub(r'[<>:"/\\|?*\n\r\t]', '_', s)
-    s = re.sub(r'\s+', '_', s)
-    return s.strip(' ._')[:50]
+    s = re.sub(r'[<>:"/\\|?*\n\r\t]', "_", s)
+    s = re.sub(r"\s+", "_", s)
+    return s.strip(" ._")[:50]
+
 
 def ext_from_mime(mime):
     """Extension d'un mimeType vidéo ; .mp4 par défaut."""
@@ -131,6 +131,7 @@ def ext_from_mime(mime):
     if not mime:
         return ".mp4"
     return MIME_EXT.get(mime) or mimetypes.guess_extension(mime) or ".mp4"
+
 
 def _video_base(handle, post_id, created_at):
     """<handle>_<YYYYMMDD>_<postid> : base de nom des fichiers d'une vidéo."""
@@ -140,9 +141,11 @@ def _video_base(handle, post_id, created_at):
         date_str = datetime.now().strftime("%Y%m%d")
     return f"{safe_filename_part(handle)}_{date_str}_{safe_filename_part(post_id)}"
 
+
 def _nom(base, suffixe, ext, max_len):
     """base + suffixe + ext, la base étant tronquée pour tenir dans max_len."""
-    return base[:max(1, max_len - len(suffixe) - len(ext))] + suffixe + ext
+    return base[: max(1, max_len - len(suffixe) - len(ext))] + suffixe + ext
+
 
 def _ecrire_blob(http, url, dest, types):
     """
@@ -175,13 +178,18 @@ def _ecrire_blob(http, url, dest, types):
             r.close()
         part.unlink(missing_ok=True)
 
+
 def _repli_hls(playlist, dest):
     """Reconstruit la vidéo depuis la playlist HLS avec ffmpeg ; lève DownloadError."""
     ok = False
     try:
-        subprocess.run(["ffmpeg", "-y", "-i", playlist, "-c", "copy", str(dest)],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                       check=True, timeout=600)
+        subprocess.run(
+            ["ffmpeg", "-y", "-i", playlist, "-c", "copy", str(dest)],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=True,
+            timeout=600,
+        )
         ok = True
     except FileNotFoundError as e:
         raise DownloadError("ffmpeg introuvable : repli HLS impossible") from e
@@ -191,6 +199,7 @@ def _repli_hls(playlist, dest):
         if not ok:
             dest.unlink(missing_ok=True)
 
+
 def _add_metadata(filepath, video_info, handle, post_id, post_url):
     """Ajoute les métadonnées avec ffmpeg (best effort : la vidéo reste valable sans)."""
     temp_file = str(filepath) + ".tmp" + filepath.suffix
@@ -198,15 +207,29 @@ def _add_metadata(filepath, video_info, handle, post_id, post_url):
         full_comment = f"{video_info['text']}\n\nLien du post : {post_url}"
         alt = ["-metadata", f"description={video_info['alt']}"] if video_info.get("alt") else []
 
-        subprocess.run([
-            "ffmpeg", "-y", "-i", str(filepath),
-            "-metadata", f"title={post_id}",
-            "-metadata", f"comment={full_comment}",
-            "-metadata", f"creation_time={video_info['created_at']}",
-            "-metadata", f"artist={handle}",
-            *alt,
-            "-codec", "copy", temp_file
-        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+        subprocess.run(
+            [
+                "ffmpeg",
+                "-y",
+                "-i",
+                str(filepath),
+                "-metadata",
+                f"title={post_id}",
+                "-metadata",
+                f"comment={full_comment}",
+                "-metadata",
+                f"creation_time={video_info['created_at']}",
+                "-metadata",
+                f"artist={handle}",
+                *alt,
+                "-codec",
+                "copy",
+                temp_file,
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=True,
+        )
 
         os.replace(temp_file, filepath)
     except Exception:
@@ -214,6 +237,7 @@ def _add_metadata(filepath, video_info, handle, post_id, post_url):
             os.remove(temp_file)
         except OSError:
             pass
+
 
 def _sous_titres(http, video_info, filepath, max_len):
     """Télécharge les captions en <video>.<lang>.vtt ; un échec n'est qu'un avertissement."""
@@ -236,6 +260,7 @@ def _sous_titres(http, video_info, filepath, max_len):
         resultats.append(DownloadResult(nom, chemin, "subtitle", chemin.stat().st_size, cap["cid"]))
     return resultats
 
+
 def _miniature(http, view_embed, dest_dir, base, max_len, video_name):
     """Télécharge la miniature de la vue hydratée ; None (avertissement) en cas d'échec."""
     url = (view_embed or {}).get("thumbnail")
@@ -250,8 +275,10 @@ def _miniature(http, view_embed, dest_dir, base, max_len, video_name):
         return None
     return DownloadResult(nom, chemin, "image", chemin.stat().st_size)
 
-def download_video(post_url, dest_dir, config, session=None, name_prefix=None,
-                   record=None, view_embed=None, did=None):
+
+def download_video(
+    post_url, dest_dir, config, session=None, name_prefix=None, record=None, view_embed=None, did=None
+):
     """
     Télécharge la vidéo d'un post dans dest_dir.
 
@@ -319,14 +346,23 @@ def download_video(post_url, dest_dir, config, session=None, name_prefix=None,
 
     _add_metadata(filepath, video_info, handle, post_id, post_url)
 
-    resultats = [DownloadResult(filepath.name, filepath, "video", filepath.stat().st_size,
-                                video_info["cid"], alt=video_info["alt"] or None)]
+    resultats = [
+        DownloadResult(
+            filepath.name,
+            filepath,
+            "video",
+            filepath.stat().st_size,
+            video_info["cid"],
+            alt=video_info["alt"] or None,
+        )
+    ]
     resultats += _sous_titres(http, video_info, filepath, max_len)
     if config.get("download_video_thumbnail", DEFAULT_CONFIG["download_video_thumbnail"]):
         miniature = _miniature(http, view_embed, dest_dir, base, max_len, filepath.name)
         if miniature:
             resultats.append(miniature)
     return resultats
+
 
 # -------------------- Usage manuel --------------------
 def main(argv=None):
@@ -348,6 +384,7 @@ def main(argv=None):
     for ligne in lignes_console(results):
         print(ligne)
     return 0
+
 
 if __name__ == "__main__":
     sys.exit(main())

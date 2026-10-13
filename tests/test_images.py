@@ -1,4 +1,5 @@
 """Tests de download_images() (downloaders/images.py) : réseau et exiftool mockés."""
+
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -25,11 +26,15 @@ def _reponse(json_data=None, content=b"", status=200, headers=None):
 
 
 def _thread(embed, text="Bonjour", created_at="2026-01-02T10:00:00.000Z"):
-    return {"thread": {"post": {
-        "author": {"handle": "user.bsky.social"},
-        "record": {"text": text, "createdAt": created_at},
-        "embed": embed,
-    }}}
+    return {
+        "thread": {
+            "post": {
+                "author": {"handle": "user.bsky.social"},
+                "record": {"text": text, "createdAt": created_at},
+                "embed": embed,
+            }
+        }
+    }
 
 
 def _session(thread, contenus=None, echecs=()):
@@ -49,8 +54,7 @@ def _session(thread, contenus=None, echecs=()):
     return session
 
 
-EMBED_2_IMAGES = {"$type": "app.bsky.embed.images#view",
-                  "images": [{"fullsize": IMG1}, {"fullsize": IMG2}]}
+EMBED_2_IMAGES = {"$type": "app.bsky.embed.images#view", "images": [{"fullsize": IMG1}, {"fullsize": IMG2}]}
 
 
 @pytest.fixture
@@ -76,15 +80,24 @@ class TestDownloadImages:
 
     def test_name_prefix_remplace_la_base_du_nom(self, tmp_path, exiftool):
         session = _session(_thread(EMBED_2_IMAGES))
-        res = download_images(URL, tmp_path, DEFAULT_CONFIG, session=session,
-                              name_prefix="citant_20260210_3kq_quote")
-        assert [r.filename for r in res] == ["citant_20260210_3kq_quote_01.jpg", "citant_20260210_3kq_quote_02.png"]
+        res = download_images(
+            URL, tmp_path, DEFAULT_CONFIG, session=session, name_prefix="citant_20260210_3kq_quote"
+        )
+        assert [r.filename for r in res] == [
+            "citant_20260210_3kq_quote_01.jpg",
+            "citant_20260210_3kq_quote_02.png",
+        ]
         assert all((tmp_path / r.filename).exists() for r in res)
 
     def test_name_prefix_tronque_a_max_filename_len(self, tmp_path, exiftool):
         session = _session(_thread(EMBED_2_IMAGES))
-        res = download_images(URL, tmp_path, {**DEFAULT_CONFIG, "max_filename_len": 20}, session=session,
-                              name_prefix="a" * 50 + "_quote")
+        res = download_images(
+            URL,
+            tmp_path,
+            {**DEFAULT_CONFIG, "max_filename_len": 20},
+            session=session,
+            name_prefix="a" * 50 + "_quote",
+        )
         assert all(len(r.filename) <= 20 for r in res)
         assert res[0].filename.endswith(".jpg") and res[1].filename.endswith(".png")
         assert len({r.filename for r in res}) == 2
@@ -118,15 +131,18 @@ class TestDownloadImages:
         session.head.assert_called_once_with(IMG1, allow_redirects=True, timeout=10)
 
     def test_record_with_media(self, tmp_path, exiftool):
-        embed = {"$type": "app.bsky.embed.recordWithMedia#view",
-                 "media": {"$type": "app.bsky.embed.images#view", "images": [{"fullsize": IMG2}]}}
+        embed = {
+            "$type": "app.bsky.embed.recordWithMedia#view",
+            "media": {"$type": "app.bsky.embed.images#view", "images": [{"fullsize": IMG2}]},
+        }
         res = download_images(URL, tmp_path, DEFAULT_CONFIG, session=_session(_thread(embed)))
         assert len(res) == 1
 
     def test_images_du_post_cite(self, tmp_path, exiftool):
-        embed = {"$type": "app.bsky.embed.record#view",
-                 "record": {"embeds": [{"$type": "app.bsky.embed.images#view",
-                                        "images": [{"fullsize": IMG2}]}]}}
+        embed = {
+            "$type": "app.bsky.embed.record#view",
+            "record": {"embeds": [{"$type": "app.bsky.embed.images#view", "images": [{"fullsize": IMG2}]}]},
+        }
         res = download_images(URL, tmp_path, DEFAULT_CONFIG, session=_session(_thread(embed)))
         assert len(res) == 1
 

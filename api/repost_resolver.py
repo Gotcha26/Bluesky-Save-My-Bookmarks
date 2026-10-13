@@ -5,6 +5,7 @@ Module déprécié : utiliser api.quote_resolver.QuoteResolver.
 Un « repost » n'est jamais bookmarké ; ce que l'ancien code appelait ainsi est une
 citation (quote post). Seul le nom RepostResolver est conservé, comme alias.
 """
+
 import warnings
 
 from api.quote_resolver import QuoteResolver as RepostResolver  # noqa: F401

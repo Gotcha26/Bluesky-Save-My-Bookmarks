@@ -8,6 +8,7 @@ nom d'utilisateur. Repli : la clé `bsky_app_password` de config.json (en clair)
 
 Le mot de passe n'est jamais affiché ni journalisé par ce module.
 """
+
 from core.config import save_config
 
 SERVICE = "bsmb"

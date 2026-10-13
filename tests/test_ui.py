@@ -1,4 +1,5 @@
 """Vraie fonction core.ui.is_interactive (la fixture autouse de conftest la remplace)."""
+
 import pytest
 
 from core import ui

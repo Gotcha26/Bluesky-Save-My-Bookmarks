@@ -11,6 +11,7 @@ Tous les appels réseau passent par `get_session()` :
 
 Aucun code au niveau module au-delà des définitions : la session est créée à la demande.
 """
+
 import logging
 import threading
 import time
@@ -25,9 +26,9 @@ from core.version import __version__
 log = logging.getLogger("bsmb.http")
 
 USER_AGENT = f"BSMB/{__version__} (+https://github.com/Gotcha26/Bluesky-Save-My-Bookmarks)"
-SEUIL_RESTANT = 50       # en dessous, on attend la réinitialisation de la fenêtre
-ATTENTE_MAX = 300        # secondes : borne d'une pause (limiteur et Retry-After)
-MAX_SIMULTANES = 8       # requêtes en vol en même temps, tous threads confondus
+SEUIL_RESTANT = 50  # en dessous, on attend la réinitialisation de la fenêtre
+ATTENTE_MAX = 300  # secondes : borne d'une pause (limiteur et Retry-After)
+MAX_SIMULTANES = 8  # requêtes en vol en même temps, tous threads confondus
 TAILLE_POOL = 16
 
 
@@ -52,18 +53,24 @@ class RateLimiter:
     `horloge` et `sleep` sont injectables pour les tests.
     """
 
-    def __init__(self, seuil=SEUIL_RESTANT, attente_max=ATTENTE_MAX, max_simultanes=MAX_SIMULTANES,
-                 horloge=time.time, sleep=time.sleep):
+    def __init__(
+        self,
+        seuil=SEUIL_RESTANT,
+        attente_max=ATTENTE_MAX,
+        max_simultanes=MAX_SIMULTANES,
+        horloge=time.time,
+        sleep=time.sleep,
+    ):
         self.seuil = seuil
         self.attente_max = attente_max
         self.max_simultanes = max_simultanes
         self._horloge = horloge
         self._sleep = sleep
         self._semaphore = threading.Semaphore(max_simultanes)
-        self._etat = threading.Lock()     # protège _reprise
-        self._pause = threading.Lock()    # un seul thread dort, les autres attendent derrière
-        self._reprise = 0.0               # epoch avant lequel on ne lance plus de requête
-        self._restant = None              # dernier RateLimit-Remaining bas (pour le journal)
+        self._etat = threading.Lock()  # protège _reprise
+        self._pause = threading.Lock()  # un seul thread dort, les autres attendent derrière
+        self._reprise = 0.0  # epoch avant lequel on ne lance plus de requête
+        self._restant = None  # dernier RateLimit-Remaining bas (pour le journal)
 
     @contextmanager
     def creneau(self):
@@ -91,8 +98,9 @@ class RateLimiter:
                 duree = min(cible - self._horloge(), self.attente_max)
             if duree <= 0:
                 return
-            log.warning("Limite de débit proche (RateLimit-Remaining=%s) : pause de %.0f s",
-                        self._restant, duree)
+            log.warning(
+                "Limite de débit proche (RateLimit-Remaining=%s) : pause de %.0f s", self._restant, duree
+            )
             ecoule = 0.0
             while ecoule < duree:
                 tranche = min(1.0, duree - ecoule)
@@ -140,8 +148,9 @@ def build_session(limiteur=None):
         respect_retry_after_header=True,
         raise_on_status=False,
     )
-    adaptateur = _AdaptateurBsmb(limiteur, pool_connections=TAILLE_POOL, pool_maxsize=TAILLE_POOL,
-                                 max_retries=retry)
+    adaptateur = _AdaptateurBsmb(
+        limiteur, pool_connections=TAILLE_POOL, pool_maxsize=TAILLE_POOL, max_retries=retry
+    )
     session.mount("http://", adaptateur)
     session.mount("https://", adaptateur)
     return session

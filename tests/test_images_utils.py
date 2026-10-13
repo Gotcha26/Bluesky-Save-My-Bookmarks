@@ -1,4 +1,5 @@
 """Tests pour les utilitaires de downloaders/images.py"""
+
 from downloaders.images import (
     build_filename,
     guess_ext_from_ct,

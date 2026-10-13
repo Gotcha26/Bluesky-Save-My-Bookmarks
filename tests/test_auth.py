@@ -1,4 +1,5 @@
 """Tests pour core/auth.py"""
+
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -89,6 +90,7 @@ class TestCreateSession:
 
     def test_connection_error(self, mock_post):
         import requests
+
         mock_post.side_effect = requests.exceptions.ConnectionError()
 
         with pytest.raises(AuthError, match="Impossible de se connecter"):
@@ -96,6 +98,7 @@ class TestCreateSession:
 
     def test_timeout(self, mock_post):
         import requests
+
         mock_post.side_effect = requests.exceptions.Timeout()
 
         with pytest.raises(AuthError, match="Timeout"):
@@ -106,7 +109,9 @@ class TestGetToken:
     @patch("core.auth.create_session")
     def test_with_credentials(self, mock_session):
         mock_session.return_value = {
-            "token": "Bearer abc123", "refresh_jwt": "r", "did": "did:plc:x",
+            "token": "Bearer abc123",
+            "refresh_jwt": "r",
+            "did": "did:plc:x",
             "pds_url": "https://bsky.social",
         }
         config = {"bsky_handle": "user.bsky.social", "bsky_app_password": "xxxx-xxxx-xxxx-xxxx"}
@@ -145,7 +150,9 @@ class TestGetSession:
     @patch("core.auth.create_session")
     def test_with_credentials_returns_full_dict(self, mock_session):
         session = {
-            "token": "Bearer abc123", "refresh_jwt": "r", "did": "did:plc:x",
+            "token": "Bearer abc123",
+            "refresh_jwt": "r",
+            "did": "did:plc:x",
             "pds_url": "https://morel.us-east.host.bsky.network",
         }
         mock_session.return_value = session
@@ -199,6 +206,7 @@ class TestSecretDansKeyring:
     def _keyring(monkeypatch, pwd="kr-pass"):
         import sys
         import types
+
         kr = types.ModuleType("keyring")
         kr.get_password = lambda service, user: pwd if (service, user) == ("bsmb", "user") else None
         monkeypatch.setitem(sys.modules, "keyring", kr)
@@ -213,7 +221,11 @@ class TestSecretDansKeyring:
     @patch("core.auth.create_session")
     def test_get_session_utilise_le_secret_keyring(self, mock_session, monkeypatch):
         self._keyring(monkeypatch)
-        mock_session.return_value = {"token": "Bearer k", "refresh_jwt": None, "did": None,
-                                     "pds_url": "https://bsky.social"}
+        mock_session.return_value = {
+            "token": "Bearer k",
+            "refresh_jwt": None,
+            "did": None,
+            "pds_url": "https://bsky.social",
+        }
         get_session({"bsky_handle": "user", "bsky_app_password": "", "token_file": "absent.txt"})
         mock_session.assert_called_once_with("user", "kr-pass")

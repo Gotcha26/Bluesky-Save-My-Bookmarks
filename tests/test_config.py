@@ -1,4 +1,5 @@
 """Tests pour core/config.py"""
+
 import json
 from unittest.mock import MagicMock
 
@@ -64,8 +65,13 @@ class TestCheminsAncres:
 class TestDefaultConfig:
     def test_default_config_has_required_keys(self):
         required = [
-            "download_dir", "token_file", "urls_file", "db_file",
-            "logs_dir", "bsky_handle", "bsky_app_password",
+            "download_dir",
+            "token_file",
+            "urls_file",
+            "db_file",
+            "logs_dir",
+            "bsky_handle",
+            "bsky_app_password",
         ]
         for key in required:
             assert key in DEFAULT_CONFIG, f"Clé manquante : {key}"
@@ -217,8 +223,9 @@ class TestCleanupOldLogs:
     def test_max_logs_ne_touche_pas_aux_autres_fichiers(self, tmp_path):
         logs_dir = tmp_path / "logs"
         logs_dir.mkdir()
-        self._logs_dates(logs_dir, ["failed_downloads_1.txt", "debug_x.json",
-                                    "download_1.log", "download_2.log"])
+        self._logs_dates(
+            logs_dir, ["failed_downloads_1.txt", "debug_x.json", "download_1.log", "download_2.log"]
+        )
 
         cleanup_old_logs({"logs_dir": str(logs_dir), "max_logs": 1})
 
@@ -280,6 +287,7 @@ class TestPermissionsFichier:
 
     def test_save_config_chmod_600_sur_posix(self, tmp_path, monkeypatch):
         import types
+
         config_file = tmp_path / "config.json"
         monkeypatch.setattr("core.config.CONFIG_FILE", config_file)
         appels = []
@@ -290,6 +298,7 @@ class TestPermissionsFichier:
 
     def test_save_config_pas_de_chmod_hors_posix(self, tmp_path, monkeypatch):
         import types
+
         monkeypatch.setattr("core.config.CONFIG_FILE", tmp_path / "config.json")
         appels = []
         faux_os = types.SimpleNamespace(name="nt", chmod=lambda p, m: appels.append((p, m)))
@@ -311,5 +320,6 @@ class TestPermissionsFichier:
 class TestDefautsArchive:
     def test_index_a_deux_chiffres_et_fiche_json_activee(self):
         from core.config import DEFAULT_CONFIG
+
         assert DEFAULT_CONFIG["index_digits"] == 2
         assert DEFAULT_CONFIG["save_sidecar"] is True

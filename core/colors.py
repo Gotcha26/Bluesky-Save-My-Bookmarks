@@ -3,6 +3,7 @@
 Classe Colors - Gestion des couleurs ANSI cross-platform pour BSMB
 Pattern menu-generator : classe centralisée, détection auto du terminal
 """
+
 import os
 import sys
 
@@ -38,6 +39,7 @@ class Colors:
         if sys.platform == "win32":
             try:
                 import ctypes
+
                 kernel32 = ctypes.windll.kernel32
                 # STD_OUTPUT_HANDLE = -11
                 handle = kernel32.GetStdHandle(-11)
@@ -79,10 +81,23 @@ class Colors:
         else:
             # Tout vide si pas de support couleur
             for attr in [
-                "RED", "GREEN", "YELLOW", "BLUE", "MAGENTA", "CYAN", "WHITE",
-                "LIGHT_RED", "LIGHT_GREEN", "LIGHT_YELLOW", "LIGHT_BLUE",
-                "LIGHT_MAGENTA", "LIGHT_CYAN",
-                "BOLD", "DIM", "UNDERLINE", "RESET",
+                "RED",
+                "GREEN",
+                "YELLOW",
+                "BLUE",
+                "MAGENTA",
+                "CYAN",
+                "WHITE",
+                "LIGHT_RED",
+                "LIGHT_GREEN",
+                "LIGHT_YELLOW",
+                "LIGHT_BLUE",
+                "LIGHT_MAGENTA",
+                "LIGHT_CYAN",
+                "BOLD",
+                "DIM",
+                "UNDERLINE",
+                "RESET",
             ]:
                 setattr(self, attr, "")
 

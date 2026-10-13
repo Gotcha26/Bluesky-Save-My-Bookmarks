@@ -1,4 +1,5 @@
 """Tests pour core/colors.py"""
+
 from core.colors import Colors
 
 

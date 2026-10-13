@@ -4,6 +4,7 @@ L'import se fait dans un interpréteur neuf, avec sys.argv vide, une entrée
 standard fermée, un dossier courant et un dossier utilisateur temporaires :
 aucun input(), aucune sortie console, aucun fichier ni dossier créé.
 """
+
 import os
 import subprocess
 import sys
@@ -60,8 +61,13 @@ def test_import_sans_effet_de_bord(module, tmp_path):
     code = SCRIPT.replace("sys.argv_module", repr(module))
     proc = subprocess.run(
         [sys.executable, "-c", code],
-        cwd=cwd, env=env, stdin=subprocess.DEVNULL,
-        capture_output=True, text=True, encoding="utf-8", errors="replace",
+        cwd=cwd,
+        env=env,
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
         timeout=60,
     )
     assert proc.returncode == 0, proc.stderr

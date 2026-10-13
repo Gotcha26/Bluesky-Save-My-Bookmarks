@@ -1,4 +1,5 @@
 """Analyse des embeds app.bsky.embed.external (issue #4) avec des fixtures getRecord."""
+
 import copy
 import json
 from pathlib import Path
@@ -71,8 +72,10 @@ class TestRecordWithMediaExternal:
         ext = rep["value"]["embed"]
         rep["value"]["embed"] = {
             "$type": "app.bsky.embed.recordWithMedia",
-            "record": {"$type": "app.bsky.embed.record",
-                       "record": {"uri": f"at://{DID}/app.bsky.feed.post/3kcite", "cid": "bafy"}},
+            "record": {
+                "$type": "app.bsky.embed.record",
+                "record": {"uri": f"at://{DID}/app.bsky.feed.post/3kcite", "cid": "bafy"},
+            },
             "media": ext,
         }
         return rep

@@ -1,4 +1,5 @@
 """Tests de downloaders/videos.py : fonctions pures et download_video() (réseau et ffmpeg mockés)."""
+
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -59,7 +60,7 @@ def ffmpeg():
 
 class TestFonctionsPures:
     def test_safe_filename_part(self):
-        assert safe_filename_part('a<b>:c d') == "a_b__c_d"
+        assert safe_filename_part("a<b>:c d") == "a_b__c_d"
         assert len(safe_filename_part("x" * 80)) == 50
 
     def test_extract_video_info(self):
@@ -84,9 +85,14 @@ class TestFonctionsPures:
         assert info["cid"] == CID
 
     def test_extract_video_info_citation_avec_video(self):
-        embed = {"$type": "app.bsky.embed.recordWithMedia",
-                 "record": {"$type": "app.bsky.embed.record", "record": {"uri": "at://did:plc:x/app.bsky.feed.post/y"}},
-                 "media": EMBED_VIDEO}
+        embed = {
+            "$type": "app.bsky.embed.recordWithMedia",
+            "record": {
+                "$type": "app.bsky.embed.record",
+                "record": {"uri": "at://did:plc:x/app.bsky.feed.post/y"},
+            },
+            "media": EMBED_VIDEO,
+        }
         info, _ = extract_video_info(_record(embed))
         assert info["cid"] == CID
 
@@ -112,8 +118,9 @@ class TestDownloadVideo:
 
     def test_name_prefix_remplace_la_base_du_nom(self, tmp_path, ffmpeg):
         session = _session(_record(EMBED_VIDEO))
-        res = download_video(URL, tmp_path, DEFAULT_CONFIG, session=session,
-                             name_prefix="citant_20260210_3kq_quote")
+        res = download_video(
+            URL, tmp_path, DEFAULT_CONFIG, session=session, name_prefix="citant_20260210_3kq_quote"
+        )
         assert [r.filename for r in res] == ["citant_20260210_3kq_quote_01.mp4"]
         assert res[0].path == tmp_path / "citant_20260210_3kq_quote_01.mp4"
 
@@ -123,19 +130,31 @@ class TestDownloadVideo:
         premier, second = session.get.call_args_list
         assert premier.args[0] == "https://bsky.social/xrpc/com.atproto.repo.getRecord"
         assert premier.kwargs["params"] == {
-            "repo": "user.bsky.social", "collection": "app.bsky.feed.post", "rkey": "3abc"}
+            "repo": "user.bsky.social",
+            "collection": "app.bsky.feed.post",
+            "rkey": "3abc",
+        }
         assert second.args[0] == f"https://bsky.social/xrpc/com.atproto.sync.getBlob?did={DID}&cid={CID}"
 
     def test_metadonnees_ffmpeg_inchangees(self, tmp_path, ffmpeg):
         res = download_video(URL, tmp_path, DEFAULT_CONFIG, session=_session(_record(EMBED_VIDEO)))
         chemin = str(res[0].path)
         assert ffmpeg.call_args.args[0] == [
-            "ffmpeg", "-y", "-i", chemin,
-            "-metadata", "title=3abc",
-            "-metadata", f"comment=Ma vidéo\n\nLien du post : {URL}",
-            "-metadata", "creation_time=2026-01-02T10:00:00.000Z",
-            "-metadata", "artist=user.bsky.social",
-            "-codec", "copy", chemin + ".tmp.mp4",
+            "ffmpeg",
+            "-y",
+            "-i",
+            chemin,
+            "-metadata",
+            "title=3abc",
+            "-metadata",
+            f"comment=Ma vidéo\n\nLien du post : {URL}",
+            "-metadata",
+            "creation_time=2026-01-02T10:00:00.000Z",
+            "-metadata",
+            "artist=user.bsky.social",
+            "-codec",
+            "copy",
+            chemin + ".tmp.mp4",
         ]
 
     def test_ffmpeg_absent_garde_la_video(self, tmp_path):

@@ -1,4 +1,5 @@
 """refreshSession (issue #11) : core.auth.refresh_session et son usage par BookmarkSync.sync()."""
+
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -12,8 +13,12 @@ PDS = "https://morel.us-east.host.bsky.network"
 
 def _reponse_ok(**extra):
     resp = MagicMock(status_code=200)
-    resp.json.return_value = {"accessJwt": "nouveau.access", "refreshJwt": "nouveau.refresh",
-                              "did": "did:plc:abc", **extra}
+    resp.json.return_value = {
+        "accessJwt": "nouveau.access",
+        "refreshJwt": "nouveau.refresh",
+        "did": "did:plc:abc",
+        **extra,
+    }
     resp.raise_for_status.return_value = None
     return resp
 
@@ -75,8 +80,14 @@ class TestRefreshSession:
 
 
 def _resultat(expired=False, error=None):
-    return {"urls": [], "posts": [], "count": 0, "pages": 1,
-            "error": error or ("Token expiré" if expired else None), "expired": expired}
+    return {
+        "urls": [],
+        "posts": [],
+        "count": 0,
+        "pages": 1,
+        "error": error or ("Token expiré" if expired else None),
+        "expired": expired,
+    }
 
 
 @pytest.fixture
