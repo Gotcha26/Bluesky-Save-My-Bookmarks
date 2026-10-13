@@ -24,7 +24,7 @@ Chantier issu de l'audit d'octobre 2026 (issues #1 à #18). Un point par issue.
 
 ### 🐛 Corrections de bugs
 
-- **Hôte PDS** (#1) : le PDS du compte est détecté à la connexion (`pds_url`) au lieu d'un hôte codé en dur qui ne fonctionnait que pour un seul compte.
+- **Hôte PDS** (#1) : le PDS du compte est détecté à la connexion (`pds_url`) au lieu d'un hôte codé en dur qui ne fonctionnait que pour un seul compte ; il est résolu avant `createSession` (handle → DID → document DID), ce qui ouvre la connexion aux comptes hébergés hors de bsky.social (eurosky.social, PDS auto-hébergé).
 - **Identité des posts** (#2) : un post est identifié par son AT-URI (DID + clé) et non par l'URL avec handle, à la synchronisation comme au téléchargement et dans le compteur « Nouveaux » (dès que le cache `bookmarks.json` existe) ; `handle.invalid` n'est plus marqué « supprimé » et un changement de handle ne crée plus de doublon ni de retéléchargement.
 - **Textes** (#8) : `text.py` respecte `download_dir` et les textes sont comptés en base.
 - **Base de données** (#9) : le statut d'un post n'est plus écrasé, les médias portent leur vrai nom de fichier sans doublon, les erreurs 500, 429 et inconnues ainsi que les téléchargements en échec (nouveau statut `failed`, échec total ou partiel) sont retentés après `retry_after_days` (7) jours.
