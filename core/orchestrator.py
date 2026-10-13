@@ -141,12 +141,24 @@ def process_post(url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_d
             buf_print(f"  {c.OK}>{c.RESET} Post original : {c.VALUE}{original_handle}/post/{original_post_id}{c.RESET}")
             buf_print(f"  {c.DIM}{original_url}{c.RESET}")
 
-            # Le post citant est traité par sa résolution : il ne sera plus retenté
-            if db:
-                db.mark_post_status(url, 'ok')
-
             # Traiter récursivement le post original
-            return process_post(original_url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_dir, log_func)
+            resultat = process_post(original_url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_dir, log_func)
+
+            # Le citant n'est « ok » que si l'original a réussi ; sinon il garde un
+            # statut retentable (l'original n'est pas dans les bookmarks, seul le
+            # citant peut être relancé)
+            if db:
+                statut_original = resultat[4]
+                if resultat[0]:
+                    statut = 'ok'
+                elif statut_original == 'error_400':
+                    statut = 'deleted'
+                elif statut_original in ('error_500', 'unknown', 'repost'):
+                    statut = statut_original
+                else:
+                    statut = 'unknown'
+                db.mark_post_status(url, statut)
+            return resultat
         else:
             buf_print(c.warning("Impossible de résoudre le repost"))
             log_func(f"   REPOST NON RÉSOLU: {url}", to_console=False)
