@@ -19,6 +19,13 @@ class AuthError(Exception):
     pass
 
 
+class NetworkError(AuthError):
+    """Échec réseau (connexion, timeout, HTTP 5xx) pendant l'authentification.
+
+    Sous-classe d'AuthError : le code existant qui attrape AuthError reste valable."""
+    pass
+
+
 def _extract_pds_url(did_doc):
     """Lit le PDS du compte dans le didDoc (service #atproto_pds), sinon bsky.social."""
     if isinstance(did_doc, dict):
@@ -77,11 +84,14 @@ def create_session(handle, app_password):
         }
 
     except requests.exceptions.ConnectionError:
-        raise AuthError("Impossible de se connecter à bsky.social. Vérifiez votre connexion.")
+        raise NetworkError("Impossible de se connecter à bsky.social. Vérifiez votre connexion.")
     except requests.exceptions.Timeout:
-        raise AuthError("Timeout lors de la connexion à bsky.social.")
+        raise NetworkError("Timeout lors de la connexion à bsky.social.")
     except requests.exceptions.HTTPError as e:
-        raise AuthError(f"Erreur HTTP {e.response.status_code}")
+        status = e.response.status_code
+        if status >= 500:
+            raise NetworkError(f"Erreur HTTP {status}")
+        raise AuthError(f"Erreur HTTP {status}")
 
 
 def get_session(config):

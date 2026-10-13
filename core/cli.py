@@ -16,7 +16,7 @@ import argparse
 import json
 
 from core import orchestrator, ui
-from core.auth import AuthError, get_session, has_credentials
+from core.auth import AuthError, NetworkError, get_session, has_credentials
 from core.bookmarks import BookmarkSync
 from core.colors import c
 from core.config import (
@@ -86,6 +86,9 @@ def cmd_sync(config, args=None):
     print(c.info("Connexion à Bluesky..."))
     try:
         session = get_session(config)
+    except NetworkError as e:
+        print(c.error(f"Erreur réseau pendant l'authentification : {e}"))
+        return EXIT_NETWORK
     except AuthError as e:
         print(c.error(f"Authentification impossible : {e}"))
         return EXIT_AUTH
