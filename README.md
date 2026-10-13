@@ -23,18 +23,26 @@ Tout est automatique. Aucun copier-coller de token, aucun fichier à éditer man
 2. Décompressez le dossier
 3. Double-cliquez sur `Start.bat`
 
-Le script installe automatiquement Python, ffmpeg et exiftool si besoin.
+Le script installe automatiquement Python (via `winget`, ou Chocolatey à défaut), ffmpeg et exiftool si besoin, crée un environnement virtuel `.venv`, puis lance BSMB. Si Python vient d'être installé, fermez la fenêtre et relancez `Start.bat`.
 
 ### Linux / macOS
 
 ```bash
 git clone https://github.com/Gotcha26/Bluesky-Save-My-Bookmarks.git
 cd Bluesky-Save-My-Bookmarks
-pip install -r requirements.txt
-python bsmb.py
+./start.sh
 ```
 
-Optionnel (pour les métadonnées) : `sudo apt install ffmpeg exiftool` ou `brew install ffmpeg exiftool`
+Le script crée `.venv`, installe les dépendances et vérifie la présence de ffmpeg et exiftool (facultatifs, pour les métadonnées) : `sudo apt install ffmpeg libimage-exiftool-perl` ou `brew install ffmpeg exiftool`.
+
+### Alternative : pipx
+
+```bash
+pipx install .
+bsmb
+```
+
+BSMB lit et écrit `config.json`, `bsmb.db` et `logs/` dans le dossier courant : lancez `bsmb` depuis le dossier où vous souhaitez conserver vos données.
 
 ---
 

@@ -25,6 +25,8 @@ __pycache__/
 dist/
 build/
 .pytest_cache/
+.venv/
+.venv-test/
 
 # Node.js (si besoin futur)
 node_modules/
