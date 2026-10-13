@@ -100,13 +100,14 @@ Pendant le téléchargement, BSMB détecte les posts problématiques :
 | `ok` | Post normal, traité avec succès |
 | `deleted` | Post supprimé (erreur HTTP 400, ou `notFoundPost` renvoyé par `getBookmarks` dès la synchronisation) |
 | `blocked` | Post bloqué (`blockedPost` renvoyé par `getBookmarks`) ; jamais retenté |
-| `error_500` | Erreur serveur temporaire (HTTP 500) |
+| `error_500` | Erreur serveur temporaire (HTTP 5xx) |
+| `error_429` | Limite de débit (HTTP 429) encore atteinte après les reprises automatiques ; retentée comme `error_500` |
 
 Les liens morts sont visibles dans **Stockage local** et peuvent être nettoyés.
 
 Le nettoyage :
 - Supprime les entrées `deleted` et `blocked` de la base de données
-- Conserve les entrées `error_500` (potentiellement temporaires)
+- Conserve les entrées `error_500` et `error_429` (potentiellement temporaires)
 - Ne supprime **jamais** les fichiers déjà téléchargés
 
 ---
@@ -163,7 +164,9 @@ bsmb/
 ├── Start.bat                    # Lanceur Windows automatique
 │
 ├── core/                        # Logique métier
-│   ├── auth.py                 # createSession + get_token
+│   ├── auth.py                 # createSession + refreshSession + get_token
+│   ├── http.py                 # Session HTTP partagée (reprises, limiteur de débit)
+│   ├── version.py              # __version__ (source unique)
 │   ├── bookmarks.py            # BookmarkSync (pont API ↔ DB)
 │   ├── bookmarks_cache.py      # Cache bookmarks.json (postView bruts)
 │   ├── colors.py               # Couleurs ANSI cross-platform
@@ -220,6 +223,19 @@ L'orchestrateur utilise `concurrent.futures.ThreadPoolExecutor` avec un nombre c
 - Console : `_print_lock` empêche l'entrelacement des lignes
 - Logs : `log_lock` protège l'écriture fichier
 - Stats : compteurs mis à jour par le seul thread principal (`as_completed`)
+
+---
+
+## Réseau
+
+Tous les appels HTTP passent par une session unique (`core/http.py`, `get_session()`), partagée par les workers :
+
+- **User-Agent** : `BSMB/<version> (+https://github.com/Gotcha26/Bluesky-Save-My-Bookmarks)`, pour que Bluesky puisse identifier l'outil.
+- **Reprises automatiques** : jusqu'à 4 reprises, avec délai croissant (backoff exponentiel), sur les erreurs de connexion et les réponses 429, 500, 502, 503, 504. L'en-tête `Retry-After` est respecté, borné à 300 s.
+- **Limiteur de débit** : au plus 8 requêtes en vol en même temps, quel que soit `max_workers`. Quand `RateLimit-Remaining` passe sous 50, les appels suivants attendent `RateLimit-Reset` (pause de 300 s maximum, une ligne est écrite dans le journal `bsmb.http`).
+- **`error_429`** : si la limite de débit est encore atteinte après les reprises, le post reçoit le statut `error_429` (rapport « Limite de débit (429) », fichier `logs/rate_limited_*.txt`, code de sortie 3 en ligne de commande). Il est retenté comme `error_500`, après `retry_after_days` jours.
+- **Token expiré** : si `getBookmarks` répond `ExpiredToken` pendant la synchronisation (le token d'accès dure environ 2 h) et que la connexion se fait par App Password, BSMB le renouvelle une fois (`refreshSession`) et reprend. Avec un `Token-Bearer.txt` manuel, il n'y a pas de jeton de rafraîchissement : il faut un nouveau token.
+- **Version** : `python bsmb.py --version` ; la valeur vient de `core/version.py`.
 
 ---
 
@@ -295,7 +311,7 @@ schtasks /Create /SC DAILY /TN BSMB /TR "\"C:\chemin\bsmb\.venv\Scripts\python.e
 | `logs_dir` | Dossier des logs | `logs` |
 | `pds_url` | PDS du compte, détecté à la connexion (`""` = inconnu, `https://bsky.social` utilisé) | `""` |
 | `max_workers` | Workers parallèles | `4` |
-| `retry_after_days` | Délai avant de retenter un post en erreur (`error_500`, `unknown`, `repost` hérité) | `7` |
+| `retry_after_days` | Délai avant de retenter un post en erreur (`error_500`, `error_429`, `unknown`, `repost` hérité) | `7` |
 | `last_sync` | Date de dernière synchronisation | `""` |
 | `advanced_mode` | Mode avancé activé | `false` |
 | `open_folder_after_download` | Propose d'ouvrir le dossier après un téléchargement (ignoré en non interactif) | `true` |
@@ -324,7 +340,7 @@ Les chemins relatifs (`token_file`, `urls_file`, `db_file`, `logs_dir`) sont ré
 | `handle` | TEXT | Handle de l'auteur |
 | `added_at` | TEXT | Date d'ajout (ISO) |
 | `last_check` | TEXT | Dernière vérification (ISO) |
-| `status` | TEXT | `ok`, `deleted`, `blocked`, `error_500`, `unknown` (`repost` : ancien statut des citations non résolues, plus écrit, encore retenté) |
+| `status` | TEXT | `ok`, `deleted`, `blocked`, `error_500`, `error_429`, `unknown` (`repost` : ancien statut des citations non résolues, plus écrit, encore retenté) |
 | `at_uri` | TEXT (UNIQUE) | Identité canonique `at://<did>/app.bsky.feed.post/<rkey>` (NULL pour les anciennes lignes, complété au prochain traitement) |
 | `did` | TEXT | DID de l'auteur |
 | `rkey` | TEXT | Clé du post |
