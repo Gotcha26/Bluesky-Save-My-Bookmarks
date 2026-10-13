@@ -137,6 +137,12 @@ class Database:
                 "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'media'"
             ).fetchone()
             if ancienne:
+                orphelins = cursor.execute(
+                    'SELECT COUNT(*) FROM media WHERE post_url IS NULL '
+                    'OR post_url NOT IN (SELECT url FROM posts)'
+                ).fetchone()[0]
+                if orphelins:
+                    print(f"Migration v2 : {orphelins} média(s) orphelin(s) écarté(s) (post absent).")
                 cursor.execute('''
                     INSERT OR IGNORE INTO media_v2 (post_url, media_type, filename, downloaded_at)
                     SELECT post_url, media_type, filename, downloaded_at FROM media
@@ -182,14 +188,18 @@ class Database:
                     ).fetchone()
                     nouvelle_url = ancienne_url if occupee else url
                     # Les médias suivent via ON UPDATE CASCADE
-                    cursor.execute('''
-                        UPDATE posts SET url = ?, last_check = ?,
-                            post_id = COALESCE(?, post_id),
-                            handle = COALESCE(?, handle),
-                            did = COALESCE(?, did)
-                        WHERE at_uri = ?
-                    ''', (nouvelle_url, now, post_id, handle, did, at_uri))
-                    self.conn.commit()
+                    try:
+                        cursor.execute('''
+                            UPDATE posts SET url = ?, last_check = ?,
+                                post_id = COALESCE(?, post_id),
+                                handle = COALESCE(?, handle),
+                                did = COALESCE(?, did)
+                            WHERE at_uri = ?
+                        ''', (nouvelle_url, now, post_id, handle, did, at_uri))
+                        self.conn.commit()
+                    except Exception:
+                        self.conn.rollback()
+                        raise
                     return
 
             cursor.execute('''

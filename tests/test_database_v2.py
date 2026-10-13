@@ -313,6 +313,36 @@ class TestOrchestrateurStatuts:
         assert self._statut(tmp_db) == "ok"
 
 
+class TestRepostOriginalEnEchec:
+    def _citant_dont_l_original(self, db, tmp_path, type_original, **proc):
+        db.add_post(URL)
+        resolver = MagicMock()
+        resolver.resolve.return_value = (URL2, "user", "3k2")
+        analyzer = MagicMock()
+        analyzer.analyze.side_effect = [(PostType.REPOST, {}, {}), (type_original, {}, {"embed_type": "x"})]
+        with patch("core.orchestrator.subprocess.run", return_value=SimpleNamespace(**proc)):
+            return process_post(URL, "IMG", "VID", "TXT", db, analyzer, resolver, tmp_path, lambda *a, **k: None)
+
+    def test_original_en_erreur_500_le_citant_reste_retentable(self, tmp_db, tmp_path):
+        res = self._citant_dont_l_original(tmp_db, tmp_path, PostType.ERROR_500, returncode=0, stdout="")
+        assert res[4] == "error_500"
+        assert _ligne(tmp_db, URL)["status"] == "error_500"
+        assert tmp_db.get_pending_posts([URL]) == []  # trop récent
+        _vieillir(tmp_db, URL, 8)
+        assert tmp_db.get_pending_posts([URL]) == [URL]
+
+    def test_original_en_echec_de_telechargement_le_citant_n_est_pas_ok(self, tmp_db, tmp_path):
+        res = self._citant_dont_l_original(tmp_db, tmp_path, PostType.TEXT_ONLY, returncode=1, stdout="")
+        assert res[4] == "failed"
+        assert _ligne(tmp_db, URL)["status"] == "unknown"
+        _vieillir(tmp_db, URL, 8)
+        assert tmp_db.get_pending_posts([URL]) == [URL]
+
+    def test_original_supprime_le_citant_est_deleted(self, tmp_db, tmp_path):
+        self._citant_dont_l_original(tmp_db, tmp_path, PostType.ERROR_400, returncode=0, stdout="")
+        assert _ligne(tmp_db, URL)["status"] == "deleted"
+
+
 class TestSynchronisation:
     def test_config_par_defaut(self):
         assert DEFAULT_CONFIG["retry_after_days"] == 7
