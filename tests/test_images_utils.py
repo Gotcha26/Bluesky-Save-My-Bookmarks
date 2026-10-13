@@ -1,10 +1,4 @@
 """Tests pour les utilitaires de downloaders/images.py"""
-import sys
-from pathlib import Path
-
-# Simuler les arguments avant l'import du module
-sys.argv = ["images.py", str(Path.home() / "Downloads" / "BSMB" / "images"), "https://bsky.app/profile/test/post/123"]
-
 from downloaders.images import (
     safe_part,
     guess_ext_from_ct,

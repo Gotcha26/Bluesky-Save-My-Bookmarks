@@ -1,8 +1,13 @@
 #!/usr/bin/env python3
 """
 Orchestrateur principal de téléchargement
-Analyse, résout et télécharge les médias des posts Bluesky
-Supporte l'exécution parallèle via ThreadPoolExecutor
+Analyse, résout et télécharge les médias des posts Bluesky.
+
+Point d'entrée : run(urls, config, …), appelé directement par bsmb.py. Les
+downloaders sont des fonctions appelées dans les threads d'un
+ThreadPoolExecutor ; aucun sous-processus Python n'est lancé.
+
+Usage manuel : python core/orchestrator.py <IMG_DIR> <VID_DIR> <TEXT_DIR> [--no-db] <URL1> [URL2] ...
 """
 import os
 import sys
@@ -14,20 +19,21 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 
-# Ajouter le répertoire parent au path pour les imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
+if __package__ in (None, ""):
+    # Exécution directe (python core/orchestrator.py) : rendre la racine importable
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-# Forcer l'encodage UTF-8 pour la console Windows (seulement en exécution directe)
-if sys.platform == "win32" and __name__ == "__main__":
-    import io
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
-
-from core.config import load_config, cleanup_old_logs
-from core.database import Database
-from core.colors import c
-from api.post_analyzer import PostAnalyzer, PostType
-from api.repost_resolver import RepostResolver
+from core.config import (  # noqa: E402
+    DEFAULT_CONFIG, cleanup_old_logs, get_media_dirs, load_config, resolve_path,
+)
+from core.database import Database  # noqa: E402
+from core.colors import c  # noqa: E402
+from api.post_analyzer import PostAnalyzer, PostType  # noqa: E402
+from api.repost_resolver import RepostResolver  # noqa: E402
+from downloaders import DownloadError, lignes_console  # noqa: E402
+from downloaders.images import download_images  # noqa: E402
+from downloaders.videos import download_video  # noqa: E402
+from downloaders.text import save_text  # noqa: E402
 
 # Lock global pour l'affichage console (évite les lignes entrelacées)
 _print_lock = threading.Lock()
@@ -74,24 +80,32 @@ def save_debug_info(post_id, debug_info, logs_dir):
     return debug_file
 
 
-def extraire_noms_fichiers(stdout, marqueur):
-    """Noms de fichiers annoncés par un downloader sur les lignes contenant `marqueur`."""
-    noms = []
-    for line in stdout.splitlines():
-        if marqueur in line:
-            nom = line.split(marqueur, 1)[1].strip()
-            if nom:
-                noms.append(nom)
-    return noms
+def _telecharger(downloader, url, dest_dir, config, buf_print):
+    """
+    Appelle un downloader et affiche ses résultats.
+    Returns: la liste de DownloadResult (vide en cas d'erreur ou sans média).
+    """
+    try:
+        results = downloader(url, dest_dir, config)
+    except DownloadError as e:
+        buf_print(f"       [ERR] {e}")
+        return []
+    if not results:
+        buf_print("       [!] Aucun média trouvé")
+    for ligne in lignes_console(results):
+        buf_print(f"    {ligne}")
+    return results
 
 
-def process_post(url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_dir, log_func):
+def process_post(url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_dir, log_func, config=None):
     """
     Traite un post unique et retourne les stats.
     Returns: (has_success, img_count, vid_count, text_count, status, output_lines)
 
     output_lines contient les lignes à afficher (buffered pour le mode parallèle).
+    config : transmise aux downloaders (DEFAULT_CONFIG si None).
     """
+    config = DEFAULT_CONFIG if config is None else config
     output = []
 
     def buf_print(msg):
@@ -108,7 +122,7 @@ def process_post(url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_d
         handle = data.get("handle")
         db.add_post(url, post_id, handle, at_uri=data.get("at_uri"), did=data.get("did"))
 
-    has_success = False
+    results = []
     img_count = 0
     vid_count = 0
     text_count = 0
@@ -142,7 +156,8 @@ def process_post(url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_d
             buf_print(f"  {c.DIM}{original_url}{c.RESET}")
 
             # Traiter récursivement le post original
-            resultat = process_post(original_url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_dir, log_func)
+            resultat = process_post(original_url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver,
+                                    logs_dir, log_func, config)
 
             # Le citant n'est « ok » que si l'original a réussi ; sinon il garde un
             # statut retentable (l'original n'est pas dans les bookmarks, seul le
@@ -169,71 +184,20 @@ def process_post(url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_d
     # Images
     if post_type == PostType.IMAGES:
         buf_print(c.info(f"{data['image_count']} image(s) détectée(s)"))
-
-        img_proc = subprocess.run(
-            ["python", "downloaders/images.py", IMG_DIR, url],
-            capture_output=True,
-            text=True
-        )
-
-        if img_proc.returncode == 0:
-            has_success = True
-            img_count = img_proc.stdout.count("[DL]")
-
-        if img_proc.stdout:
-            for line in img_proc.stdout.strip().split("\n"):
-                if line and not line.startswith("SCRIPT") and not line.startswith("DEBUG"):
-                    buf_print(f"    {line}")
-
-        if db and img_proc.returncode == 0:
-            for filename in extraire_noms_fichiers(img_proc.stdout, "[DL] Téléchargé ->"):
-                db.add_media(url, 'image', filename)
+        results = _telecharger(download_images, url, IMG_DIR, config, buf_print)
+        img_count = len(results)
 
     # Vidéo
     elif post_type == PostType.VIDEO:
         buf_print(c.info("Vidéo détectée"))
-
-        vid_proc = subprocess.run(
-            ["python", "downloaders/videos.py", VID_DIR, url],
-            capture_output=True,
-            text=True
-        )
-
-        if vid_proc.returncode == 0:
-            has_success = True
-            vid_count = vid_proc.stdout.count("[DL]")
-
-        if vid_proc.stdout:
-            for line in vid_proc.stdout.strip().split("\n"):
-                if line and not line.startswith("SCRIPT") and not line.startswith("DEBUG"):
-                    buf_print(f"    {line}")
-
-        if db and vid_proc.returncode == 0:
-            for filename in extraire_noms_fichiers(vid_proc.stdout, "[OK] Fichier enregistré :"):
-                db.add_media(url, 'video', filename)
+        results = _telecharger(download_video, url, VID_DIR, config, buf_print)
+        vid_count = len(results)
 
     # Texte seul
     elif post_type == PostType.TEXT_ONLY:
         buf_print(c.info("Texte seul détecté"))
-
-        text_proc = subprocess.run(
-            ["python", "downloaders/text.py", TEXT_DIR, url],
-            capture_output=True,
-            text=True
-        )
-
-        if text_proc.returncode == 0:
-            has_success = True
-            text_count = text_proc.stdout.count("[TXT]")
-
-        if text_proc.stdout:
-            for line in text_proc.stdout.strip().split("\n"):
-                if line:
-                    buf_print(f"    {line}")
-
-        if db and text_proc.returncode == 0:
-            for filename in extraire_noms_fichiers(text_proc.stdout, "[TXT]"):
-                db.add_media(url, 'text', filename)
+        results = _telecharger(save_text, url, TEXT_DIR, config, buf_print)
+        text_count = len(results)
 
     # Cas inconnu - MODE DEBUG
     elif post_type == PostType.UNKNOWN:
@@ -250,8 +214,10 @@ def process_post(url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_d
         return False, 0, 0, 0, 'unknown', output
 
     # Bilan
-    if has_success:
+    if results:
         if db:
+            for r in results:
+                db.add_media(url, r.media_type, r.filename, cid=r.cid)
             db.update_last_check(url)
             # Un post retenté avec succès ne doit plus rester en erreur
             db.mark_post_status(url, 'ok')
@@ -313,8 +279,8 @@ def _print_progress_bar(completed, total, img_total, vid_total, text_total):
     sys.stdout.flush()
 
 
-def print_report(stats, duration, total_size, no_db_mode, logs_dir, log_file, max_workers):
-    """Affiche le rapport final structuré."""
+def print_report(stats, duration, total_size, no_db_mode, log_file, max_workers, generated_files=()):
+    """Affiche le rapport final structuré (generated_files : sortie de _save_problem_logs)."""
     border = "=" * 80
     print(f"\n  {c.HEADER}{border}{c.RESET}")
     print(f"  {c.HEADER}{'RAPPORT DE TÉLÉCHARGEMENT':^80}{c.RESET}")
@@ -366,11 +332,18 @@ def print_report(stats, duration, total_size, no_db_mode, logs_dir, log_file, ma
     print(f"  {c.HEADER}{border}{c.RESET}")
 
     # Fichiers de log générés
-    _save_and_report_logs(stats, logs_dir, log_file)
+    if generated_files:
+        print()
+        print(c.title("  FICHIERS GÉNÉRÉS"))
+        print(c.separator(width=78))
+        for name, detail in generated_files:
+            print(f"  {c.YELLOW}>{c.RESET} {c.VALUE}{name}{c.RESET}  ({detail})")
+
+    print(f"\n  {c.DIM}Log détaillé : {log_file}{c.RESET}")
 
 
-def _save_and_report_logs(stats, logs_dir, log_file):
-    """Sauvegarde les fichiers de problèmes et affiche les liens."""
+def _save_problem_logs(stats, logs_dir):
+    """Écrit un fichier par catégorie de problème ; renvoie [(nom, détail), …]."""
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     generated = []
 
@@ -390,44 +363,44 @@ def _save_and_report_logs(stats, logs_dir, log_file):
                 f.write("\n".join(urls))
             generated.append((filepath.name, f"{len(urls)} {label}"))
 
-    if generated:
-        print()
-        print(c.title("  FICHIERS GÉNÉRÉS"))
-        print(c.separator(width=78))
-        for name, detail in generated:
-            print(f"  {c.YELLOW}>{c.RESET} {c.VALUE}{name}{c.RESET}  ({detail})")
-
-    print(f"\n  {c.DIM}Log détaillé : {log_file}{c.RESET}")
+    return generated
 
 
-def main():
-    if len(sys.argv) < 5:
-        print("Usage: python orchestrator.py <IMG_DIR> <VID_DIR> <TEXT_DIR> [--no-db] <URL1> [URL2] ...")
-        sys.exit(1)
+def run(urls, config, no_db=False, on_progress=None, quiet=False) -> dict:
+    """
+    Télécharge les médias des posts `urls` dans les sous-dossiers de config["download_dir"].
 
+    Args:
+        urls: URLs de posts bsky.app
+        config: configuration chargée (load_config())
+        no_db: ne pas lire ni écrire la base (mode dev)
+        on_progress: callback(termines, total) appelé après chaque post
+        quiet: aucune sortie console (ni progression ni rapport)
+
+    Returns:
+        dict: {"total", "success", "images", "videos", "texts",
+               "error_500", "error_400", "reposts", "unknown", "failed"}
+        (les cinq dernières clés sont des listes d'URLs)
+    """
+    return _run(urls, config, media_dirs=get_media_dirs(config), no_db=no_db,
+                on_progress=on_progress, quiet=quiet)
+
+
+def _run(urls, config, media_dirs, no_db=False, on_progress=None, quiet=False):
+    """run() avec des dossiers médias explicites (utilisé par la CLI)."""
     start_time = time.time()
+    IMG_DIR = media_dirs["img_dir"]
+    VID_DIR = media_dirs["vid_dir"]
+    TEXT_DIR = media_dirs["text_dir"]
 
-    IMG_DIR = sys.argv[1]
-    VID_DIR = sys.argv[2]
-    TEXT_DIR = sys.argv[3]
-
-    no_db_mode = "--no-db" in sys.argv
-    if no_db_mode:
-        sys.argv.remove("--no-db")
-
-    urls = sys.argv[4:]
-
-    config = load_config()
     cleanup_old_logs(config)
 
     max_workers = max(1, int(config.get("max_workers", 4)))
-    db = None if no_db_mode else Database(config["db_file"])
     analyzer = PostAnalyzer()
     resolver = RepostResolver()
 
-    # Compteurs thread-safe
+    # Compteurs (mis à jour dans le thread principal, au fil de as_completed)
     total_jobs = len(urls)
-    stats_lock = threading.Lock()
     success_count = 0
     img_count = 0
     vid_count = 0
@@ -440,8 +413,8 @@ def main():
     unknown_urls = []
 
     # Logs
-    logs_dir = Path(config["logs_dir"])
-    logs_dir.mkdir(exist_ok=True)
+    logs_dir = resolve_path(config, "logs_dir")
+    logs_dir.mkdir(parents=True, exist_ok=True)
     log_file = logs_dir / f"download_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
     log_lock = threading.Lock()
 
@@ -451,40 +424,43 @@ def main():
         with log_lock:
             with open(str(log_file), "a", encoding="utf-8") as f:
                 f.write(log_line)
-        if to_console:
+        if to_console and not quiet:
             with _print_lock:
                 print(msg)
 
     log(f"=== Début du téléchargement : {total_jobs} posts à traiter ({max_workers} workers) ===")
-    if no_db_mode:
+    if no_db:
         log("MODE DEV: Base de données désactivée", to_console=False)
 
     # En-tête
-    print()
-    print(f"  {c.HEADER}{'─' * 78}{c.RESET}")
-    print(f"  {c.BOLD}{total_jobs} posts à traiter{c.RESET} {c.DIM}({max_workers} workers parallèles){c.RESET}")
-    print(f"  {c.HEADER}{'─' * 78}{c.RESET}")
-    print()
+    if not quiet:
+        print()
+        print(f"  {c.HEADER}{'─' * 78}{c.RESET}")
+        print(f"  {c.BOLD}{total_jobs} posts à traiter{c.RESET} {c.DIM}({max_workers} workers parallèles){c.RESET}")
+        print(f"  {c.HEADER}{'─' * 78}{c.RESET}")
+        print()
+
+    db = None if no_db else Database(resolve_path(config, "db_file"))
 
     def worker(idx, url):
         """Worker qui traite un post et retourne le résultat."""
         log(f"Job {idx}/{total_jobs}: {url}", to_console=False)
         has_success, imgs, vids, texts, status, output_lines = process_post(
-            url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_dir, log
+            url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_dir, log, config
         )
         return idx, url, has_success, imgs, vids, texts, status, output_lines
 
     # === EXÉCUTION PARALLÈLE ===
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = {
-            executor.submit(worker, idx, url): (idx, url)
-            for idx, url in enumerate(urls, start=1)
-        }
+    try:
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {
+                executor.submit(worker, idx, url): (idx, url)
+                for idx, url in enumerate(urls, start=1)
+            }
 
-        for future in as_completed(futures):
-            idx, url, has_success, imgs, vids, texts, status, output_lines = future.result()
+            for future in as_completed(futures):
+                idx, url, has_success, imgs, vids, texts, status, output_lines = future.result()
 
-            with stats_lock:
                 completed_count += 1
                 if has_success:
                     success_count += 1
@@ -503,29 +479,23 @@ def main():
                 elif status == 'failed':
                     failed_urls.append(url)
 
-                current_completed = completed_count
-                current_imgs = img_count
-                current_vids = vid_count
-                current_texts = text_count
+                if not quiet:
+                    with _print_lock:
+                        summary = _format_job_summary(idx, total_jobs, url, status, imgs, vids, texts)
+                        print(summary)
+                        _print_progress_bar(completed_count, total_jobs, img_count, vid_count, text_count)
+                if on_progress:
+                    on_progress(completed_count, total_jobs)
+    finally:
+        if db:
+            db.close()
 
-            # Affichage thread-safe
-            with _print_lock:
-                summary = _format_job_summary(idx, total_jobs, url, status, imgs, vids, texts)
-                print(summary)
-                _print_progress_bar(current_completed, total_jobs, current_imgs, current_vids, current_texts)
+    if not quiet:
+        # Effacer la barre de progression
+        sys.stdout.write("\r" + " " * 100 + "\r")
+        sys.stdout.flush()
 
-    # Effacer la barre de progression
-    sys.stdout.write("\r" + " " * 100 + "\r")
-    sys.stdout.flush()
-
-    if db:
-        db.close()
-
-    # Rapport final
-    duration = time.time() - start_time
-    total_size = get_folder_size(IMG_DIR) + get_folder_size(VID_DIR)
-
-    report_stats = {
+    stats = {
         'total': total_jobs,
         'success': success_count,
         'images': img_count,
@@ -538,13 +508,35 @@ def main():
         'failed': failed_urls,
     }
 
-    print_report(report_stats, duration, total_size, no_db_mode, logs_dir, log_file, max_workers)
+    generated = _save_problem_logs(stats, logs_dir)
 
-    if success_count > 0:
+    if not quiet:
+        duration = time.time() - start_time
+        total_size = get_folder_size(IMG_DIR) + get_folder_size(VID_DIR)
+        print_report(stats, duration, total_size, no_db, log_file, max_workers, generated)
+
+    return stats
+
+
+def main(argv=None):
+    argv = sys.argv[1:] if argv is None else list(argv)
+    no_db_mode = "--no-db" in argv
+    if no_db_mode:
+        argv.remove("--no-db")
+
+    if len(argv) < 4:
+        print("Usage: python orchestrator.py <IMG_DIR> <VID_DIR> <TEXT_DIR> [--no-db] <URL1> [URL2] ...")
+        sys.exit(1)
+
+    media_dirs = {"img_dir": argv[0], "vid_dir": argv[1], "text_dir": argv[2]}
+    config = load_config()
+    stats = _run(argv[3:], config, media_dirs=media_dirs, no_db=no_db_mode)
+
+    if stats["success"] > 0:
         print()
         confirm = input(c.prompt("  Ouvrir le dossier de téléchargements ? [O/n]: ")).strip().lower()
         if not confirm or confirm in ("o", "oui", "y", "yes"):
-            download_dir = config.get("download_dir", os.path.expandvars(r"%USERPROFILE%\Downloads\BSMB"))
+            download_dir = config["download_dir"]
             if sys.platform == "win32":
                 os.startfile(download_dir)
             else:
@@ -552,4 +544,9 @@ def main():
 
 
 if __name__ == "__main__":
+    # Forcer l'encodage UTF-8 pour la console Windows (exécution directe uniquement)
+    if sys.platform == "win32":
+        import io
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
     main()

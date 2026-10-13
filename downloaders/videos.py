@@ -1,71 +1,58 @@
 #!/usr/bin/env python3
 """
-bsky_vid_downloader.py
-Télécharge vidéos depuis Bluesky via l'API
-"""
+Téléchargement de la vidéo d'un post Bluesky via l'API, renommée :
+  <handle>_<YYYYMMDD>_<postid>_01.mp4
+Ajoute titre, commentaire, date et auteur (si ffmpeg est installé).
 
-import sys
+Usage manuel : python downloaders/videos.py <dossier> <url_post>
+Codes de sortie : 0 = vidéo téléchargée, 1 = erreur technique, 2 = aucune vidéo.
+"""
 import os
 import re
+import sys
 import subprocess
-import requests
 from datetime import datetime
-from urllib.parse import urlparse
-import json
 from pathlib import Path
+from urllib.parse import urlparse
 
-# Ajouter le répertoire parent au path pour les imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
+import requests
 
-# Charger config si disponible
-from core.config import get_default_paths
+if __package__ in (None, ""):
+    # Exécution directe (python downloaders/videos.py) : rendre la racine importable
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-default_paths = get_default_paths()
-default_vid = default_paths["vid_dir"]
+from core.config import DEFAULT_CONFIG, get_default_paths, load_config  # noqa: E402
+from downloaders import DownloadError, DownloadResult, lignes_console  # noqa: E402
 
-VID_DIR = sys.argv[1] if len(sys.argv) > 1 else default_vid
 
-if len(sys.argv) > 2:
-    url = sys.argv[2]
-else:
-    url = input("👉 Collez une URL vidéo : ").strip()
-    
-MAX_FILENAME_LEN = 64
-os.makedirs(VID_DIR, exist_ok=True)
-
-def get_post_data(post_url):
-    """Récupère les données complètes du post via l'API"""
+def get_post_data(post_url, http=requests):
+    """Récupère le record brut du post via l'API ; lève DownloadError en cas d'échec."""
     parts = urlparse(post_url).path.strip("/").split("/")
-    if len(parts) < 2:
-        return None
-    
     handle_from_url = parts[-3] if len(parts) >= 3 else parts[-2]
     post_id = parts[-1]
-    
+
     api_url = "https://bsky.social/xrpc/com.atproto.repo.getRecord"
     params = {
         "repo": handle_from_url,
         "collection": "app.bsky.feed.post",
         "rkey": post_id
     }
-    
+
     try:
-        resp = requests.get(api_url, params=params, timeout=15)
+        resp = http.get(api_url, params=params, timeout=15)
         resp.raise_for_status()
         return resp.json()
     except Exception as e:
-        print(f"   ⚠️ Erreur API : {e}")
-        return None
+        raise DownloadError(f"Post supprimé ou inaccessible ({e})") from e
 
 def extract_video_info(data):
     """Extrait les infos vidéo du JSON"""
     if not data:
         return None, False
-    
+
     value = data.get("value", {})
     embed = value.get("embed", {})
-    embed_type = embed.get("$type", "None")
-    
+
     # Vérifier si c'est un repost
     is_repost = False
     if embed.get("$type") == "app.bsky.embed.record":
@@ -77,29 +64,29 @@ def extract_video_info(data):
             if emb.get("$type") == "app.bsky.embed.video":
                 embed = emb
                 break
-    
+
     # Vérifier si c'est une vidéo
     if embed.get("$type") != "app.bsky.embed.video":
         return None, is_repost
-    
+
     video_blob = embed.get("video", {})
-    
+
     cid = video_blob.get("ref", {}).get("$link")
-    
+
     if not cid:
         return None, is_repost
-    
+
     uri = data.get("uri", "")
     did = uri.split("/")[2] if "/" in uri else None
-    
+
     if not did:
         return None, is_repost
-    
+
     video_url = f"https://bsky.social/xrpc/com.atproto.sync.getBlob?did={did}&cid={cid}"
-    
+
     text = value.get("text", "")
     created_at = value.get("createdAt", "")
-    
+
     return {
         "url": video_url,
         "text": text,
@@ -113,97 +100,98 @@ def safe_filename_part(s):
     s = re.sub(r'\s+', '_', s)
     return s.strip(' ._')[:50]
 
-def download_video(video_info, handle, post_id):
-    """Télécharge la vidéo"""
-    created_at = video_info["created_at"]
+def _video_filename(handle, post_id, created_at, max_len):
     try:
         date_str = datetime.fromisoformat(created_at.replace("Z", "")).strftime("%Y%m%d")
-    except:
+    except ValueError:
         date_str = datetime.now().strftime("%Y%m%d")
-    
-    handle_safe = safe_filename_part(handle)
-    post_id_safe = safe_filename_part(post_id)
-    filename = f"{handle_safe}_{date_str}_{post_id_safe}_01.mp4"
-    
-    if len(filename) > MAX_FILENAME_LEN:
-        filename = filename[:MAX_FILENAME_LEN-4] + ".mp4"
-    
-    filepath = os.path.join(VID_DIR, filename)
-    
-    print(f"   [DL] Téléchargement en cours...")
+
+    filename = f"{safe_filename_part(handle)}_{date_str}_{safe_filename_part(post_id)}_01.mp4"
+    if len(filename) > max_len:
+        filename = filename[:max_len-4] + ".mp4"
+    return filename
+
+def _add_metadata(filepath, video_info, handle, post_id, post_url):
+    """Ajoute les métadonnées avec ffmpeg (best effort : la vidéo reste valable sans)."""
     try:
-        r = requests.get(video_info["url"], stream=True, timeout=60)
+        temp_file = str(filepath) + ".tmp.mp4"
+        full_comment = f"{video_info['text']}\n\nLien du post : {post_url}"
+
+        subprocess.run([
+            "ffmpeg", "-y", "-i", str(filepath),
+            "-metadata", f"title={post_id}",
+            "-metadata", f"comment={full_comment}",
+            "-metadata", f"creation_time={video_info['created_at']}",
+            "-metadata", f"artist={handle}",
+            "-codec", "copy", temp_file
+        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+
+        os.replace(temp_file, filepath)
+    except Exception:
+        pass
+
+def download_video(post_url, dest_dir, config, session=None):
+    """
+    Télécharge la vidéo d'un post dans dest_dir.
+
+    Returns:
+        list[DownloadResult] : la vidéo écrite (avec son CID) ; liste vide si le
+        post ne contient pas de vidéo.
+    Raises:
+        DownloadError : URL invalide, API inaccessible ou téléchargement en échec.
+    """
+    http = session or requests
+    parts = urlparse(post_url).path.strip("/").split("/")
+    if len(parts) < 4:
+        raise DownloadError("URL invalide")
+
+    handle = parts[-3]
+    post_id = parts[-1]
+
+    video_info, _ = extract_video_info(get_post_data(post_url, http))
+    if not video_info:
+        return []
+
+    dest_dir = Path(dest_dir)
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    max_len = config.get("max_filename_len", DEFAULT_CONFIG["max_filename_len"])
+    filename = _video_filename(handle, post_id, video_info["created_at"], max_len)
+    filepath = dest_dir / filename
+
+    try:
+        r = http.get(video_info["url"], stream=True, timeout=60)
         r.raise_for_status()
-        
+
         with open(filepath, "wb") as f:
             for chunk in r.iter_content(chunk_size=8192):
                 f.write(chunk)
-        
-        print(f"   [OK] Fichier enregistré : {filename}")
-        
-        try:
-            temp_file = filepath + ".tmp.mp4"
-            full_comment = f"{video_info['text']}\n\nLien du post : {url}"
-            
-            subprocess.run([
-                "ffmpeg", "-y", "-i", filepath,
-                "-metadata", f"title={post_id}",
-                "-metadata", f"comment={full_comment}",
-                "-metadata", f"creation_time={created_at}",
-                "-metadata", f"artist={handle}",
-                "-codec", "copy", temp_file
-            ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
-            
-            os.replace(temp_file, filepath)
-            print("   [OK] Métadonnées ajoutées")
-        except Exception as e:
-            print(f"   [!] Métadonnées non ajoutées : {e}")
-        
-        return True
-    
     except Exception as e:
-        print(f"   [ERR] Erreur : {e}")
-        return False
+        raise DownloadError(f"Erreur : {e}") from e
 
-def main():
-    parts = urlparse(url).path.strip("/").split("/")
-    if len(parts) < 4:
-        print("   [ERR] URL invalide")
-        sys.exit(1)
-    
-    handle = parts[-3]
-    post_id = parts[-1]
-    
-    print("   [...] Récupération des informations...")
-    
+    _add_metadata(filepath, video_info, handle, post_id, post_url)
+
+    return [DownloadResult(filename, filepath, "video", filepath.stat().st_size, video_info["cid"])]
+
+# -------------------- Usage manuel --------------------
+def main(argv=None):
+    """python downloaders/videos.py <dossier> <url_post>"""
+    argv = sys.argv[1:] if argv is None else argv
+    dest_dir = argv[0] if argv else get_default_paths()["vid_dir"]
+    url = argv[1] if len(argv) > 1 else input("👉 Collez une URL vidéo : ").strip()
+
     try:
-        data = get_post_data(url)
-        
-        if not data:
-            error_msg = "400 Client Error: Bad Request"
-            print(f"   [!] Post supprimé ou inaccessible")
-            sys.exit(1)
-        
-        video_info, is_repost = extract_video_info(data)
-        
-        if not video_info:
-            if is_repost:
-                print("   [REPOST] Post sans vidéo directement accessible")
-            else:
-                print("   [!] Aucune vidéo trouvée")
-            sys.exit(2)
-        
-        if is_repost:
-            print("   [REPOST] Vidéo du post cité détectée")
-        
-        success = download_video(video_info, handle, post_id)
-        
-        sys.exit(0 if success else 1)
-    
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)
+        results = download_video(url, dest_dir, load_config())
+    except DownloadError as e:
+        print(f"   [ERR] {e}")
+        return 1
+
+    if not results:
+        print("   [!] Aucune vidéo trouvée")
+        return 2
+
+    for ligne in lignes_console(results):
+        print(ligne)
+    return 0
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

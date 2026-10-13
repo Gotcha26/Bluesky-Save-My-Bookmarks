@@ -1,86 +1,110 @@
 #!/usr/bin/env python3
 """
-bsky_text_downloader.py
-Sauvegarde le texte des posts sans média
-Exit codes: 0=succès, 1=erreur, 2=pas de texte
+Sauvegarde du texte d'un post Bluesky sans média, dans :
+  <handle>_<YYYYMMDD>_<postid>.txt
+
+Usage manuel : python downloaders/text.py [<dossier>] <url_post>
+Codes de sortie : 0 = texte sauvegardé, 1 = erreur technique, 2 = pas de texte.
 """
-import os
 import sys
-from urllib.parse import urlparse
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import urlparse
+
 import requests
 
-# Ajouter le répertoire parent au path pour les imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
+if __package__ in (None, ""):
+    # Exécution directe (python downloaders/text.py) : rendre la racine importable
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-# Charger config si disponible
-from core.config import get_default_paths
+from core.config import get_default_paths, load_config  # noqa: E402
+from downloaders import DownloadError, DownloadResult, lignes_console  # noqa: E402
 
-default_paths = get_default_paths()
 
-# Usage : text.py <TEXT_DIR> <url> ; avec un seul argument (URL), ancien comportement
-if len(sys.argv) > 2:
-    TEXT_DIR = sys.argv[1]
-    url = sys.argv[2]
-else:
-    TEXT_DIR = os.path.join(os.path.dirname(default_paths["img_dir"]), "texts")
-    url = sys.argv[1] if len(sys.argv) > 1 else None
-os.makedirs(TEXT_DIR, exist_ok=True)
-
-if url is None:
-    url = input("👉 URL : ").strip()
-
-def fetch_post(handle, post_id):
+def fetch_post(handle, post_id, http=requests):
     api_url = f"https://public.api.bsky.app/xrpc/app.bsky.feed.getPostThread?uri=at://{handle}/app.bsky.feed.post/{post_id}"
-    resp = requests.get(api_url, timeout=15)
+    resp = http.get(api_url, timeout=15)
     resp.raise_for_status()
     return resp.json()
 
-def save_text(post_url):
+def save_text(post_url, dest_dir, config, session=None):
+    """
+    Sauvegarde le texte d'un post dans dest_dir.
+
+    Returns:
+        list[DownloadResult] : le fichier texte écrit ; liste vide si l'URL
+        n'est pas celle d'un post ou si le post n'a pas de texte.
+    Raises:
+        DownloadError : API inaccessible.
+    """
+    http = session or requests
     parts = urlparse(post_url).path.strip("/").split("/")
     if len(parts) < 4:
-        return False
-    
+        return []
+
     handle = parts[1]
     post_id = parts[-1]
-    
+
     try:
-        data = fetch_post(handle, post_id)
-    except:
-        return False
-    
+        data = fetch_post(handle, post_id, http)
+    except Exception as e:
+        raise DownloadError(f"Erreur API : {e}") from e
+
     post = data.get("thread", {}).get("post", {})
     record = post.get("record", {})
     text = record.get("text", "")
     created_at = record.get("createdAt", "")
-    
+
     if not text:
-        return False
-    
+        return []
+
     # Date
     date_str = datetime.now().strftime("%Y%m%d")
     if created_at:
         try:
             date_str = datetime.fromisoformat(created_at.replace("Z", "")).strftime("%Y%m%d")
-        except:
+        except ValueError:
             pass
-    
+
     # Nom fichier
     handle_safe = handle.replace(":", "_").replace(".", "_")[:20]
     filename = f"{handle_safe}_{date_str}_{post_id}.txt"
-    filepath = os.path.join(TEXT_DIR, filename)
-    
+    dest_dir = Path(dest_dir)
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    filepath = dest_dir / filename
+
     # Sauvegarde
     with open(filepath, "w", encoding="utf-8") as f:
         f.write(f"Post: {post_url}\n")
         f.write(f"Date: {created_at}\n")
         f.write(f"Auteur: {handle}\n")
         f.write(f"\n{text}\n")
-    
-    print(f"   [TXT] {filename}")
-    return True
+
+    return [DownloadResult(filename, filepath, "text", filepath.stat().st_size)]
+
+# -------------------- Usage manuel --------------------
+def main(argv=None):
+    """python downloaders/text.py [<dossier>] <url_post>"""
+    argv = sys.argv[1:] if argv is None else argv
+    if len(argv) > 1:
+        dest_dir, url = argv[0], argv[1]
+    else:
+        dest_dir = get_default_paths()["text_dir"]
+        url = argv[0] if argv else input("👉 URL : ").strip()
+
+    try:
+        results = save_text(url, dest_dir, load_config())
+    except DownloadError as e:
+        print(f"   [ERR] {e}")
+        return 1
+
+    if not results:
+        print("   [!] Aucun texte trouvé")
+        return 2
+
+    for ligne in lignes_console(results):
+        print(ligne)
+    return 0
 
 if __name__ == "__main__":
-    success = save_text(url)
-    sys.exit(0 if success else 2)
+    sys.exit(main())

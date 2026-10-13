@@ -1,6 +1,6 @@
 """Tests de l'identité des posts par AT-URI (issue #2) : base, export, analyse, synchronisation."""
 import sqlite3
-from types import SimpleNamespace
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from api.post_analyzer import PostAnalyzer, PostType
@@ -9,6 +9,7 @@ from core.bookmarks import BookmarkSync
 from core.database import Database
 from core.orchestrator import process_post
 from api.export_bookmarks import fetch_bookmarks
+from downloaders import DownloadResult
 
 DID = "did:plc:abc"
 URI = f"at://{DID}/app.bsky.feed.post/3k1"
@@ -255,8 +256,8 @@ class TestOrchestratorIdentite:
         analyzer.analyze.return_value = (
             PostType.TEXT_ONLY, {"handle": "user.bsky.social", "did": DID, "at_uri": URI}, {}
         )
-        proc = SimpleNamespace(returncode=0, stdout="   [TXT] f.txt\n")
-        with patch("core.orchestrator.subprocess.run", return_value=proc):
+        resultat = [DownloadResult("f.txt", Path("f.txt"), "text", 1)]
+        with patch("core.orchestrator.save_text", return_value=resultat):
             process_post(URL, "I", "V", "T", tmp_db, analyzer, MagicMock(), tmp_path, lambda *a, **k: None)
         ligne = tmp_db.conn.execute("SELECT at_uri, did, rkey FROM posts WHERE url = ?", (URL,)).fetchone()
         assert tuple(ligne) == (URI, DID, "3k1")
