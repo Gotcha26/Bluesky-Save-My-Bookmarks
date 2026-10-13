@@ -24,7 +24,7 @@ DEFAULT_CONFIG = {
     "bsky_app_password": "",
     "pds_url": "",  # PDS du compte ("" = inconnu, bsky.social utilisé)
     "max_workers": 4,
-    "retry_after_days": 7,  # délai avant de retenter un post en erreur (500, inconnu, repost)
+    "retry_after_days": 7,  # délai avant de retenter un post en erreur (500, 429, inconnu, échec, repost)
     "last_sync": "",
     "advanced_mode": False,
     # propose d'ouvrir le dossier après un téléchargement (ignoré en non interactif)

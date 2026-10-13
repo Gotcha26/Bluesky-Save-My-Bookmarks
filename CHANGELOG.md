@@ -27,7 +27,7 @@ Chantier issu de l'audit d'octobre 2026 (issues #1 à #18). Un point par issue.
 - **Hôte PDS** (#1) : le PDS du compte est détecté à la connexion (`pds_url`) au lieu d'un hôte codé en dur qui ne fonctionnait que pour un seul compte.
 - **Identité des posts** (#2) : un post est identifié par son AT-URI (DID + clé) et non par l'URL avec handle ; `handle.invalid` n'est plus marqué « supprimé » et un changement de handle ne crée plus de doublon.
 - **Textes** (#8) : `text.py` respecte `download_dir` et les textes sont comptés en base.
-- **Base de données** (#9) : le statut d'un post n'est plus écrasé, les médias portent leur vrai nom de fichier sans doublon, les erreurs 500, 429 et inconnues sont retentées après `retry_after_days` (7) jours.
+- **Base de données** (#9) : le statut d'un post n'est plus écrasé, les médias portent leur vrai nom de fichier sans doublon, les erreurs 500, 429 et inconnues ainsi que les téléchargements en échec (nouveau statut `failed`, échec total ou partiel) sont retentés après `retry_after_days` (7) jours.
 
 ### 🔐 Sécurité
 
@@ -45,7 +45,7 @@ Chantier issu de l'audit d'octobre 2026 (issues #1 à #18). Un point par issue.
 
 - **Python 3.11 ou plus récent** est requis (la 3.10 n'est plus prise en charge).
 - **`index_digits` vaut 2 par défaut** : les nouvelles images sont nommées `…_01.jpg` (au lieu de `…_1.jpg`). Les fichiers déjà téléchargés ne sont pas renommés ; pour garder l'ancien format, mettez `index_digits` à `1` dans `config.json`.
-- **Nouveau statut `blocked`** (post bloqué, jamais retenté, nettoyable avec les liens morts) et statut `error_429`. `repost` n'est plus écrit (ancien statut des citations, encore retenté pour les anciennes lignes).
+- **Nouveau statut `blocked`** (post bloqué, jamais retenté, nettoyable avec les liens morts) et statuts `error_429` et `failed` (téléchargement en échec, retenté). `repost` n'est plus écrit (ancien statut des citations, encore retenté pour les anciennes lignes).
 - **Schéma de la base en version 2** : migration automatique au premier lancement (table `media` recréée sans doublons, table `meta`). Sauvegardez `bsmb.db` avant de mettre à jour : le retour à une version antérieure n'est pas prévu.
 - **`requests` reste la seule dépendance obligatoire** ; `keyring` est facultatif.
 - `tools/debug_post.py`, `core/logger.py` et `FAQ.md` / `Instructions-token.md` sont supprimés ; le token n'est plus transmis par la variable `BSMB_TOKEN` à un sous-processus (le script `api/export_bookmarks.py` reste utilisable seul). `api/repost_resolver.py` n'est plus qu'un alias déprécié de `api/quote_resolver.py`.
@@ -257,7 +257,6 @@ Fonctionnalités de base :
 
 ### Prochaine version (3.2)
 - [ ] Dossier de données utilisateur (`platformdirs`) : `config.json`, `bsmb.db` et `logs/` survivraient à `pipx upgrade` au lieu d'être stockés dans le dossier d'installation
-- [ ] Statut `failed` persistant : un post dont le téléchargement a échoué serait retenté automatiquement, au lieu de rester marqué « traité » jusqu'à un Force DL
 - [ ] Contexte de fil : archiver le post parent d'une réponse (aujourd'hui seule la ligne `Réponse à:` est écrite)
 - [ ] Incrustation des sous-titres dans le MP4 (aujourd'hui des fichiers `.vtt` à côté de la vidéo)
 
