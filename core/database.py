@@ -384,18 +384,28 @@ class Database:
         Returns:
             bool: True si le statut a été posé, False si le post était déjà `ok`.
         """
-        with self._lock:
-            ligne = self._ligne_de_ref(self.conn.cursor(), ref)
-        if ligne and ligne[0] == 'ok':
-            return False
+        url = ref['url']
         at_uri = ref.get('at_uri')
-        rkey = ref.get('rkey') or ref['url'].rstrip('/').rsplit('/', 1)[-1]
-        self.add_post(ref['url'], rkey, ref.get('handle'), at_uri=at_uri, did=ref.get('did'))
         with self._lock:
-            self.conn.execute(
-                'UPDATE posts SET status = ? WHERE at_uri = ? OR (at_uri IS NULL AND url = ?)',
-                (status, at_uri, ref['url']),
-            )
+            cursor = self.conn.cursor()
+            # La ligne est identifiée par at_uri d'abord (l'URL a pu changer), puis par url
+            ligne = None
+            if at_uri:
+                ligne = cursor.execute('SELECT url, status FROM posts WHERE at_uri = ?', (at_uri,)).fetchone()
+            if ligne is None:
+                ligne = cursor.execute('SELECT url, status FROM posts WHERE url = ?', (url,)).fetchone()
+            if ligne is not None:
+                if ligne[1] == 'ok':
+                    return False
+                cursor.execute('UPDATE posts SET status = ? WHERE url = ?', (status, ligne[0]))
+            else:
+                now = datetime.now().isoformat()
+                rkey = ref.get('rkey') or url.rstrip('/').rsplit('/', 1)[-1]
+                cursor.execute(
+                    'INSERT INTO posts (url, post_id, handle, added_at, last_check, status, at_uri, did, rkey) '
+                    'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                    (url, rkey, ref.get('handle'), now, now, status, at_uri, ref.get('did'), rkey if at_uri else None),
+                )
             self.conn.commit()
         return True
 

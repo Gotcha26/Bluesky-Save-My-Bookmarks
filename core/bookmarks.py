@@ -101,11 +101,12 @@ class BookmarkSync:
     def get_cached_state(self):
         """
         Retourne l'état actuel sans refaire d'appel API.
-        Lit depuis urls.txt si disponible.
+        Lit depuis bookmarks.json s'il existe (online_count et new_count décrivent alors la même
+        liste), sinon depuis urls.txt.
 
         Returns:
             dict: {
-                "online_count": int (depuis urls.txt) ou 0,
+                "online_count": int (depuis le cache ou urls.txt) ou 0,
                 "local_count": int,
                 "new_count": int,
                 "dead_count": int,
@@ -120,12 +121,20 @@ class BookmarkSync:
         new_count = 0
         has_cache = False
 
-        if urls_file.exists() and urls_file.stat().st_size > 0:
+        retry_after_days = self.config.get("retry_after_days", 7)
+        cache = load_cache(resolve_path(self.config, "bookmarks_cache"))
+
+        if cache:
+            # Même liste pour les deux chiffres : celle de la dernière synchro
+            online_count = len(cache)
+            vivants = [p for p in cache.values() if p.get("item_type") not in _STATUT_PAR_TYPE]
+            new_count = len(self.db.get_pending_refs(vivants, retry_after_days))
+            has_cache = True
+        elif urls_file.exists() and urls_file.stat().st_size > 0:
             with open(urls_file, "r", encoding="utf-8") as f:
                 urls = [line.strip() for line in f if line.strip()]
-            online_count = len(load_cache(resolve_path(self.config, "bookmarks_cache"))) or len(urls)
-            new_urls = self.db.get_pending_posts(urls, self.config.get("retry_after_days", 7))
-            new_count = len(new_urls)
+            online_count = len(urls)
+            new_count = len(self.db.get_pending_posts(urls, retry_after_days))
             has_cache = True
 
         return {

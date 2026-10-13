@@ -244,7 +244,7 @@ schtasks /Create /SC DAILY /TN BSMB /TR "\"C:\chemin\bsmb\.venv\Scripts\python.e
 | `download_dir` | Dossier racine des téléchargements | `~/Downloads/BSMB` |
 | `token_file` | Fichier token Bearer (fallback) | `Token-Bearer.txt` |
 | `urls_file` | Liste des bookmarks exportés | `urls.txt` |
-| `bookmarks_cache` | Dernière réponse `getBookmarks` (`postView` bruts, évite un `getRecord` par post ; absent en mode dev) | `bookmarks.json` |
+| `bookmarks_cache` | Dernière réponse `getBookmarks` (`postView` bruts, évite un `getRecord` par post ; absent en mode dev). Il contient le **texte complet** de vos posts en favori (donnée personnelle) : `bookmarks.json` est ignoré par Git, mais un autre nom doit être ajouté au `.gitignore` par vos soins | `bookmarks.json` |
 | `db_file` | Base de données SQLite | `bsmb.db` |
 | `logs_dir` | Dossier des logs | `logs` |
 | `pds_url` | PDS du compte, détecté à la connexion (`""` = inconnu, `https://bsky.social` utilisé) | `""` |

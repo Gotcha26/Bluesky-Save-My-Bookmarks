@@ -328,3 +328,22 @@ class TestAnalyzeAvecPostView:
         t, _, _ = self.analyzer.analyze(URL_PV)
         assert t == PostType.ERROR_400
         mock_get.assert_called_once()
+
+
+class TestHandleInvalide:
+    def test_handle_invalid_equivalent_a_get_record(self, monkeypatch):
+        """Un author.handle = handle.invalid donne le même handle (le DID de l'URL) par les deux chemins."""
+        analyzer = PostAnalyzer()
+        url = f"https://bsky.app/profile/{DID}/post/3kpv00000001"
+        vue = _post_view()
+        vue["author"]["handle"] = "handle.invalid"
+        t_vue, d_vue, _ = analyzer.analyze(url, post_view=vue)
+
+        reponse = MagicMock(status_code=200)
+        reponse.json.return_value = {"uri": vue["uri"], "value": vue["record"]}
+        monkeypatch.setattr("api.post_analyzer.requests.get", lambda *a, **k: reponse)
+        t_rec, d_rec, _ = analyzer.analyze(url)
+
+        assert d_vue["handle"] == d_rec["handle"] == DID
+        assert t_vue == t_rec
+        assert d_vue["did"] == d_rec["did"]

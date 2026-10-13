@@ -276,6 +276,18 @@ class TestStatutBlocked:
         assert tmp_db.mark_unavailable({"url": url}, "deleted") is True
         assert tmp_db.conn.execute("SELECT status FROM posts WHERE url = ?", (url,)).fetchone()[0] == "deleted"
 
+    def test_mark_unavailable_ne_touche_que_la_ligne_identifiee(self, tmp_db):
+        at_uri = "at://did:plc:t/app.bsky.feed.post/2"
+        ancienne = "https://bsky.app/profile/ancien/post/2"
+        nouvelle = "https://bsky.app/profile/nouveau/post/2"
+        tmp_db.add_post(ancienne, "2", "ancien", at_uri=at_uri, did="did:plc:t")
+        tmp_db.mark_post_status(ancienne, "error_500")
+        tmp_db.add_post(nouvelle)  # ligne B : at_uri NULL, statut ok
+        ref = {"url": nouvelle, "at_uri": at_uri, "did": "did:plc:t", "rkey": "2"}
+        assert tmp_db.mark_unavailable(ref, "deleted") is True
+        statuts = dict(tmp_db.conn.execute("SELECT url, status FROM posts").fetchall())
+        assert statuts == {ancienne: "deleted", nouvelle: "ok"}
+
     def test_mark_unavailable_respecte_un_post_archive(self, tmp_db):
         url = "https://bsky.app/profile/u/post/2"
         tmp_db.add_post(url)
