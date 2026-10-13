@@ -1,0 +1,5 @@
+# BSMB - Dépendances Python optionnelles
+# Installation : pip install -r requirements-optional.txt
+
+# Stockage sécurisé de l'App Password (Credential Manager, Keychain, Secret Service)
+keyring>=24

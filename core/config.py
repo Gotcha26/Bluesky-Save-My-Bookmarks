@@ -25,7 +25,8 @@ DEFAULT_CONFIG = {
     "max_workers": 4,
     "retry_after_days": 7,  # délai avant de retenter un post en erreur (500, inconnu, repost)
     "last_sync": "",
-    "advanced_mode": False
+    "advanced_mode": False,
+    "warned_plaintext_secret": False  # avertissement « App Password en clair » déjà affiché
 }
 
 def get_default_paths():
@@ -58,10 +59,20 @@ def load_config():
 
     return config
 
+def restrict_permissions(path):
+    """chmod 600 sur le fichier (POSIX uniquement ; un échec est ignoré)."""
+    if os.name != "posix":
+        return
+    try:
+        os.chmod(path, 0o600)
+    except OSError:
+        pass
+
 def save_config(config):
-    """Sauvegarde la configuration"""
+    """Sauvegarde la configuration (lisible par le seul propriétaire sur POSIX)"""
     with open(CONFIG_FILE, "w", encoding="utf-8") as f:
         json.dump(config, f, indent=2, ensure_ascii=False)
+    restrict_permissions(CONFIG_FILE)
 
 def resolve_path(config, key):
     """

@@ -6,6 +6,7 @@ Obtient un token Bearer automatiquement à partir du handle + App Password.
 import requests
 
 from core.config import resolve_path
+from core.secrets import load_app_password
 
 ENDPOINT = "https://bsky.social/xrpc/com.atproto.server.createSession"
 
@@ -95,7 +96,7 @@ def get_session(config):
         d'authentification
     """
     handle = config.get("bsky_handle", "")
-    app_password = config.get("bsky_app_password", "")
+    app_password = load_app_password(config, handle)
 
     # Mode 1 : createSession
     if handle and app_password:
@@ -129,4 +130,5 @@ def get_token(config):
 
 def has_credentials(config):
     """Vérifie si des credentials sont configurés."""
-    return bool(config.get("bsky_handle")) and bool(config.get("bsky_app_password"))
+    handle = config.get("bsky_handle", "")
+    return bool(handle) and bool(load_app_password(config, handle))

@@ -1,4 +1,5 @@
 """Tests de bsmb.py : le téléchargement appelle orchestrator.run() directement (issue #10)."""
+from pathlib import Path
 from unittest.mock import patch
 
 import bsmb
@@ -64,3 +65,153 @@ class TestDownloadMediaDev:
              patch("builtins.input", side_effect=["", "n"]):
             bsmb.download_media_dev(tmp_config)
         run.assert_called_once_with([URL, URL2], tmp_config, no_db=True)
+
+
+# ─── Identifiants et déconnexion (issue #12) ─────────────────
+
+class _FauxKeyring:
+    def __init__(self):
+        self.store = {}
+
+    def set_password(self, service, user, pwd):
+        self.store[(service, user)] = pwd
+
+    def get_password(self, service, user):
+        return self.store.get((service, user))
+
+    def delete_password(self, service, user):
+        self.store.pop((service, user), None)
+
+
+def _session():
+    return {"token": "Bearer x", "refresh_jwt": None, "did": "did:plc:x", "pds_url": "https://pds.example"}
+
+
+class TestConfigureCredentials:
+    def _run(self, config, handle="user.bsky.social", pwd="abcd-efgh-ijkl-mnop"):
+        with patch("bsmb.clear_screen"), \
+             patch("builtins.input", side_effect=[handle, pwd, ""]), \
+             patch("core.auth.create_session", return_value=_session()), \
+             patch("bsmb.save_config") as save:
+            bsmb.configure_credentials(config)
+        return save
+
+    def test_secret_en_keyring_pas_dans_config(self, tmp_config, monkeypatch):
+        import sys
+        kr = _FauxKeyring()
+        monkeypatch.setitem(sys.modules, "keyring", kr)
+        save = self._run(tmp_config)
+        assert kr.store[("bsmb", "user.bsky.social")] == "abcd-efgh-ijkl-mnop"
+        assert tmp_config["bsky_app_password"] == ""
+        assert tmp_config["bsky_handle"] == "user.bsky.social"
+        assert tmp_config["pds_url"] == "https://pds.example"
+        save.assert_called()
+
+    def test_avertissement_affiche_une_seule_fois_sans_keyring(self, tmp_config, capsys):
+        self._run(tmp_config)
+        assert "en clair" in capsys.readouterr().out
+        assert tmp_config["bsky_app_password"] == "abcd-efgh-ijkl-mnop"
+        assert tmp_config["warned_plaintext_secret"] is True
+        self._run(tmp_config)
+        assert "AVERTISSEMENT" not in capsys.readouterr().out
+
+    def test_pas_d_avertissement_avec_keyring(self, tmp_config, monkeypatch, capsys):
+        import sys
+        monkeypatch.setitem(sys.modules, "keyring", _FauxKeyring())
+        self._run(tmp_config)
+        assert tmp_config.get("warned_plaintext_secret", False) is False
+        assert "AVERTISSEMENT" not in capsys.readouterr().out
+
+    def test_le_mot_de_passe_n_est_jamais_affiche(self, tmp_config, capsys):
+        self._run(tmp_config)
+        assert "abcd-efgh-ijkl-mnop" not in capsys.readouterr().out
+
+    def test_echec_de_connexion_ne_stocke_rien(self, tmp_config):
+        from core.auth import AuthError
+        with patch("bsmb.clear_screen"), \
+             patch("builtins.input", side_effect=["user.bsky.social", "mauvais", ""]), \
+             patch("core.auth.create_session", side_effect=AuthError("non")), \
+             patch("bsmb.save_config") as save:
+            bsmb.configure_credentials(tmp_config)
+        assert tmp_config["bsky_app_password"] == ""
+        save.assert_not_called()
+
+
+class TestDisconnectAccount:
+    def _config(self, tmp_config):
+        tmp_config.update(bsky_handle="user.bsky.social", pds_url="https://pds.example",
+                          bsky_app_password="en-clair")
+        return tmp_config
+
+    def test_confirmation_supprime_secret_handle_et_pds(self, tmp_config, monkeypatch):
+        import sys
+        kr = _FauxKeyring()
+        kr.store[("bsmb", "user.bsky.social")] = "secret"
+        monkeypatch.setitem(sys.modules, "keyring", kr)
+        config = self._config(tmp_config)
+        with patch("builtins.input", side_effect=["o", ""]), patch("bsmb.save_config") as save:
+            assert bsmb.disconnect_account(config) is True
+        assert kr.store == {}
+        assert config["bsky_handle"] == "" and config["pds_url"] == ""
+        assert config["bsky_app_password"] == ""
+        save.assert_called_once_with(config)
+
+    def test_refus_ne_change_rien(self, tmp_config):
+        config = self._config(tmp_config)
+        for reponse in ("", "n", "N", "x"):
+            with patch("builtins.input", side_effect=[reponse]), patch("bsmb.save_config") as save:
+                assert bsmb.disconnect_account(config) is False
+            save.assert_not_called()
+        assert config["bsky_handle"] == "user.bsky.social"
+        assert config["bsky_app_password"] == "en-clair"
+
+    def test_fichiers_telecharges_et_base_intacts(self, tmp_config):
+        config = self._config(tmp_config)
+        Database(config["db_file"]).close()
+        dossier = Path(config["download_dir"])
+        dossier.mkdir(parents=True)
+        (dossier / "a.txt").write_text("x", encoding="utf-8")
+        with patch("builtins.input", side_effect=["o", ""]), patch("bsmb.save_config"):
+            bsmb.disconnect_account(config)
+        assert (dossier / "a.txt").exists() and Path(config["db_file"]).exists()
+
+    def test_option_d_du_menu_compte(self, tmp_config):
+        config = self._config(tmp_config)
+        state = {"has_account": True, "last_sync": "", "has_urls": False,
+                 "stats": {"posts": 0, "dead": 0}}
+        with patch("bsmb.clear_screen"), \
+             patch("bsmb.disconnect_account", return_value=True) as disc, \
+             patch("bsmb.get_app_state", return_value={**state, "has_account": False}), \
+             patch("builtins.input", side_effect=["D", "0"]):
+            bsmb.menu_account(config, state)
+        disc.assert_called_once_with(config)
+
+    def test_option_d_absente_sans_compte(self, tmp_config, capsys):
+        state = {"has_account": False, "last_sync": "", "has_urls": False,
+                 "stats": {"posts": 0, "dead": 0}}
+        with patch("bsmb.clear_screen"), patch("builtins.input", side_effect=["0"]):
+            bsmb.menu_account(tmp_config, state)
+        assert "Déconnecter" not in capsys.readouterr().out
+
+
+class TestGetSessionPermissions:
+    def test_chmod_sur_le_fichier_token_existant(self, tmp_config):
+        token = Path(tmp_config["token_file"])
+        token.write_text("Bearer abc", encoding="utf-8")
+        with patch("bsmb.restrict_permissions") as restrict:
+            session = bsmb.get_session(tmp_config)
+        assert session["token"] == "Bearer abc"
+        restrict.assert_called_once_with(token)
+
+
+class TestMigrationAuDemarrage:
+    def test_main_appelle_la_migration_apres_load_config(self, tmp_config):
+        ordre = []
+        with patch("bsmb.load_config", side_effect=lambda: ordre.append("load") or tmp_config), \
+             patch("bsmb.migrate_secret_to_keyring", side_effect=lambda c: ordre.append("migrate")), \
+             patch("bsmb.ensure_dirs"), patch("core.config.cleanup_old_logs"), \
+             patch("bsmb.clear_screen"), patch("bsmb.get_app_state", return_value={}), \
+             patch("bsmb.print_header"), patch("bsmb.show_main_menu"), \
+             patch("builtins.input", side_effect=["0"]):
+            bsmb.main()
+        assert ordre == ["load", "migrate"]
