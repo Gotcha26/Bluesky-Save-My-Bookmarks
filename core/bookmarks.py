@@ -8,11 +8,63 @@ from datetime import datetime
 
 from api.export_bookmarks import DEFAULT_PDS_URL, fetch_bookmarks
 from core.auth import AuthError, NetworkError, refresh_session
-from core.bookmarks_cache import load_cache, save_cache
+from core.bookmarks_cache import load_cache, post_views_index, save_cache
 from core.config import resolve_path, save_config
 
 # Statut posé d'emblée selon la forme de l'item renvoyé par getBookmarks
 _STATUT_PAR_TYPE = {"notFoundPost": "deleted", "blockedPost": "blocked"}
+
+
+def read_urls(config):
+    """URLs de urls.txt (liste vide si le fichier est absent)."""
+    urls_file = resolve_path(config, "urls_file")
+    if not urls_file.exists():
+        return []
+    with open(urls_file, encoding="utf-8") as f:
+        return [line.strip() for line in f if line.strip()]
+
+
+def pending_downloads(config, db):
+    """
+    Posts à télécharger (nouveaux ou à retenter) : source unique du téléchargement
+    (menu, CLI) et du compteur « Nouveaux ».
+
+    Avec le cache des bookmarks (`bookmarks.json`), les posts sont comparés à la base
+    par AT-URI (`get_pending_refs`) : un changement de handle ne déclenche aucun
+    retéléchargement ; les `notFoundPost` / `blockedPost` sont exclus. Sans cache, repli
+    sur urls.txt comparé par URL (`get_pending_posts`).
+
+    Returns:
+        tuple: (URLs à traiter, {URL ou AT-URI: postView} du cache, {} sans cache)
+    """
+    retry_after_days = config.get("retry_after_days", 7)
+    cache = load_cache(resolve_path(config, "bookmarks_cache"))
+    if cache:
+        vivants = [p for p in cache.values() if p.get("item_type") not in _STATUT_PAR_TYPE and p.get("url")]
+        urls = [p["url"] for p in db.get_pending_refs(vivants, retry_after_days)]
+        return urls, post_views_index(cache)
+    return db.get_pending_posts(read_urls(config), retry_after_days), {}
+
+
+def run_sync(config, db, session_info, on_progress=None):
+    """
+    Synchronisation commune au menu et à la CLI (les appelants ne gardent que l'affichage) :
+    mémorise le PDS du compte dans la config s'il a changé, puis lance BookmarkSync.sync.
+
+    Args:
+        session_info: dict de core.auth.get_session() ({"token", "refresh_jwt", "did", "pds_url"})
+        on_progress: callback(page, count) optionnel
+
+    Returns:
+        dict: résultat de BookmarkSync.sync()
+    """
+    pds_url = session_info.get("pds_url")
+    if pds_url and config.get("pds_url") != pds_url:
+        config["pds_url"] = pds_url
+        save_config(config)
+    return BookmarkSync(config, db).sync(
+        session_info["token"], on_progress=on_progress, session_info=session_info
+    )
 
 
 class BookmarkSync:
@@ -140,26 +192,19 @@ class BookmarkSync:
         """
         stats = self.db.get_stats()
 
-        urls_file = resolve_path(self.config, "urls_file")
         online_count = 0
-        new_count = 0
         has_cache = False
-
-        retry_after_days = self.config.get("retry_after_days", 7)
         cache = load_cache(resolve_path(self.config, "bookmarks_cache"))
 
         if cache:
             # Même liste pour les deux chiffres : celle de la dernière synchro
             online_count = len(cache)
-            vivants = [p for p in cache.values() if p.get("item_type") not in _STATUT_PAR_TYPE]
-            new_count = len(self.db.get_pending_refs(vivants, retry_after_days))
             has_cache = True
-        elif urls_file.exists() and urls_file.stat().st_size > 0:
-            with open(urls_file, encoding="utf-8") as f:
-                urls = [line.strip() for line in f if line.strip()]
-            online_count = len(urls)
-            new_count = len(self.db.get_pending_posts(urls, retry_after_days))
-            has_cache = True
+        else:
+            online_count = len(read_urls(self.config))
+            has_cache = online_count > 0
+        # « Nouveaux » : exactement ce que le téléchargement traitera
+        new_count = len(pending_downloads(self.config, self.db)[0])
 
         return {
             "online_count": online_count,

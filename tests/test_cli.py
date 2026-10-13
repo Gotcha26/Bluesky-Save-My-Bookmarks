@@ -46,7 +46,7 @@ def _stats(**kw):
 @pytest.fixture
 def cfg(tmp_config):
     """Config injectée dans la CLI sans toucher à config.json."""
-    with patch("core.cli._preparer_config", return_value=tmp_config), patch("core.cli.save_config"):
+    with patch("core.cli._preparer_config", return_value=tmp_config), patch("core.bookmarks.save_config"):
         yield tmp_config
 
 
@@ -134,7 +134,10 @@ class TestStatus:
 
 class TestSync:
     def test_ok(self, cfg):
-        with patch("core.cli.get_session", return_value=SESSION), patch("core.cli.BookmarkSync") as sync_cls:
+        with (
+            patch("core.cli.get_session", return_value=SESSION),
+            patch("core.bookmarks.BookmarkSync") as sync_cls,
+        ):
             sync_cls.return_value.sync.return_value = _sync_ok()
             assert cli.main(["sync", "--yes"]) == 0
         sync_cls.return_value.sync.assert_called_once()
@@ -150,7 +153,10 @@ class TestSync:
             assert cli.main(["sync"]) == 1
 
     def test_token_expire_code_1(self, cfg):
-        with patch("core.cli.get_session", return_value=SESSION), patch("core.cli.BookmarkSync") as sync_cls:
+        with (
+            patch("core.cli.get_session", return_value=SESSION),
+            patch("core.bookmarks.BookmarkSync") as sync_cls,
+        ):
             sync_cls.return_value.sync.return_value = _sync_ok(error="expired", expired=True)
             assert cli.main(["sync"]) == 1
 
@@ -161,7 +167,10 @@ class TestSync:
             assert cli.main(["sync"]) == 2
 
     def test_erreur_reseau_code_2(self, cfg):
-        with patch("core.cli.get_session", return_value=SESSION), patch("core.cli.BookmarkSync") as sync_cls:
+        with (
+            patch("core.cli.get_session", return_value=SESSION),
+            patch("core.bookmarks.BookmarkSync") as sync_cls,
+        ):
             sync_cls.return_value.sync.return_value = _sync_ok(error="timeout")
             assert cli.main(["sync"]) == 2
 
@@ -251,7 +260,7 @@ class TestRun:
     def test_run_bout_en_bout_mocke(self, cfg):
         with (
             patch("core.cli.get_session", return_value=SESSION),
-            patch("core.cli.BookmarkSync") as sync_cls,
+            patch("core.bookmarks.BookmarkSync") as sync_cls,
             patch("core.cli.orchestrator.run", return_value=_stats()) as run,
         ):
 

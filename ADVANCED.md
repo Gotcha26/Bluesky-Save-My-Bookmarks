@@ -181,7 +181,7 @@ bsmb/
 │
 ├── core/                        # Logique métier
 │   ├── auth.py                 # createSession + refreshSession + get_session / get_token
-│   ├── bookmarks.py            # BookmarkSync (pont API ↔ DB, renouvellement du token)
+│   ├── bookmarks.py            # BookmarkSync, run_sync, pending_downloads (pont API ↔ DB)
 │   ├── bookmarks_cache.py      # Cache bookmarks.json (postView bruts)
 │   ├── cli.py                  # Sous-commandes non interactives et codes de retour
 │   ├── colors.py               # Couleurs ANSI cross-platform

@@ -8,8 +8,8 @@ Ce document explique les mécanismes internes de BSMB : ce qu'il faut savoir ava
 
 Le flux a deux temps, pilotés par le menu de `bsmb.py` ou par les sous-commandes de `core/cli.py` :
 
-1. **Synchronisation** : `core/bookmarks.py` (`BookmarkSync.sync`) appelle `api/export_bookmarks.fetch_bookmarks()` (importé, aucun sous-processus). Les URLs vont dans `urls.txt`, la réponse complète (`postView` bruts) dans `bookmarks.json` (`core/bookmarks_cache.py`), et les posts inconnus de la base sont comptés comme « nouveaux ».
-2. **Téléchargement** : `core.orchestrator.run(urls, config, no_db=False, on_progress=None, quiet=False, post_views=None)` traite les posts dans un `ThreadPoolExecutor` et renvoie un dict de statistiques. Chaque worker exécute `process_post()` : analyse du type par `PostAnalyzer`, puis appel direct de la fonction du téléchargeur adapté.
+1. **Synchronisation** : `core/bookmarks.py` (`run_sync`, commun au menu et à la CLI : mémorise le PDS puis `BookmarkSync.sync`) appelle `api/export_bookmarks.fetch_bookmarks()` (importé, aucun sous-processus). Les URLs vont dans `urls.txt`, la réponse complète (`postView` bruts) dans `bookmarks.json` (`core/bookmarks_cache.py`), et les posts inconnus de la base sont comptés comme « nouveaux ».
+2. **Téléchargement** : `core/bookmarks.pending_downloads(config, db)` donne les posts à traiter et leurs `postView` (par AT-URI depuis `bookmarks.json`, sinon par URL depuis `urls.txt` ; même calcul pour le compteur « Nouveaux » du menu et de `status`), puis `core.orchestrator.run(urls, config, no_db=False, on_progress=None, quiet=False, post_views=None)` traite les posts dans un `ThreadPoolExecutor` et renvoie un dict de statistiques. Chaque worker exécute `process_post()` : analyse du type par `PostAnalyzer`, puis appel direct de la fonction du téléchargeur adapté.
 
 Seuls `exiftool` et `ffmpeg` sont lancés en sous-processus.
 
@@ -48,8 +48,8 @@ L'App Password est géré par `core/secret_store.py` : `keyring` (service `bsmb`
 Le schéma (tables `posts`, `media`, `meta`) et les migrations sont décrits dans [ADVANCED.md](ADVANCED.md#base-de-données-sqlite). Points à connaître :
 
 - `posts.url` est la clé primaire ; l'identité canonique est `at_uri` (UNIQUE) : un changement de handle met la ligne à jour au lieu de créer un doublon.
-- `status` : `ok`, `deleted`, `blocked` (jamais retenté), `error_500`, `error_429`, `unknown` ; `repost` est un ancien statut, plus écrit mais encore retenté.
-- `get_pending_posts(urls, retry_after_days=7)` renvoie les URLs jamais vues plus les posts `error_500` / `error_429` / `unknown` / `repost` vérifiés il y a plus de `retry_after_days` jours.
+- `status` : `ok`, `deleted`, `blocked` (jamais retenté), `error_500`, `error_429`, `unknown`, `failed` (téléchargement en échec) ; `repost` est un ancien statut, plus écrit mais encore retenté.
+- `get_pending_posts(urls, retry_after_days=7)` renvoie les URLs jamais vues plus les posts `error_500` / `error_429` / `unknown` / `failed` / `repost` vérifiés il y a plus de `retry_after_days` jours ; `get_pending_refs(refs, …)` fait de même par AT-URI.
 - `add_post()` rafraîchit sans écraser `added_at` ni `status` ; `add_media()` ignore les doublons (`INSERT OR IGNORE`, `media.filename` unique par post).
 - Les migrations sont des méthodes `_migrate_vN` numérotées, appliquées dans l'ordre d'après `meta.schema_version`.
 - Une seule connexion est partagée entre les threads (`check_same_thread=False` + `threading.Lock` sur chaque méthode) ; appeler `db.close()` à la fin.
