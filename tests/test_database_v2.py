@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from api.post_analyzer import PostType
+from api.quote_resolver import QuoteTarget
 from core.bookmarks import BookmarkSync
 from core.config import DEFAULT_CONFIG
 from core.database import Database
@@ -291,11 +292,12 @@ class TestOrchestrateurStatuts:
         _lancer(tmp_db, tmp_path, PostType.UNKNOWN, {}, "")
         assert self._statut(tmp_db) == "unknown"
 
-    def test_repost_non_resolu_marque(self, tmp_db, tmp_path):
+    def test_citation_non_resolue_sans_contenu_propre_est_failed(self, tmp_db, tmp_path):
         resolver = MagicMock()
-        resolver.resolve.return_value = (None, None, None)
-        _lancer(tmp_db, tmp_path, PostType.REPOST, {}, "", resolver=resolver)
-        assert self._statut(tmp_db) == "repost"
+        resolver.resolve.return_value = None
+        res = _lancer(tmp_db, tmp_path, PostType.QUOTE, {}, "", resolver=resolver)
+        assert res[4] == "failed"
+        assert self._statut(tmp_db) != "repost"
 
     def test_succes_remet_le_statut_a_ok_apres_une_erreur(self, tmp_db, tmp_path):
         tmp_db.add_post(URL)
@@ -310,14 +312,14 @@ class TestOrchestrateurStatuts:
         _lancer(tmp_db, tmp_path, PostType.TEXT_ONLY, {}, erreur=DownloadError("API"))
         assert self._statut(tmp_db) == "error_500"
 
-    def test_repost_resolu_remet_le_citant_a_ok(self, tmp_db, tmp_path):
+    def test_citation_archivee_remet_le_citant_a_ok(self, tmp_db, tmp_path):
         tmp_db.add_post(URL)
-        tmp_db.mark_post_status(URL, "repost")
+        tmp_db.mark_post_status(URL, "unknown")
         resolver = MagicMock()
-        resolver.resolve.return_value = (URL2, "user", "3k2")
+        resolver.resolve.return_value = _cible()
         analyzer = MagicMock()
         analyzer.analyze.side_effect = [
-            (PostType.REPOST, {}, {}),
+            (PostType.QUOTE, {}, {}),
             (PostType.TEXT_ONLY, {}, {}),
         ]
         with _downloaders([_res("t.txt", "text")]):
@@ -325,34 +327,50 @@ class TestOrchestrateurStatuts:
         assert self._statut(tmp_db) == "ok"
 
 
-class TestRepostOriginalEnEchec:
-    def _citant_dont_l_original(self, db, tmp_path, type_original, erreur=None):
+def _cible():
+    return QuoteTarget(URL2, DID, "3k2", "user.bsky.social", "app.bsky.feed.post", "post")
+
+
+class TestCitationEnEchec:
+    """Le citant garde son propre contenu : son statut ne dépend pas de l'issue du post cité."""
+
+    def _citant_dont_le_cite(self, db, tmp_path, type_cite, erreur_cite=None):
         db.add_post(URL)
         resolver = MagicMock()
-        resolver.resolve.return_value = (URL2, "user", "3k2")
+        resolver.resolve.return_value = _cible()
         analyzer = MagicMock()
-        analyzer.analyze.side_effect = [(PostType.REPOST, {}, {}), (type_original, {}, {"embed_type": "x"})]
-        with _downloaders(erreur=erreur):
-            return process_post(URL, "IMG", "VID", "TXT", db, analyzer, resolver, tmp_path, lambda *a, **k: None)
+        analyzer.analyze.side_effect = [(PostType.QUOTE, {}, {}), (type_cite, {}, {"embed_type": "x"})]
 
-    def test_original_en_erreur_500_le_citant_reste_retentable(self, tmp_db, tmp_path):
-        res = self._citant_dont_l_original(tmp_db, tmp_path, PostType.ERROR_500)
-        assert res[4] == "error_500"
-        assert _ligne(tmp_db, URL)["status"] == "error_500"
-        assert tmp_db.get_pending_posts([URL]) == []  # trop récent
-        _vieillir(tmp_db, URL, 8)
-        assert tmp_db.get_pending_posts([URL]) == [URL]
+        def save_text(url, dest, config, session=None, name_prefix=None):
+            if name_prefix and erreur_cite:
+                raise erreur_cite
+            return [_res("citant.txt" if not name_prefix else "cite.txt", "text")]
 
-    def test_original_en_echec_de_telechargement_le_citant_n_est_pas_ok(self, tmp_db, tmp_path):
-        res = self._citant_dont_l_original(tmp_db, tmp_path, PostType.TEXT_ONLY, erreur=DownloadError("API"))
-        assert res[4] == "failed"
-        assert _ligne(tmp_db, URL)["status"] == "unknown"
-        _vieillir(tmp_db, URL, 8)
-        assert tmp_db.get_pending_posts([URL]) == [URL]
+        non_resolues = []
+        with patch.multiple("core.orchestrator", save_text=save_text):
+            res = process_post(URL, "IMG", "VID", "TXT", db, analyzer, resolver, tmp_path,
+                               lambda *a, **k: None, quotes_unresolved=non_resolues)
+        return res, non_resolues
 
-    def test_original_supprime_le_citant_est_deleted(self, tmp_db, tmp_path):
-        self._citant_dont_l_original(tmp_db, tmp_path, PostType.ERROR_400)
-        assert _ligne(tmp_db, URL)["status"] == "deleted"
+    def test_cite_en_erreur_500_le_citant_reste_ok(self, tmp_db, tmp_path):
+        res, non_resolues = self._citant_dont_le_cite(tmp_db, tmp_path, PostType.ERROR_500)
+        assert res[4] == "success"
+        assert _ligne(tmp_db, URL)["status"] == "ok"
+        assert non_resolues == [URL]
+        assert _medias(tmp_db) == [("text", "citant.txt")]
+
+    def test_echec_de_telechargement_du_cite_le_citant_reste_ok(self, tmp_db, tmp_path):
+        res, non_resolues = self._citant_dont_le_cite(
+            tmp_db, tmp_path, PostType.TEXT_ONLY, erreur_cite=DownloadError("API"))
+        assert res[4] == "success"
+        assert _ligne(tmp_db, URL)["status"] == "ok"
+        assert non_resolues == [URL]
+
+    def test_cite_supprime_le_citant_reste_ok_sans_citation_non_resolue(self, tmp_db, tmp_path):
+        res, non_resolues = self._citant_dont_le_cite(tmp_db, tmp_path, PostType.ERROR_400)
+        assert res[4] == "success"
+        assert _ligne(tmp_db, URL)["status"] == "ok"
+        assert non_resolues == []
 
 
 class TestSynchronisation:

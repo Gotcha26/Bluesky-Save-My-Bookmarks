@@ -1,0 +1,19 @@
+{
+  "uri": "at://did:plc:test3000000000000000000000/app.bsky.feed.post/3kchain000c",
+  "cid": "bafyreitest000000000000000000000000000000000000000000000000",
+  "value": {
+    "$type": "app.bsky.feed.post",
+    "text": "C cite D",
+    "createdAt": "2026-02-10T09:30:00.000Z",
+    "langs": [
+      "fr"
+    ],
+    "embed": {
+      "$type": "app.bsky.embed.record",
+      "record": {
+        "uri": "at://did:plc:test4000000000000000000000/app.bsky.feed.post/3kchain000d",
+        "cid": "bafyreitest000000000000000000000000000000000000000000000000"
+      }
+    }
+  }
+}

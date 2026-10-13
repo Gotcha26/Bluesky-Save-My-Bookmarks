@@ -11,7 +11,8 @@ URL2 = "https://bsky.app/profile/user.bsky.social/post/3k2"
 
 def _stats(success=1):
     return {"total": 1, "success": success, "images": 0, "videos": 0, "texts": success,
-            "error_500": [], "error_400": [], "reposts": [], "unknown": [], "failed": []}
+            "error_500": [], "error_400": [], "quotes_unresolved": [], "reposts": [],
+            "unknown": [], "failed": []}
 
 
 def _urls(tmp_config, *urls):

@@ -41,11 +41,11 @@
 - ✅ Marqué comme traité (pas de re-tentative)
 - ❌ Aucun média téléchargé (post inaccessible)
 
-**Q : Les reposts sont-ils gérés ?**  
-**R :** Oui ! Quand un repost est détecté :
-1. BSMB extrait l'URL du post original
-2. Le post original est téléchargé automatiquement
-3. Si le repost ne peut pas être résolu, il est listé dans `logs/reposts_unresolved_*.txt`
+**Q : Les citations (quote posts) sont-elles gérées ?**  
+**R :** Oui ! Un post qui en cite un autre est archivé comme n'importe quel post (son texte, ses médias), puis le post cité est archivé à son tour :
+1. Les fichiers du post cité portent le nom du post bookmarké suivi de `_quote` (`_quote2` pour une citation de citation) ; deux niveaux au maximum
+2. Si le post cité est supprimé, bloqué ou n'est pas un post (feed, liste…), une note est ajoutée au log et le post bookmarké reste « ok »
+3. Si le post cité n'a pas pu être archivé (erreur réseau ou serveur), il est listé dans `logs/quotes_unresolved_*.txt`
 
 **Q : J'ai X posts trackés mais 0 médias téléchargés, pourquoi ?**  
 **R :** C'est **normal** ! Un post est "tracké" dès qu'il est analysé, même s'il ne contient aucun média téléchargeable.
@@ -62,10 +62,10 @@
    - Trackés pour ne pas les re-tenter
    - Listés dans `logs/deleted_posts_*.txt`
 
-3. **Reposts non résolus**
-   - BSMB n'a pas pu extraire le post original
+3. **Citations non archivées**
+   - Le post est archivé, mais pas le post qu'il cite (erreur réseau ou serveur)
    - Trackés comme "traités"
-   - Listés dans `logs/reposts_unresolved_*.txt`
+   - Listés dans `logs/quotes_unresolved_*.txt`
 
 4. **Erreurs serveur (500)**
    - Erreur temporaire de l'API Bluesky
@@ -85,7 +85,7 @@ Menu > Option 4 : Statistiques
 Consultez les fichiers dans le dossier `logs/` :
 - `failed_downloads_*.txt` : Échecs de téléchargement
 - `deleted_posts_*.txt` : Posts supprimés
-- `reposts_unresolved_*.txt` : Reposts non traités
+- `quotes_unresolved_*.txt` : Citations dont le post cité n'a pas pu être archivé
 - `download_*.log` : Log détaillé de la session
 
 ### 💾 Stockage et données
@@ -172,7 +172,7 @@ Pour re-télécharger une **liste restreinte** :
 La base de données `bsmb.db` a un rôle **cumulatif et historique**. Elle conserve la trace de **tous** les posts que vous avez tenté de traiter, même ceux qui :
 - N'ont plus de médias téléchargeables
 - Ont été supprimés par leur auteur
-- Sont des reposts non résolus
+- Citent un post qui n'a pas pu être archivé
 - Contiennent uniquement du texte
 - Ont échoué au téléchargement
 
@@ -300,7 +300,7 @@ Ce système évite les erreurs en masquant les actions impossibles.
 
 **Q : "Aucun média trouvé" alors que le post en contient**  
 **R :** Vérifiez :
-1. Le post est peut-être un **repost non résolu** (listé dans les logs)
+1. Le post est peut-être un **post dont la citation n'a pas pu être archivée** (listé dans `quotes_unresolved_*.txt`)
 2. Le post contient peut-être un type de média non géré (créez une issue GitHub)
 3. Utilisez `tools/debug_post.py` pour analyser la structure du post
 

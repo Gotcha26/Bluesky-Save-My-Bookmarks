@@ -44,9 +44,12 @@ def nom_fichier_texte(handle, post_id, created_at):
     return f"{nom_base_texte(handle, post_id, created_at)}.txt"
 
 
-def save_text(post_url, dest_dir, config, session=None):
+def save_text(post_url, dest_dir, config, session=None, name_prefix=None):
     """
     Sauvegarde le texte d'un post dans dest_dir.
+
+    name_prefix : si fourni, remplace la base <handle>_<date>_<postid> du nom
+    (texte d'un post cité : <prefix>.txt).
 
     Returns:
         list[DownloadResult] : le fichier texte écrit ; liste vide si l'URL
@@ -75,7 +78,7 @@ def save_text(post_url, dest_dir, config, session=None):
     if not text:
         return []
 
-    filename = nom_fichier_texte(handle, post_id, created_at)
+    filename = f"{name_prefix}.txt" if name_prefix else nom_fichier_texte(handle, post_id, created_at)
     dest_dir = Path(dest_dir)
     dest_dir.mkdir(parents=True, exist_ok=True)
     filepath = dest_dir / filename

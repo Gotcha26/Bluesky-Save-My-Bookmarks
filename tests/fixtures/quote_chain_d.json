@@ -1,0 +1,12 @@
+{
+  "uri": "at://did:plc:test4000000000000000000000/app.bsky.feed.post/3kchain000d",
+  "cid": "bafyreitest000000000000000000000000000000000000000000000000",
+  "value": {
+    "$type": "app.bsky.feed.post",
+    "text": "D est le dernier maillon",
+    "createdAt": "2026-02-10T09:30:00.000Z",
+    "langs": [
+      "fr"
+    ]
+  }
+}

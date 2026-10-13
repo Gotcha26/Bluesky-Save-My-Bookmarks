@@ -16,6 +16,7 @@ import time
 import threading
 import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
@@ -29,8 +30,9 @@ from core.config import (  # noqa: E402
 from core.database import Database  # noqa: E402
 from core.colors import c  # noqa: E402
 from api.post_analyzer import PostAnalyzer, PostType  # noqa: E402
-from api.repost_resolver import RepostResolver  # noqa: E402
+from api.quote_resolver import QuoteResolver  # noqa: E402
 from downloaders import DownloadError, lignes_console  # noqa: E402
+from downloaders.text import nom_base_texte  # noqa: E402
 from downloaders.images import download_images  # noqa: E402
 from downloaders.videos import download_video  # noqa: E402
 from downloaders.text import save_text  # noqa: E402
@@ -38,6 +40,10 @@ from downloaders.external import download_external  # noqa: E402
 
 # Lock global pour l'affichage console (évite les lignes entrelacées)
 _print_lock = threading.Lock()
+
+# Profondeur maximale d'une chaîne de citations : le post bookmarké est à 0, le post
+# qu'il cite à 1, celui que ce dernier cite à 2 ; au-delà, rien n'est archivé.
+PROFONDEUR_MAX = 2
 
 
 def get_folder_size(path):
@@ -81,22 +87,28 @@ def save_debug_info(post_id, debug_info, logs_dir):
     return debug_file
 
 
-def _telecharger(downloader, url, dest_dir, config, buf_print, log_func):
+def _telecharger(downloader, url, dest_dir, config, buf_print, log_func, erreurs=None, **options):
     """
     Appelle un downloader et affiche ses résultats.
     Toute exception est isolée au post (journalisée, statut « failed ») pour
     ne jamais interrompre le lot.
+    options : paramètres nommés transmis au downloader (name_prefix).
+    erreurs : liste (optionnelle) à laquelle l'exception est ajoutée.
     Returns: la liste de DownloadResult (vide en cas d'erreur ou sans média).
     """
     try:
-        results = downloader(url, dest_dir, config)
+        results = downloader(url, dest_dir, config, **options)
     except DownloadError as e:
         buf_print(f"       [ERR] {e}")
         log_func(f"   ERREUR DE TÉLÉCHARGEMENT: {url} - {e}", to_console=False)
+        if erreurs is not None:
+            erreurs.append(e)
         return []
     except Exception as e:
         buf_print(f"       [ERR] Erreur inattendue : {e}")
         log_func(f"   ERREUR INATTENDUE: {url} - {type(e).__name__}: {e}", to_console=False)
+        if erreurs is not None:
+            erreurs.append(e)
         return []
     if not results:
         buf_print("       [!] Aucun média trouvé")
@@ -105,13 +117,145 @@ def _telecharger(downloader, url, dest_dir, config, buf_print, log_func):
     return results
 
 
-def process_post(url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_dir, log_func, config=None):
+@dataclass
+class _Contexte:
+    """Ce dont l'archivage d'un post (et de ses citations) a besoin."""
+    dirs: dict
+    config: dict
+    analyzer: object
+    resolver: object
+    buf_print: object
+    log_func: object
+
+
+# Libellés des états d'un record cité qui n'est plus lisible
+_ETATS_CITE_ABSENT = {"not_found": "supprimé", "blocked": "bloqué", "detached": "détaché"}
+
+
+def _contenu_propre(post_type, data, url, ctx, name_prefix=None, erreurs=None):
+    """
+    Télécharge le contenu propre d'un post selon son type (sans suivre sa citation).
+
+    name_prefix : base de nom des fichiers d'un post cité (None pour le post bookmarké).
+    erreurs : liste complétée avec les erreurs de téléchargement rencontrées.
+    Returns: la liste de DownloadResult.
+    """
+    cite = name_prefix is not None
+    options = {"name_prefix": name_prefix} if cite else {}
+    dirs = ctx.dirs
+    args = (ctx.config, ctx.buf_print, ctx.log_func)
+    results = []
+
+    if post_type == PostType.IMAGES:
+        ctx.buf_print(c.info(f"{data.get('image_count', 1)} image(s) détectée(s)"))
+        results = _telecharger(download_images, url, dirs["img_dir"], *args, erreurs=erreurs, **options)
+    elif post_type == PostType.VIDEO:
+        ctx.buf_print(c.info("Vidéo détectée"))
+        results = _telecharger(download_video, url, dirs["vid_dir"], *args, erreurs=erreurs, **options)
+    elif post_type == PostType.EXTERNAL and not cite:
+        # Embed externe : carte de lien, GIF, lien tiers
+        ctx.buf_print(c.info("Lien externe détecté"))
+        results = _telecharger(
+            lambda u, _dest, cfg: download_external(u, data, dirs, cfg),
+            url, dirs["text_dir"], *args, erreurs=erreurs)
+    elif post_type in (PostType.TEXT_ONLY, PostType.QUOTE, PostType.EXTERNAL):
+        # Un lien externe cité n'est archivé que par son texte
+        ctx.buf_print(c.info("Texte seul détecté" if post_type == PostType.TEXT_ONLY else "Texte du post détecté"))
+        results = _telecharger(save_text, url, dirs["text_dir"], *args, erreurs=erreurs, **options)
+
+    # Le texte d'une citation avec média n'est pas dans le média : on le garde aussi
+    if data.get("is_quote") and post_type in (PostType.IMAGES, PostType.VIDEO):
+        results = results + _telecharger(save_text, url, dirs["text_dir"], *args, erreurs=erreurs, **options)
+    return results
+
+
+def _base_de_nom(url, data):
+    """<handle>_<YYYYMMDD>_<postid> du post citant : base commune des fichiers de ses citations."""
+    post_id = url.rstrip("/").split("/")[-1]
+    parts = url.split("/")
+    handle = data.get("handle") or (parts[4] if len(parts) > 4 else "")
+    return nom_base_texte(handle, post_id, data.get("created_at", ""))
+
+
+def _archiver_citation(url, quote_uri, depth, base, ctx):
+    """
+    Archive le post cité par la citation `url` (de profondeur `depth`), puis, tant que
+    la profondeur le permet, les citations de ce post cité.
+
+    Les fichiers du post cité de profondeur n sont préfixés par `base` (identifiant du
+    post bookmarké) : <base>_quote (n=1), <base>_quote2 (n=2).
+
+    Returns: (results, problemes) où problemes est une liste de (genre, référence),
+    genre valant "failed" (erreur réseau/serveur) ou un état de QuoteTarget
+    ("not_found", "blocked", "detached").
+    """
+    cible = ctx.resolver.resolve(url)
+    if cible is None:
+        ref = quote_uri or url
+        ctx.buf_print(c.warning("Citation non résolue"))
+        ctx.log_func(f"   CITATION NON ARCHIVÉE: {ref}", to_console=False)
+        return [], [("failed", ref)]
+
+    if cible.state == "not_post":
+        ctx.buf_print(f"  {c.DIM}Le record cité n'est pas un post ({cible.collection}) : ignoré{c.RESET}")
+        ctx.log_func(f"   CITATION IGNORÉE: {url} - le record cité n'est pas un post ({cible.collection})",
+                     to_console=False)
+        return [], []
+
+    if cible.state != "post":
+        etat = _ETATS_CITE_ABSENT.get(cible.state, cible.state)
+        ctx.buf_print(f"  {c.DIM}Post cité {etat}{c.RESET}")
+        ctx.log_func(f"   NOTE: post cité {etat} ({cible.url or cible.at_uri}) pour {url}", to_console=False)
+        return [], [(cible.state, cible.url or cible.at_uri)]
+
+    profondeur = depth + 1
+    ctx.buf_print(f"  {c.OK}>{c.RESET} Post cité : {c.VALUE}{cible.url}{c.RESET}")
+    post_type, data, debug_info = ctx.analyzer.analyze(cible.url)
+
+    if post_type == PostType.ERROR_400:
+        ctx.buf_print(f"  {c.DIM}Post cité supprimé{c.RESET}")
+        ctx.log_func(f"   NOTE: post cité supprimé ({cible.url}) pour {url}", to_console=False)
+        return [], [("not_found", cible.url)]
+    if post_type == PostType.ERROR_500 or (post_type == PostType.UNKNOWN and "error" in debug_info):
+        ctx.buf_print(c.warning("Post cité inaccessible"))
+        ctx.log_func(f"   CITATION NON ARCHIVÉE: {cible.url}", to_console=False)
+        return [], [("failed", cible.url)]
+    if post_type == PostType.UNKNOWN:
+        ctx.buf_print(f"  {c.DIM}Contenu du post cité non reconnu : ignoré{c.RESET}")
+        ctx.log_func(f"   NOTE: contenu du post cité non reconnu ({cible.url})", to_console=False)
+        return [], []
+
+    suffixe = "quote" if profondeur == 1 else f"quote{profondeur}"
+    erreurs = []
+    results = _contenu_propre(post_type, data, cible.url, ctx, name_prefix=f"{base}_{suffixe}", erreurs=erreurs)
+    problemes = []
+    if erreurs:
+        ctx.log_func(f"   CITATION NON ARCHIVÉE: {cible.url}", to_console=False)
+        problemes.append(("failed", cible.url))
+
+    est_citation = post_type == PostType.QUOTE or data.get("is_quote")
+    if est_citation and profondeur < PROFONDEUR_MAX:
+        suite, suite_problemes = _archiver_citation(cible.url, data.get("quote_uri"), profondeur, base, ctx)
+        results += suite
+        problemes += suite_problemes
+    return results, problemes
+
+
+def process_post(url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_dir, log_func, config=None,
+                 depth=0, quotes_unresolved=None):
     """
     Traite un post unique et retourne les stats.
     Returns: (has_success, img_count, vid_count, text_count, status, output_lines)
 
     output_lines contient les lignes à afficher (buffered pour le mode parallèle).
     config : transmise aux downloaders (DEFAULT_CONFIG si None).
+    depth : profondeur du post dans une chaîne de citations (0 pour un bookmark) ;
+        les citations ne sont suivies que tant que depth < PROFONDEUR_MAX.
+    quotes_unresolved : liste complétée avec `url` quand le post est archivé mais
+        que le post qu'il cite n'a pas pu l'être (erreur réseau ou serveur).
+
+    Une citation est archivée comme un post normal (texte, média d'un recordWithMedia),
+    puis le post cité l'est à son tour ; tous les fichiers sont enregistrés sous `url`.
     """
     config = DEFAULT_CONFIG if config is None else config
     output = []
@@ -129,11 +273,6 @@ def process_post(url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_d
     if db:
         handle = data.get("handle")
         db.add_post(url, post_id, handle, at_uri=data.get("at_uri"), did=data.get("did"))
-
-    results = []
-    img_count = 0
-    vid_count = 0
-    text_count = 0
 
     # === TRAITEMENT PAR TYPE ===
 
@@ -154,72 +293,8 @@ def process_post(url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_d
             db.mark_post_status(url, 'deleted')
         return False, 0, 0, 0, 'error_400', output
 
-    # Repost - RÉSOLUTION
-    if post_type == PostType.REPOST:
-        buf_print(c.info("Repost détecté, résolution du post d'origine..."))
-        original_url, original_handle, original_post_id = resolver.resolve(url)
-
-        if original_url:
-            buf_print(f"  {c.OK}>{c.RESET} Post original : {c.VALUE}{original_handle}/post/{original_post_id}{c.RESET}")
-            buf_print(f"  {c.DIM}{original_url}{c.RESET}")
-
-            # Traiter récursivement le post original
-            resultat = process_post(original_url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver,
-                                    logs_dir, log_func, config)
-
-            # Le citant n'est « ok » que si l'original a réussi ; sinon il garde un
-            # statut retentable (l'original n'est pas dans les bookmarks, seul le
-            # citant peut être relancé)
-            if db:
-                statut_original = resultat[4]
-                if resultat[0]:
-                    statut = 'ok'
-                elif statut_original == 'error_400':
-                    statut = 'deleted'
-                elif statut_original in ('error_500', 'unknown', 'repost'):
-                    statut = statut_original
-                else:
-                    statut = 'unknown'
-                db.mark_post_status(url, statut)
-            return resultat
-        else:
-            buf_print(c.warning("Impossible de résoudre le repost"))
-            log_func(f"   REPOST NON RÉSOLU: {url}", to_console=False)
-            if db:
-                db.mark_post_status(url, 'repost')
-            return False, 0, 0, 0, 'repost', output
-
-    # Images
-    if post_type == PostType.IMAGES:
-        buf_print(c.info(f"{data['image_count']} image(s) détectée(s)"))
-        results = _telecharger(download_images, url, IMG_DIR, config, buf_print, log_func)
-        img_count = len(results)
-
-    # Vidéo
-    elif post_type == PostType.VIDEO:
-        buf_print(c.info("Vidéo détectée"))
-        results = _telecharger(download_video, url, VID_DIR, config, buf_print, log_func)
-        vid_count = len(results)
-
-    # Embed externe : carte de lien, GIF, lien tiers
-    elif post_type == PostType.EXTERNAL:
-        buf_print(c.info("Lien externe détecté"))
-        dirs = {"img_dir": IMG_DIR, "vid_dir": VID_DIR, "text_dir": TEXT_DIR}
-        results = _telecharger(
-            lambda u, _dest, cfg: download_external(u, data, dirs, cfg),
-            url, TEXT_DIR, config, buf_print, log_func)
-        img_count = sum(r.media_type == "image" for r in results)
-        vid_count = sum(r.media_type == "video" for r in results)
-        text_count = sum(r.media_type == "text" for r in results)
-
-    # Texte seul
-    elif post_type == PostType.TEXT_ONLY:
-        buf_print(c.info("Texte seul détecté"))
-        results = _telecharger(save_text, url, TEXT_DIR, config, buf_print, log_func)
-        text_count = len(results)
-
     # Cas inconnu - MODE DEBUG
-    elif post_type == PostType.UNKNOWN:
+    if post_type == PostType.UNKNOWN:
         buf_print(c.warning("Type de post non reconnu"))
         debug_file = save_debug_info(post_id, debug_info, logs_dir)
         buf_print(f"  {c.DIM}Debug sauvegardé : {debug_file.name}{c.RESET}")
@@ -232,6 +307,30 @@ def process_post(url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_d
             db.mark_post_status(url, 'unknown')
         return False, 0, 0, 0, 'unknown', output
 
+    ctx = _Contexte(
+        dirs={"img_dir": IMG_DIR, "vid_dir": VID_DIR, "text_dir": TEXT_DIR},
+        config=config, analyzer=analyzer, resolver=resolver, buf_print=buf_print, log_func=log_func,
+    )
+    est_citation = post_type == PostType.QUOTE or bool(data.get("is_quote"))
+
+    # 1. Le post bookmarké, d'après son propre contenu
+    if est_citation:
+        buf_print(c.info("Citation détectée, résolution du post cité..."))
+    erreurs = []
+    results = _contenu_propre(post_type, data, url, ctx, erreurs=erreurs)
+    propre_archive = bool(results)
+
+    # 2. Le post qu'il cite (profondeur max PROFONDEUR_MAX)
+    problemes = []
+    if est_citation and depth < PROFONDEUR_MAX:
+        cites, problemes = _archiver_citation(url, data.get("quote_uri"), depth, _base_de_nom(url, data), ctx)
+        results = results + cites
+
+    img_count = sum(r.media_type == "image" for r in results)
+    vid_count = sum(r.media_type == "video" for r in results)
+    text_count = sum(r.media_type == "text" for r in results)
+    echec_citation = any(genre == "failed" for genre, _ in problemes)
+
     # Bilan
     if results:
         if db:
@@ -240,11 +339,22 @@ def process_post(url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_d
             db.update_last_check(url)
             # Un post retenté avec succès ne doit plus rester en erreur
             db.mark_post_status(url, 'ok')
+        if echec_citation and quotes_unresolved is not None:
+            quotes_unresolved.append(url)
         log_func(f"   SUCCÈS: {url}", to_console=False)
         return True, img_count, vid_count, text_count, 'success', output
-    else:
-        log_func(f"   ÉCHEC: {url}", to_console=False)
-        return False, 0, 0, 0, 'failed', output
+
+    # Rien d'archivé : le citant n'a pas de contenu propre et son cité est supprimé,
+    # bloqué ou détaché -> rien à conserver, comme un post supprimé
+    if est_citation and not erreurs and problemes and not echec_citation:
+        buf_print(c.error("Post cité supprimé ou inaccessible"))
+        log_func(f"   POST SUPPRIMÉ: {url}", to_console=False)
+        if db:
+            db.mark_post_status(url, 'deleted')
+        return False, 0, 0, 0, 'error_400', output
+
+    log_func(f"   ÉCHEC: {url}", to_console=False)
+    return False, 0, 0, 0, 'failed', output
 
 
 def _format_job_summary(idx, total, url, status, img_count, vid_count, text_count):
@@ -269,8 +379,6 @@ def _format_job_summary(idx, total, url, status, img_count, vid_count, text_coun
         return f"  {c.DIM}{counter}{c.RESET} {c.RED}--{c.RESET} {c.DIM}post supprimé (400){c.RESET}"
     elif status == 'error_500':
         return f"  {c.DIM}{counter}{c.RESET} {c.RED}--{c.RESET} {c.DIM}erreur serveur (500){c.RESET}"
-    elif status == 'repost':
-        return f"  {c.DIM}{counter}{c.RESET} {c.YELLOW}~~{c.RESET} {c.DIM}repost non résolu{c.RESET}"
     elif status == 'unknown':
         return f"  {c.DIM}{counter}{c.RESET} {c.YELLOW}??{c.RESET} {c.DIM}type inconnu{c.RESET}"
     else:
@@ -316,9 +424,10 @@ def print_report(stats, duration, total_size, no_db_mode, log_file, max_workers,
     print()
 
     # Problèmes (seulement si présents)
+    non_resolues = stats.get('quotes_unresolved', stats.get('reposts', []))
     has_problems = any([
         stats['error_500'], stats['error_400'],
-        stats['reposts'], stats['unknown'], stats['failed']
+        non_resolues, stats['unknown'], stats['failed']
     ])
 
     if has_problems:
@@ -328,8 +437,8 @@ def print_report(stats, duration, total_size, no_db_mode, log_file, max_workers,
             print(c.config_line("Posts supprimés (400)", str(len(stats['error_400'])), 28))
         if stats['error_500']:
             print(c.config_line("Erreurs serveur (500)", str(len(stats['error_500'])), 28))
-        if stats['reposts']:
-            print(c.config_line("Reposts non résolus", str(len(stats['reposts'])), 28))
+        if non_resolues:
+            print(c.config_line("Citations non archivées", str(len(non_resolues)), 28))
         if stats['unknown']:
             print(c.config_line("Types inconnus", str(len(stats['unknown'])), 28))
         if stats['failed']:
@@ -368,7 +477,7 @@ def _save_problem_logs(stats, logs_dir):
 
     entries = [
         ("error_400", "deleted_posts", "posts supprimés"),
-        ("reposts", "reposts_unresolved", "reposts non résolus"),
+        ("quotes_unresolved", "quotes_unresolved", "citations non archivées"),
         ("error_500", "error_500", "erreurs 500"),
         ("unknown", "unknown_types", "types inconnus"),
         ("failed", "failed_downloads", "échecs"),
@@ -398,8 +507,9 @@ def run(urls, config, no_db=False, on_progress=None, quiet=False) -> dict:
 
     Returns:
         dict: {"total", "success", "images", "videos", "texts",
-               "error_500", "error_400", "reposts", "unknown", "failed"}
-        (les cinq dernières clés sont des listes d'URLs)
+               "error_500", "error_400", "quotes_unresolved", "reposts", "unknown", "failed"}
+        (les six dernières clés sont des listes d'URLs ; "quotes_unresolved" liste les
+        bookmarks archivés dont le post cité ne l'a pas été, "reposts" est son ancien nom)
     """
     return _run(urls, config, media_dirs=get_media_dirs(config), no_db=no_db,
                 on_progress=on_progress, quiet=quiet)
@@ -414,7 +524,7 @@ def _run(urls, config, media_dirs, no_db=False, on_progress=None, quiet=False):
 
     max_workers = max(1, int(config.get("max_workers", 4)))
     analyzer = PostAnalyzer()
-    resolver = RepostResolver()
+    resolver = QuoteResolver()
 
     # Compteurs (mis à jour dans le thread principal, au fil de as_completed)
     total_jobs = len(urls)
@@ -425,7 +535,7 @@ def _run(urls, config, media_dirs, no_db=False, on_progress=None, quiet=False):
     completed_count = 0
     failed_urls = []
     deleted_urls = []
-    repost_unresolved_urls = []
+    quotes_unresolved_urls = []  # alimentée par les workers (list.append est atomique)
     error_500_urls = []
     unknown_urls = []
 
@@ -465,7 +575,8 @@ def _run(urls, config, media_dirs, no_db=False, on_progress=None, quiet=False):
         """Worker qui traite un post et retourne le résultat."""
         log(f"Job {idx}/{total_jobs}: {url}", to_console=False)
         has_success, imgs, vids, texts, status, output_lines = process_post(
-            url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_dir, log, config
+            url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_dir, log, config,
+            quotes_unresolved=quotes_unresolved_urls,
         )
         return idx, url, has_success, imgs, vids, texts, status, output_lines
 
@@ -491,8 +602,6 @@ def _run(urls, config, media_dirs, no_db=False, on_progress=None, quiet=False):
                     error_500_urls.append(url)
                 elif status == 'error_400':
                     deleted_urls.append(url)
-                elif status == 'repost':
-                    repost_unresolved_urls.append(url)
                 elif status == 'unknown':
                     unknown_urls.append(url)
                 elif status == 'failed':
@@ -522,7 +631,8 @@ def _run(urls, config, media_dirs, no_db=False, on_progress=None, quiet=False):
         'texts': text_count,
         'error_500': error_500_urls,
         'error_400': deleted_urls,
-        'reposts': repost_unresolved_urls,
+        'quotes_unresolved': quotes_unresolved_urls,
+        'reposts': quotes_unresolved_urls,  # ancien nom, même liste
         'unknown': unknown_urls,
         'failed': failed_urls,
     }

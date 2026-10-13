@@ -75,6 +75,21 @@ class TestDownloadImages:
         assert res[0].path.read_bytes() == b"aaaa"
         assert res[0].cid is None
 
+    def test_name_prefix_remplace_la_base_du_nom(self, tmp_path, exiftool):
+        session = _session(_thread(EMBED_2_IMAGES))
+        res = download_images(URL, tmp_path, DEFAULT_CONFIG, session=session,
+                              name_prefix="citant_20260210_3kq_quote")
+        assert [r.filename for r in res] == ["citant_20260210_3kq_quote_1.jpg", "citant_20260210_3kq_quote_2.png"]
+        assert all((tmp_path / r.filename).exists() for r in res)
+
+    def test_name_prefix_tronque_a_max_filename_len(self, tmp_path, exiftool):
+        session = _session(_thread(EMBED_2_IMAGES))
+        res = download_images(URL, tmp_path, {**DEFAULT_CONFIG, "max_filename_len": 20}, session=session,
+                              name_prefix="a" * 50 + "_quote")
+        assert all(len(r.filename) <= 20 for r in res)
+        assert res[0].filename.endswith(".jpg") and res[1].filename.endswith(".png")
+        assert len({r.filename for r in res}) == 2
+
     def test_metadonnees_exif_inchangees(self, tmp_path, exiftool):
         session = _session(_thread(EMBED_2_IMAGES))
         res = download_images(URL, tmp_path, DEFAULT_CONFIG, session=session)

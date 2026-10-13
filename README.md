@@ -123,7 +123,7 @@ BSMB se souvient de ce qui a déjà été traité grâce à sa base de données 
 ## Fonctionnalités
 
 - **Téléchargement incrémental** — seuls les nouveaux bookmarks sont traités
-- **Résolution des reposts** — si vous avez bookmarké un repost, BSMB retrouve le post original
+- **Citations (quote posts)** — le texte et les médias du post bookmarké sont archivés, puis ceux du post qu'il cite (fichiers `…_quote…`, deux niveaux au plus)
 - **Métadonnées** — chaque fichier contient l'auteur, la date et le lien vers le post original
 - **Détection des liens morts** — les posts supprimés (erreur 400/500) sont identifiés et nettoyables
 - **Téléchargement parallèle** — configurable de 1 à 16 workers (défaut : 4)

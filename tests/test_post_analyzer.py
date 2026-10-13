@@ -8,7 +8,8 @@ class TestPostTypeEnum:
     def test_all_types_exist(self):
         assert PostType.ERROR_500.value == "error_500"
         assert PostType.ERROR_400.value == "error_400"
-        assert PostType.REPOST.value == "repost"
+        assert PostType.QUOTE.value == "quote"
+        assert PostType.REPOST is PostType.QUOTE  # alias déprécié
         assert PostType.IMAGES.value == "images"
         assert PostType.VIDEO.value == "video"
         assert PostType.TEXT_ONLY.value == "text_only"
@@ -111,7 +112,7 @@ class TestAnalyzePostTypes:
         assert data["video_cid"] == "bafkrei_vid1"
 
     @patch("api.post_analyzer.requests.get")
-    def test_detect_repost(self, mock_get):
+    def test_detect_quote(self, mock_get):
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.raise_for_status.return_value = None
@@ -131,8 +132,8 @@ class TestAnalyzePostTypes:
         post_type, data, _ = self.analyzer.analyze(
             "https://bsky.app/profile/user.bsky.social/post/789"
         )
-        assert post_type == PostType.REPOST
-        assert data["is_repost"] is True
+        assert post_type == PostType.QUOTE
+        assert data["is_quote"] is True
 
     @patch("api.post_analyzer.requests.get")
     def test_detect_text_only(self, mock_get):

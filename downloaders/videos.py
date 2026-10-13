@@ -53,6 +53,10 @@ def extract_video_info(data):
     value = data.get("value", {})
     embed = value.get("embed", {})
 
+    # Citation avec média : la vidéo est dans `media`
+    if embed.get("$type") == "app.bsky.embed.recordWithMedia":
+        embed = embed.get("media", {})
+
     # Vérifier si c'est un repost
     is_repost = False
     if embed.get("$type") == "app.bsky.embed.record":
@@ -130,9 +134,12 @@ def _add_metadata(filepath, video_info, handle, post_id, post_url):
     except Exception:
         pass
 
-def download_video(post_url, dest_dir, config, session=None):
+def download_video(post_url, dest_dir, config, session=None, name_prefix=None):
     """
     Télécharge la vidéo d'un post dans dest_dir.
+
+    name_prefix : si fourni, remplace la base <handle>_<date>_<postid> du nom
+    (vidéo d'un post cité : <prefix>_01.mp4).
 
     Returns:
         list[DownloadResult] : la vidéo écrite (avec son CID) ; liste vide si le
@@ -155,7 +162,11 @@ def download_video(post_url, dest_dir, config, session=None):
     dest_dir = Path(dest_dir)
     dest_dir.mkdir(parents=True, exist_ok=True)
     max_len = config.get("max_filename_len", DEFAULT_CONFIG["max_filename_len"])
-    filename = _video_filename(handle, post_id, video_info["created_at"], max_len)
+    if name_prefix:
+        suffixe = "_01.mp4"
+        filename = name_prefix[:max(1, max_len - len(suffixe))] + suffixe
+    else:
+        filename = _video_filename(handle, post_id, video_info["created_at"], max_len)
     filepath = dest_dir / filename
 
     try:
