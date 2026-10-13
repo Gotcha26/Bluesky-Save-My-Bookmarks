@@ -112,6 +112,7 @@ def tmp_config(tmp_path):
         "max_workers": 4,
         "last_sync": "",
         "advanced_mode": False,
+        "language": "fr",  # sinon main() réinitialiserait la langue d'après la locale de la machine
     }
 
 

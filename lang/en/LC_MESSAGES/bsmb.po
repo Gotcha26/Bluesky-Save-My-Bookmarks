@@ -46,7 +46,7 @@ msgid_plural "il y a {n} jours"
 msgstr[0] "{n} day ago"
 msgstr[1] "{n} days ago"
 
-#: bsmb.py:132 bsmb.py:569 core/cli.py:218
+#: bsmb.py:132 bsmb.py:569 core/cli.py:247
 msgid "non connecté"
 msgstr "not connected"
 
@@ -110,7 +110,7 @@ msgstr "Invalid choice: \"{choix}\""
 msgid "MON COMPTE"
 msgstr "MY ACCOUNT"
 
-#: bsmb.py:263 bsmb.py:788
+#: bsmb.py:263 bsmb.py:826
 msgid "Aucun compte Bluesky connecté"
 msgstr "No Bluesky account connected"
 
@@ -122,11 +122,11 @@ msgstr "To save your bookmarks, connect your account:"
 msgid "Connecter mon compte Bluesky"
 msgstr "Connect my Bluesky account"
 
-#: bsmb.py:269 bsmb.py:309 bsmb.py:461 bsmb.py:598
+#: bsmb.py:269 bsmb.py:309 bsmb.py:461 bsmb.py:599
 msgid "Retour"
 msgstr "Back"
 
-#: bsmb.py:282 core/cli.py:218
+#: bsmb.py:282 core/cli.py:247
 msgid "Compte"
 msgstr "Account"
 
@@ -134,15 +134,15 @@ msgstr "Account"
 msgid "Dernière sync"
 msgstr "Last sync"
 
-#: bsmb.py:291 bsmb.py:402 core/cli.py:138 core/cli.py:220
+#: bsmb.py:291 bsmb.py:402 core/cli.py:167 core/cli.py:249
 msgid "Bookmarks en ligne"
 msgstr "Online bookmarks"
 
-#: bsmb.py:292 bsmb.py:429 core/cli.py:221 core/orchestrator.py:655
+#: bsmb.py:292 bsmb.py:429 core/cli.py:250 core/orchestrator.py:655
 msgid "Posts traités"
 msgstr "Posts processed"
 
-#: bsmb.py:294 bsmb.py:296 bsmb.py:405 bsmb.py:407 core/cli.py:140 core/cli.py:222
+#: bsmb.py:294 bsmb.py:296 bsmb.py:405 bsmb.py:407 core/cli.py:169 core/cli.py:251
 msgid "Nouveaux"
 msgstr "New"
 
@@ -150,11 +150,11 @@ msgstr "New"
 msgid "0 - tout est à jour"
 msgstr "0 - all up to date"
 
-#: bsmb.py:299 bsmb.py:800
+#: bsmb.py:299 bsmb.py:838
 msgid "Aucune synchronisation effectuée"
 msgstr "No synchronization done yet"
 
-#: bsmb.py:302 core/cli.py:223
+#: bsmb.py:302 core/cli.py:252
 msgid "Liens morts"
 msgstr "Dead links"
 
@@ -186,7 +186,7 @@ msgstr "Account disconnected"
 msgid "Compte déconnecté, mais le trousseau n'a pas pu être nettoyé : supprimez l'entrée « bsmb » à la main."
 msgstr "Account disconnected, but the keyring could not be cleaned: delete the 'bsmb' entry by hand."
 
-#: bsmb.py:367 core/cli.py:100
+#: bsmb.py:367 core/cli.py:129
 msgid "Connexion à Bluesky..."
 msgstr "Connecting to Bluesky..."
 
@@ -206,11 +206,11 @@ msgstr "Authentication successful"
 msgid "Récupération des bookmarks..."
 msgstr "Fetching bookmarks..."
 
-#: bsmb.py:388 core/cli.py:123
+#: bsmb.py:388 core/cli.py:152
 msgid "Page {page}... {count} bookmarks"
 msgstr "Page {page}... {count} bookmarks"
 
-#: bsmb.py:396 core/cli.py:132
+#: bsmb.py:396 core/cli.py:161
 msgid "Token expiré — reconnectez votre compte"
 msgstr "Token expired — reconnect your account"
 
@@ -218,15 +218,15 @@ msgstr "Token expired — reconnect your account"
 msgid "Erreur : {erreur}"
 msgstr "Error: {erreur}"
 
-#: bsmb.py:401 core/cli.py:137
+#: bsmb.py:401 core/cli.py:166
 msgid "Synchronisation terminée"
 msgstr "Synchronization complete"
 
-#: bsmb.py:403 core/cli.py:139
+#: bsmb.py:403 core/cli.py:168
 msgid "Déjà traités"
 msgstr "Already processed"
 
-#: bsmb.py:410 core/cli.py:142
+#: bsmb.py:410 core/cli.py:171
 msgid "Cache des bookmarks non écrit : {erreur}"
 msgstr "Bookmarks cache not written: {erreur}"
 
@@ -254,7 +254,7 @@ msgstr "Total media"
 msgid "Taille du dossier"
 msgstr "Folder size"
 
-#: bsmb.py:441 core/cli.py:230
+#: bsmb.py:441 core/cli.py:259
 msgid "Destination"
 msgstr "Destination"
 
@@ -388,345 +388,369 @@ msgstr "enabled"
 msgid "désactivé"
 msgstr "disabled"
 
-#: bsmb.py:583
+#: bsmb.py:580
+msgid "L. Langue"
+msgstr "L. Language"
+
+#: bsmb.py:584
 msgid "OPTIONS AVANCÉES"
 msgstr "ADVANCED OPTIONS"
 
-#: bsmb.py:585
+#: bsmb.py:586
 msgid "5. Fichier token (fallback)"
 msgstr "5. Token file (fallback)"
 
-#: bsmb.py:586
+#: bsmb.py:587
 msgid "6. Fichier URLs"
 msgstr "6. URLs file"
 
-#: bsmb.py:587
+#: bsmb.py:588
 msgid "Supprimer les logs"
 msgstr "Delete the logs"
 
-#: bsmb.py:588
+#: bsmb.py:589
 msgid "Mode dev - Depuis urls.txt, sans token"
 msgstr "Dev mode - From urls.txt, no token"
 
-#: bsmb.py:589
+#: bsmb.py:590
 msgid "{force_dl} - Re-télécharger tous les médias"
 msgstr "{force_dl} - Download all media again"
 
-#: bsmb.py:596
+#: bsmb.py:597
 msgid "Entrez le numéro pour modifier, ou 0 pour revenir"
 msgstr "Enter the number to edit, or 0 to go back"
 
-#: bsmb.py:613
+#: bsmb.py:616
 msgid "Dossier de téléchargements"
 msgstr "Downloads folder"
 
-#: bsmb.py:622
+#: bsmb.py:625
 msgid "Mode avancé activé"
 msgstr "Advanced mode enabled"
 
-#: bsmb.py:624
+#: bsmb.py:627
 msgid "Mode avancé désactivé"
 msgstr "Advanced mode disabled"
 
-#: bsmb.py:627
+#: bsmb.py:630
 msgid "Fichier token"
 msgstr "Token file"
 
-#: bsmb.py:629
+#: bsmb.py:632
 msgid "Fichier URLs"
 msgstr "URLs file"
 
-#: bsmb.py:636
+#: bsmb.py:639
 msgid "{n} fichier log supprimé"
 msgid_plural "{n} fichiers log supprimés"
 msgstr[0] "{n} log file deleted"
 msgstr[1] "{n} log files deleted"
 
-#: bsmb.py:654
+#: bsmb.py:657
 msgid "IDENTIFIANTS BLUESKY"
 msgstr "BLUESKY CREDENTIALS"
 
-#: bsmb.py:660
+#: bsmb.py:663
 msgid "non configuré"
 msgstr "not set"
 
-#: bsmb.py:661
+#: bsmb.py:664
 msgid "Handle actuel"
 msgstr "Current handle"
 
-#: bsmb.py:662
+#: bsmb.py:665
 msgid "App Password"
 msgstr "App Password"
 
-#: bsmb.py:662
+#: bsmb.py:665
 msgid "configuré"
 msgstr "set"
 
-#: bsmb.py:666
+#: bsmb.py:669
 msgid "Pour créer un App Password :"
 msgstr "To create an App Password:"
 
-#: bsmb.py:668
+#: bsmb.py:671
 msgid "Allez sur {chemin}"
 msgstr "Go to {chemin}"
 
-#: bsmb.py:670
+#: bsmb.py:673
 msgid "Cliquez sur {bouton}"
 msgstr "Click {bouton}"
 
-#: bsmb.py:671
+#: bsmb.py:674
 msgid "Nommez-le (ex: 'BSMB') et copiez le mot de passe généré"
 msgstr "Name it (e.g. 'BSMB') and copy the generated password"
 
-#: bsmb.py:674
+#: bsmb.py:677
 msgid "L'App Password sera stocké dans le trousseau du système (keyring)"
 msgstr "The App Password will be stored in the system keyring"
 
-#: bsmb.py:676
+#: bsmb.py:679
 msgid "L'App Password sera stocké dans config.json (fichier local, hors Git)"
 msgstr "The App Password will be stored in config.json (local file, kept out of Git)"
 
-#: bsmb.py:678
+#: bsmb.py:681
 msgid "Conseil : créez un App Password dédié à BSMB et révoquez-le en cas de doute."
 msgstr "Tip: create an App Password dedicated to BSMB and revoke it if in doubt."
 
-#: bsmb.py:684
+#: bsmb.py:687
 msgid "Handle Bluesky (ENTRÉE pour garder):"
 msgstr "Bluesky handle (ENTER to keep):"
 
-#: bsmb.py:686 bsmb.py:694
+#: bsmb.py:689 bsmb.py:697
 msgid "Configuration annulée"
 msgstr "Configuration cancelled"
 
-#: bsmb.py:692
+#: bsmb.py:695
 msgid "App Password (xxxx-xxxx-xxxx-xxxx):"
 msgstr "App Password (xxxx-xxxx-xxxx-xxxx):"
 
-#: bsmb.py:700
+#: bsmb.py:703
 msgid "Test de connexion..."
 msgstr "Testing the connection..."
 
-#: bsmb.py:706
+#: bsmb.py:709
 msgid "Connexion réussie !"
 msgstr "Connection successful!"
 
-#: bsmb.py:714
+#: bsmb.py:717
 msgid "AVERTISSEMENT : l'App Password est stocké en clair dans config.json."
 msgstr "WARNING: the App Password is stored in plain text in config.json."
 
-#: bsmb.py:715
+#: bsmb.py:718
 msgid "Installez keyring (pip install keyring) pour le placer dans le trousseau du système."
 msgstr "Install keyring (pip install keyring) to store it in the system keyring instead."
 
-#: bsmb.py:722
+#: bsmb.py:725
 msgid "Identifiants sauvegardés (trousseau du système)"
 msgstr "Credentials saved (system keyring)"
 
-#: bsmb.py:724
+#: bsmb.py:727
 msgid "Identifiants sauvegardés"
 msgstr "Credentials saved"
 
-#: bsmb.py:727
+#: bsmb.py:730
 msgid "Échec : {erreur}"
 msgstr "Failed: {erreur}"
 
-#: bsmb.py:728
+#: bsmb.py:731
 msgid "Identifiants non sauvegardés"
 msgstr "Credentials not saved"
 
-#: bsmb.py:736 bsmb.py:756
+#: bsmb.py:739 bsmb.py:769 bsmb.py:794
 msgid "Actuel:"
 msgstr "Current:"
 
-#: bsmb.py:737
+#: bsmb.py:740
 msgid "Nouveau {label} (ENTRÉE pour garder):"
 msgstr "New {label} (ENTER to keep):"
 
-#: bsmb.py:745
+#: bsmb.py:748
 msgid "Sauvegardé"
 msgstr "Saved"
 
-#: bsmb.py:747 bsmb.py:774
+#: bsmb.py:750 bsmb.py:778 bsmb.py:812
 msgid "Valeur inchangée"
 msgstr "Value unchanged"
 
-#: bsmb.py:756
+#: bsmb.py:763
+msgid "Automatique ({langue})"
+msgstr "Automatic ({langue})"
+
+#: bsmb.py:773
+msgid "Automatique (langue du système)"
+msgstr "Automatic (system language)"
+
+#: bsmb.py:775
+msgid "Votre choix (ENTRÉE pour garder):"
+msgstr "Your choice (ENTER to keep):"
+
+#: bsmb.py:783
+msgid "Langue mise à jour : {langue}"
+msgstr "Language updated: {langue}"
+
+#: bsmb.py:794
 msgid "{n} workers"
 msgstr "{n} workers"
 
-#: bsmb.py:757
+#: bsmb.py:795
 msgid "Plage recommandée : 1 (séquentiel) à 8 (rapide)"
 msgstr "Recommended range: 1 (sequential) to 8 (fast)"
 
-#: bsmb.py:758
+#: bsmb.py:796
 msgid "Nombre de workers (ENTRÉE pour garder):"
 msgstr "Number of workers (ENTER to keep):"
 
-#: bsmb.py:767
+#: bsmb.py:805
 msgid "Limité à {n} workers maximum"
 msgstr "Limited to {n} workers at most"
 
-#: bsmb.py:770
+#: bsmb.py:808
 msgid "Workers mis à jour : {n}"
 msgstr "Workers updated: {n}"
 
-#: bsmb.py:772
+#: bsmb.py:810
 msgid "Valeur invalide (nombre entier attendu)"
 msgstr "Invalid value (whole number expected)"
 
-#: bsmb.py:786 bsmb.py:798
+#: bsmb.py:824 bsmb.py:836
 msgid "TÉLÉCHARGER"
 msgstr "DOWNLOAD"
 
-#: bsmb.py:790
+#: bsmb.py:828
 msgid "Connectez d'abord votre compte :"
 msgstr "Connect your account first:"
 
-#: bsmb.py:791
+#: bsmb.py:829
 msgid "Menu principal > 1. Mon compte"
 msgstr "Main menu > 1. My account"
 
-#: bsmb.py:802
+#: bsmb.py:840
 msgid "Synchroniser les bookmarks maintenant ?"
 msgstr "Synchronize the bookmarks now?"
 
-#: bsmb.py:809
+#: bsmb.py:847
 msgid "Tout est à jour — aucun nouveau bookmark à télécharger"
 msgstr "Everything is up to date — no new bookmark to download"
 
-#: bsmb.py:821
+#: bsmb.py:859
 msgid "Fichier {fichier} introuvable"
 msgstr "File {fichier} not found"
 
-#: bsmb.py:828 bsmb.py:887
+#: bsmb.py:866 bsmb.py:925
 msgid "Aucune URL à traiter"
 msgstr "No URL to process"
 
-#: bsmb.py:836
+#: bsmb.py:874
 msgid "Mode FORCE : {n} posts seront tous traités"
 msgstr "FORCE mode: all {n} posts will be processed"
 
-#: bsmb.py:844
+#: bsmb.py:882
 msgid "{total} URLs au total, {new} nouvelles"
 msgstr "{total} URLs in total, {new} new"
 
-#: bsmb.py:851 core/cli.py:164
+#: bsmb.py:889 core/cli.py:193
 msgid "Tous les posts sont déjà traités"
 msgstr "All posts are already processed"
 
-#: bsmb.py:856 core/cli.py:167
+#: bsmb.py:894 core/cli.py:196
 msgid "Traiter {n} posts ?"
 msgstr "Process {n} posts?"
 
-#: bsmb.py:863
+#: bsmb.py:901
 msgid "Lancement du téléchargement..."
 msgstr "Starting the download..."
 
-#: bsmb.py:880
+#: bsmb.py:918
 msgid "Aucune URL disponible dans urls.txt"
 msgstr "No URL available in urls.txt"
 
-#: bsmb.py:891
+#: bsmb.py:929
 msgid "MODE DÉVELOPPEMENT"
 msgstr "DEVELOPMENT MODE"
 
-#: bsmb.py:893
+#: bsmb.py:931
 msgid "Traitement direct depuis urls.txt"
 msgstr "Processing directly from urls.txt"
 
-#: bsmb.py:894
+#: bsmb.py:932
 msgid "non vérifié"
 msgstr "not checked"
 
-#: bsmb.py:895
+#: bsmb.py:933
 msgid "Base de données"
 msgstr "Database"
 
-#: bsmb.py:895
+#: bsmb.py:933
 msgid "non mise à jour"
 msgstr "not updated"
 
-#: bsmb.py:896
+#: bsmb.py:934
 msgid "Posts à traiter"
 msgstr "Posts to process"
 
-#: bsmb.py:901
+#: bsmb.py:939
 msgid "Traiter {n} posts en mode dev ?"
 msgstr "Process {n} posts in dev mode?"
 
-#: bsmb.py:913
+#: bsmb.py:951
 msgid "Ouvrir le dossier de téléchargements ?"
 msgstr "Open the downloads folder?"
 
-#: bsmb.py:954
+#: bsmb.py:996
 msgid "Entrée interrompue — fin du programme"
 msgstr "Input interrupted — exiting"
 
-#: bsmb.py:969
+#: bsmb.py:1011
 msgid "Au revoir !"
 msgstr "Goodbye!"
 
-#: core/cli.py:51
+#: core/cli.py:67
 msgid "BSMB - Bsky Save My Bookmarks. Sans sous-commande : menu interactif."
 msgstr "BSMB - Bsky Save My Bookmarks. Without a subcommand: interactive menu."
 
-#: core/cli.py:55 core/cli.py:65
+#: core/cli.py:71 core/cli.py:87
 msgid "mode non interactif : accepte les valeurs par défaut"
 msgstr "non-interactive mode: accept the default answers"
 
-#: core/cli.py:69
+#: core/cli.py:77 core/cli.py:94
+msgid "langue de l'interface (prioritaire sur la configuration)"
+msgstr "interface language (takes precedence over the configuration)"
+
+#: core/cli.py:98
 msgid "synchronise les bookmarks en ligne"
 msgstr "synchronize the online bookmarks"
 
-#: core/cli.py:70
+#: core/cli.py:99
 msgid "télécharge les posts pas encore traités"
 msgstr "download the posts not processed yet"
 
-#: core/cli.py:71
+#: core/cli.py:100
 msgid "retraite tous les posts de urls.txt"
 msgstr "reprocess every post in urls.txt"
 
-#: core/cli.py:72
+#: core/cli.py:101
 msgid "synchronise puis télécharge (pour la planification)"
 msgstr "synchronize, then download (for scheduled runs)"
 
-#: core/cli.py:73
+#: core/cli.py:102
 msgid "affiche l'état du compte et les compteurs"
 msgstr "show the account state and the counters"
 
-#: core/cli.py:74
+#: core/cli.py:103
 msgid "sortie JSON"
 msgstr "JSON output"
 
-#: core/cli.py:104
+#: core/cli.py:133
 msgid "Erreur réseau pendant l'authentification : {erreur}"
 msgstr "Network error during authentication: {erreur}"
 
-#: core/cli.py:107
+#: core/cli.py:136
 msgid "Authentification impossible : {erreur}"
 msgstr "Authentication failed: {erreur}"
 
-#: core/cli.py:110
+#: core/cli.py:139
 msgid "Aucun moyen d'authentification : configurez un compte (menu > Mon compte)"
 msgstr "No way to authenticate: configure an account (menu > My account)"
 
-#: core/cli.py:134
+#: core/cli.py:163
 msgid "Erreur réseau : {erreur}"
 msgstr "Network error: {erreur}"
 
-#: core/cli.py:151
+#: core/cli.py:180
 msgid "Aucune URL à traiter (lancez d'abord « sync »)"
 msgstr "No URL to process (run 'sync' first)"
 
-#: core/cli.py:219
+#: core/cli.py:248
 msgid "Dernière synchronisation"
 msgstr "Last synchronization"
 
-#: core/cli.py:219
+#: core/cli.py:248
 msgid "jamais"
 msgstr "never"
 
-#: core/cli.py:227
+#: core/cli.py:256
 msgid "Images / vidéos / textes"
 msgstr "Images / videos / texts"
 
