@@ -6,7 +6,11 @@ Pont entre l'API (export_bookmarks) et la base de données locale.
 from datetime import datetime
 
 from api.export_bookmarks import fetch_bookmarks, DEFAULT_PDS_URL
+from core.bookmarks_cache import load_cache, save_cache
 from core.config import resolve_path, save_config
+
+# Statut posé d'emblée selon la forme de l'item renvoyé par getBookmarks
+_STATUT_PAR_TYPE = {"notFoundPost": "deleted", "blockedPost": "blocked"}
 
 
 class BookmarkSync:
@@ -34,7 +38,11 @@ class BookmarkSync:
                 "new_count": int,
                 "new_urls": list[str],
                 "dead_count": int,
+                "cache_error": str|None,   # échec d'écriture de bookmarks.json
             }
+
+        Les bookmarks `notFoundPost` / `blockedPost` sont enregistrés tout de suite
+        (statuts `deleted` / `blocked`) et ne comptent pas dans `new_count`.
         """
         pds_url = self.config.get("pds_url") or DEFAULT_PDS_URL
         result = fetch_bookmarks(token, on_progress, pds_url=pds_url)
@@ -48,11 +56,26 @@ class BookmarkSync:
                 "new_count": 0,
                 "new_urls": [],
                 "dead_count": self.db.get_dead_count(),
+                "cache_error": None,
             }
 
         self._online_urls = result["urls"]
+
+        # Cache de la réponse complète (postView bruts) : un échec ne bloque pas la synchro
+        cache_error = None
+        try:
+            save_cache(resolve_path(self.config, "bookmarks_cache"), result["posts"], pds_url=pds_url)
+        except OSError as e:
+            cache_error = str(e)
+
+        # L'API dit elle-même qu'un post est supprimé ou bloqué : inutile de le re-télécharger
+        morts = [p for p in result["posts"] if p.get("item_type") in _STATUT_PAR_TYPE]
+        for post in morts:
+            self.db.mark_unavailable(post, _STATUT_PAR_TYPE[post["item_type"]])
+
         retry_after_days = self.config.get("retry_after_days", 7)
-        new_urls = [p["url"] for p in self.db.get_pending_refs(result["posts"], retry_after_days)]
+        vivants = [p for p in result["posts"] if p.get("item_type") not in _STATUT_PAR_TYPE]
+        new_urls = [p["url"] for p in self.db.get_pending_refs(vivants, retry_after_days)]
 
         # Sauvegarder dans urls.txt (rétrocompatibilité)
         urls_file = resolve_path(self.config, "urls_file")
@@ -72,6 +95,7 @@ class BookmarkSync:
             "new_count": len(new_urls),
             "new_urls": new_urls,
             "dead_count": stats["dead"],
+            "cache_error": cache_error,
         }
 
     def get_cached_state(self):
@@ -99,7 +123,7 @@ class BookmarkSync:
         if urls_file.exists() and urls_file.stat().st_size > 0:
             with open(urls_file, "r", encoding="utf-8") as f:
                 urls = [line.strip() for line in f if line.strip()]
-            online_count = len(urls)
+            online_count = len(load_cache(resolve_path(self.config, "bookmarks_cache"))) or len(urls)
             new_urls = self.db.get_pending_posts(urls, self.config.get("retry_after_days", 7))
             new_count = len(new_urls)
             has_cache = True

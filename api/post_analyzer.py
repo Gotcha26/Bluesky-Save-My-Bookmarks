@@ -43,15 +43,24 @@ class PostAnalyzer:
     def __init__(self):
         self.api_base = "https://bsky.social/xrpc/com.atproto.repo.getRecord"
     
-    def analyze(self, post_url):
+    def analyze(self, post_url, post_view=None):
         """
         Analyse un post et retourne son type + données associées
         Returns: (PostType, data_dict, debug_info)
+
+        post_view : vue hydratée du post (`postView` de getBookmarks). Si elle porte un
+        `record`, l'analyse se fait sans aucune requête (le record y est au même format
+        que la réponse de getRecord) et `data["view_embed"]` reçoit l'embed au format
+        `#view` (`playlist`, `fullsize`, `thumbnail`…). Sinon, repli sur getRecord.
+        `labels` et `viewer` sont ignorés.
         """
         parts = urlparse(post_url).path.strip("/").split("/")
         if len(parts) < 4:
             return PostType.UNKNOWN, {}, {"error": "URL invalide"}
-        
+
+        if post_view and isinstance(post_view.get("record"), dict):
+            return self._analyze_view(post_url, post_view)
+
         # Le segment de l'URL est un handle ou un DID ; getRecord accepte les deux.
         handle = parts[1]
         post_id = parts[-1]
@@ -77,13 +86,35 @@ class PostAnalyzer:
         except Exception as e:
             return PostType.UNKNOWN, {"handle": handle, "post_id": post_id, **identity}, {"error": str(e)}
 
-        value = data.get("value", {})
+        return self._classify(data.get("value", {}), data.get("uri", ""), handle, post_id, identity, data)
+
+    def _analyze_view(self, post_url, post_view):
+        """Classe un post à partir de sa vue hydratée (`postView` de getBookmarks), sans requête."""
+        parts = urlparse(post_url).path.strip("/").split("/")
+        uri = post_view.get("uri", "")
+        uri_parts = uri.split("/")
+        author = post_view.get("author") or {}
+        did = author.get("did") or (uri_parts[2] if len(uri_parts) > 2 else None)
+        handle = author.get("handle") or parts[1]
+        post_id = uri_parts[-1] if len(uri_parts) > 4 else parts[-1]
+        return self._classify(post_view["record"], uri, handle, post_id, _identity(did, post_id), post_view,
+                              view_embed=post_view.get("embed"))
+
+    def _classify(self, value, uri, handle, post_id, identity, full_data, view_embed=None):
+        """
+        Classe un record `app.bsky.feed.post` (format record : `app.bsky.embed.*`).
+        Commun au chemin getRecord (`value`) et au chemin postView (`post_view["record"]`).
+
+        uri: AT-URI du post ; identity: champs d'identité déjà connus ({} si le DID est inconnu) ;
+        full_data: réponse brute, conservée dans debug_info ;
+        view_embed: embed au format `#view` (playlist, fullsize…), si la vue hydratée est connue.
+        """
         embed = value.get("embed", {})
         embed_type = embed.get("$type", "")
 
         # Le DID figure dans l'`uri` de la réponse : aucun appel supplémentaire
         if not identity:
-            uri_parts = data.get("uri", "").split("/")
+            uri_parts = uri.split("/")
             identity = _identity(uri_parts[2] if len(uri_parts) > 2 else None, post_id)
 
         result_data = {
@@ -94,11 +125,13 @@ class PostAnalyzer:
             "text": value.get("text", ""),
             "embed_type": embed_type
         }
-        
+        if view_embed is not None:
+            result_data["view_embed"] = view_embed
+
         debug_info = {
             "embed_type": embed_type,
             "has_embed": bool(embed),
-            "full_data": data
+            "full_data": full_data
         }
         
         # 1. Vidéo
@@ -106,7 +139,6 @@ class PostAnalyzer:
             video_blob = embed.get("video", {})
             cid = video_blob.get("ref", {}).get("$link")
             if cid:
-                uri = data.get("uri", "")
                 did = uri.split("/")[2] if "/" in uri else None
                 if did:
                     result_data["video_url"] = f"https://bsky.social/xrpc/com.atproto.sync.getBlob?did={did}&cid={cid}"
@@ -153,7 +185,6 @@ class PostAnalyzer:
                 video_blob = media.get("video", {})
                 cid = video_blob.get("ref", {}).get("$link")
                 if cid:
-                    uri = data.get("uri", "")
                     did = uri.split("/")[2] if "/" in uri else None
                     if did:
                         result_data["video_url"] = f"https://bsky.social/xrpc/com.atproto.sync.getBlob?did={did}&cid={cid}"

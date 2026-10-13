@@ -21,7 +21,8 @@ def _colonnes(db):
 
 
 def _post(at_uri=URI, url=URL, did=DID, rkey="3k1", handle="user.bsky.social"):
-    return {"at_uri": at_uri, "did": did, "rkey": rkey, "handle": handle, "url": url}
+    return {"at_uri": at_uri, "did": did, "rkey": rkey, "handle": handle, "url": url,
+            "item_type": "unknown", "post_view": None, "created_at": None}
 
 
 class TestMigration:

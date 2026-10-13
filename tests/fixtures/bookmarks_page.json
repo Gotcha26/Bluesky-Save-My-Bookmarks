@@ -1,0 +1,82 @@
+{
+  "cursor": null,
+  "bookmarks": [
+    {
+      "createdAt": "2026-03-01T10:00:00.000Z",
+      "subject": {
+        "uri": "at://did:plc:test1000000000000000000000/app.bsky.feed.post/3kpost00001",
+        "cid": "bafyreitest000000000000000000000000000000000000000000000000"
+      },
+      "item": {
+        "$type": "app.bsky.feed.defs#postView",
+        "uri": "at://did:plc:test1000000000000000000000/app.bsky.feed.post/3kpost00001",
+        "cid": "bafyreitest000000000000000000000000000000000000000000000000",
+        "author": {
+          "did": "did:plc:test1000000000000000000000",
+          "handle": "alice.example.com",
+          "displayName": "Alice"
+        },
+        "record": {
+          "$type": "app.bsky.feed.post",
+          "text": "Voici une photo",
+          "createdAt": "2026-02-10T09:30:00.000Z",
+          "embed": {
+            "$type": "app.bsky.embed.images",
+            "images": [
+              {
+                "alt": "Un chat",
+                "image": {
+                  "$type": "blob",
+                  "ref": {"$link": "bafkreitestimage0000000000000000000000000000000000000001"},
+                  "mimeType": "image/jpeg",
+                  "size": 1234
+                }
+              }
+            ]
+          }
+        },
+        "embed": {
+          "$type": "app.bsky.embed.images#view",
+          "images": [
+            {
+              "thumb": "https://cdn.bsky.app/img/feed_thumbnail/plain/did:plc:test1000000000000000000000/bafkreitestimage0000000000000000000000000000000000000001@jpeg",
+              "fullsize": "https://cdn.bsky.app/img/feed_fullsize/plain/did:plc:test1000000000000000000000/bafkreitestimage0000000000000000000000000000000000000001@jpeg",
+              "alt": "Un chat"
+            }
+          ]
+        },
+        "labels": [],
+        "viewer": {"bookmarked": true},
+        "indexedAt": "2026-02-10T09:30:05.000Z"
+      }
+    },
+    {
+      "createdAt": "2026-03-01T10:01:00.000Z",
+      "subject": {
+        "uri": "at://did:plc:test2000000000000000000000/app.bsky.feed.post/3kgone000001",
+        "cid": "bafyreitest000000000000000000000000000000000000000000000000"
+      },
+      "item": {
+        "$type": "app.bsky.feed.defs#notFoundPost",
+        "uri": "at://did:plc:test2000000000000000000000/app.bsky.feed.post/3kgone000001",
+        "notFound": true
+      }
+    },
+    {
+      "createdAt": "2026-03-01T10:02:00.000Z",
+      "subject": {
+        "uri": "at://did:plc:test3000000000000000000000/app.bsky.feed.post/3kblock00001",
+        "cid": "bafyreitest000000000000000000000000000000000000000000000000"
+      },
+      "item": {
+        "$type": "app.bsky.feed.defs#blockedPost",
+        "uri": "at://did:plc:test3000000000000000000000/app.bsky.feed.post/3kblock00001",
+        "blocked": true,
+        "author": {
+          "did": "did:plc:test3000000000000000000000",
+          "viewer": {"blockedBy": true}
+        }
+      }
+    }
+  ]
+}

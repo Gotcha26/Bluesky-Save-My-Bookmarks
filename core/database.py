@@ -363,12 +363,41 @@ class Database:
 
         Args:
             url: URL du post
-            status: 'ok', 'deleted', 'error_500', 'unknown' ('repost' n'est plus écrit, hérité)
+            status: 'ok', 'deleted', 'blocked', 'error_500', 'unknown'
+                ('repost' n'est plus écrit, hérité)
         """
         with self._lock:
             cursor = self.conn.cursor()
             cursor.execute('UPDATE posts SET status = ? WHERE url = ?', (status, url))
             self.conn.commit()
+
+    def mark_unavailable(self, ref, status):
+        """Enregistre un post que l'API déclare supprimé ou bloqué (thread-safe).
+
+        Args:
+            ref: dict avec `url` et, si connus, `at_uri`, `did`, `rkey`, `handle`
+            status: 'deleted' ou 'blocked'
+
+        Un post déjà archivé (`ok`) garde son statut : son contenu est sur le disque
+        et `cleanup_dead_posts()` effacerait sinon sa trace en base.
+
+        Returns:
+            bool: True si le statut a été posé, False si le post était déjà `ok`.
+        """
+        with self._lock:
+            ligne = self._ligne_de_ref(self.conn.cursor(), ref)
+        if ligne and ligne[0] == 'ok':
+            return False
+        at_uri = ref.get('at_uri')
+        rkey = ref.get('rkey') or ref['url'].rstrip('/').rsplit('/', 1)[-1]
+        self.add_post(ref['url'], rkey, ref.get('handle'), at_uri=at_uri, did=ref.get('did'))
+        with self._lock:
+            self.conn.execute(
+                'UPDATE posts SET status = ? WHERE at_uri = ? OR (at_uri IS NULL AND url = ?)',
+                (status, at_uri, ref['url']),
+            )
+            self.conn.commit()
+        return True
 
     def get_dead_count(self):
         """Retourne le nombre de liens morts (thread-safe)."""
@@ -385,7 +414,7 @@ class Database:
             return cursor.fetchall()
 
     def cleanup_dead_posts(self):
-        """Supprime les posts marqués 'deleted' de la DB (thread-safe).
+        """Supprime les posts marqués 'deleted' ou 'blocked' de la DB (thread-safe).
 
         Les médias associés sont supprimés par ON DELETE CASCADE.
 
@@ -394,9 +423,9 @@ class Database:
         """
         with self._lock:
             cursor = self.conn.cursor()
-            cursor.execute("SELECT COUNT(*) FROM posts WHERE status = 'deleted'")
+            cursor.execute("SELECT COUNT(*) FROM posts WHERE status IN ('deleted', 'blocked')")
             count = cursor.fetchone()[0]
-            cursor.execute("DELETE FROM posts WHERE status = 'deleted'")
+            cursor.execute("DELETE FROM posts WHERE status IN ('deleted', 'blocked')")
             self.conn.commit()
             return count
 

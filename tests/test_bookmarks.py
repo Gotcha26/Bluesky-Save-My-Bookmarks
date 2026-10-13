@@ -244,3 +244,139 @@ class TestBookmarkSyncGetCachedState:
         assert state["dead_count"] == 1
 
         db.close()
+
+
+# --------------------------------------------------- postView, notFoundPost, blockedPost (issue #3)
+
+def _page_fixture():
+    import json
+    chemin = Path(__file__).parent / "fixtures" / "bookmarks_page.json"
+    return json.loads(chemin.read_text(encoding="utf-8"))
+
+
+def _posts_de_la_page():
+    """Sortie de fetch_bookmarks() pour la page de la fixture (construite à la main)."""
+    posts = []
+    for bm in _page_fixture()["bookmarks"]:
+        item = bm["item"]
+        type_item = item["$type"].split("#")[1]
+        did = item["uri"].split("/")[2]
+        rkey = item["uri"].rsplit("/", 1)[1]
+        handle = item.get("author", {}).get("handle")
+        posts.append({
+            "at_uri": item["uri"], "did": did, "rkey": rkey, "handle": handle,
+            "url": f"https://bsky.app/profile/{handle or did}/post/{rkey}",
+            "item_type": type_item, "post_view": item if type_item == "postView" else None,
+            "created_at": bm["createdAt"],
+        })
+    return posts
+
+
+def _fetch_de_la_page():
+    posts = _posts_de_la_page()
+    return {"urls": [p["url"] for p in posts], "posts": posts, "count": len(posts),
+            "pages": 1, "error": None, "expired": False}
+
+
+def _statut(db, url):
+    ligne = db.conn.execute("SELECT status FROM posts WHERE url = ?", (url,)).fetchone()
+    return ligne[0] if ligne else None
+
+
+class TestSyncPostViews:
+    @patch("core.bookmarks.fetch_bookmarks")
+    @patch("core.bookmarks.save_config")
+    def test_statuts_et_compte(self, mock_save, mock_fetch, tmp_config, tmp_db):
+        mock_fetch.return_value = _fetch_de_la_page()
+        posts = {p["item_type"]: p for p in mock_fetch.return_value["posts"]}
+
+        result = BookmarkSync(tmp_config, tmp_db).sync("Bearer t")
+
+        assert result["error"] is None
+        assert result["online_count"] == 3
+        assert result["new_urls"] == [posts["postView"]["url"]]
+        assert result["new_count"] == 1
+        assert _statut(tmp_db, posts["notFoundPost"]["url"]) == "deleted"
+        assert _statut(tmp_db, posts["blockedPost"]["url"]) == "blocked"
+        assert _statut(tmp_db, posts["postView"]["url"]) is None  # sera traité par run()
+        assert result["dead_count"] == 2
+
+    @patch("core.bookmarks.fetch_bookmarks")
+    @patch("core.bookmarks.save_config")
+    def test_identite_enregistree_pour_les_posts_morts(self, mock_save, mock_fetch, tmp_config, tmp_db):
+        mock_fetch.return_value = _fetch_de_la_page()
+        gone = next(p for p in mock_fetch.return_value["posts"] if p["item_type"] == "notFoundPost")
+        BookmarkSync(tmp_config, tmp_db).sync("Bearer t")
+        ligne = tmp_db.conn.execute("SELECT at_uri, did, rkey FROM posts WHERE url = ?", (gone["url"],)).fetchone()
+        assert tuple(ligne) == (gone["at_uri"], gone["did"], gone["rkey"])
+
+    @patch("core.bookmarks.fetch_bookmarks")
+    @patch("core.bookmarks.save_config")
+    def test_cache_ecrit_et_urls_txt_conserve(self, mock_save, mock_fetch, tmp_config, tmp_db):
+        from core.bookmarks_cache import load_cache
+        mock_fetch.return_value = _fetch_de_la_page()
+        BookmarkSync(tmp_config, tmp_db).sync("Bearer t")
+
+        cache = load_cache(tmp_config["bookmarks_cache"])
+        assert set(cache) == {p["at_uri"] for p in mock_fetch.return_value["posts"]}
+        vue = next(e for e in cache.values() if e["item_type"] == "postView")
+        assert vue["post_view"]["record"]["text"] == "Voici une photo"
+        urls = Path(tmp_config["urls_file"]).read_text(encoding="utf-8").splitlines()
+        assert urls == mock_fetch.return_value["urls"]
+
+    @patch("core.bookmarks.fetch_bookmarks")
+    @patch("core.bookmarks.save_config")
+    def test_post_deja_archive_garde_son_statut_ok(self, mock_save, mock_fetch, tmp_config, tmp_db):
+        mock_fetch.return_value = _fetch_de_la_page()
+        gone = next(p for p in mock_fetch.return_value["posts"] if p["item_type"] == "notFoundPost")
+        tmp_db.add_post(gone["url"], gone["rkey"], None, at_uri=gone["at_uri"], did=gone["did"])
+        tmp_db.mark_post_status(gone["url"], "ok")
+
+        BookmarkSync(tmp_config, tmp_db).sync("Bearer t")
+
+        assert _statut(tmp_db, gone["url"]) == "ok"  # contenu déjà archivé : on le conserve
+
+    @patch("core.bookmarks.fetch_bookmarks")
+    @patch("core.bookmarks.save_config")
+    def test_blocked_jamais_retente(self, mock_save, mock_fetch, tmp_config, tmp_db):
+        mock_fetch.return_value = _fetch_de_la_page()
+        blocked = next(p for p in mock_fetch.return_value["posts"] if p["item_type"] == "blockedPost")
+        BookmarkSync(tmp_config, tmp_db).sync("Bearer t")
+        tmp_db.conn.execute("UPDATE posts SET last_check = '2000-01-01T00:00:00'")
+        tmp_db.conn.commit()
+        assert tmp_db.get_pending_refs([blocked], 7) == []
+
+    @patch("core.bookmarks.fetch_bookmarks")
+    @patch("core.bookmarks.save_config")
+    def test_echec_d_ecriture_du_cache_ne_bloque_pas(self, mock_save, mock_fetch, tmp_config, tmp_db, tmp_path):
+        mock_fetch.return_value = _fetch_de_la_page()
+        tmp_config["bookmarks_cache"] = str(tmp_path / "absent" / "dossier" / "bookmarks.json")
+        result = BookmarkSync(tmp_config, tmp_db).sync("Bearer t")
+        assert result["error"] is None
+        assert result["cache_error"]
+        assert result["new_count"] == 1
+
+    @patch("core.bookmarks.fetch_bookmarks")
+    @patch("core.bookmarks.save_config")
+    def test_erreur_api_n_ecrase_pas_le_cache(self, mock_save, mock_fetch, tmp_config, tmp_db):
+        from core.bookmarks_cache import load_cache
+        mock_fetch.return_value = _fetch_de_la_page()
+        BookmarkSync(tmp_config, tmp_db).sync("Bearer t")
+        mock_fetch.return_value = {"urls": [], "posts": [], "count": 0, "pages": 1,
+                                   "error": "Erreur réseau", "expired": False}
+        BookmarkSync(tmp_config, tmp_db).sync("Bearer t")
+        assert len(load_cache(tmp_config["bookmarks_cache"])) == 3
+
+
+class TestEtatEnCache:
+    def test_online_count_vient_du_cache(self, tmp_config, tmp_db):
+        from core.bookmarks_cache import save_cache
+        save_cache(tmp_config["bookmarks_cache"], _posts_de_la_page())
+        Path(tmp_config["urls_file"]).write_text("https://bsky.app/profile/u/post/1", encoding="utf-8")
+        assert BookmarkSync(tmp_config, tmp_db).get_cached_state()["online_count"] == 3
+
+    def test_sans_cache_urls_txt(self, tmp_config, tmp_db):
+        Path(tmp_config["urls_file"]).write_text("https://bsky.app/profile/u/post/1", encoding="utf-8")
+        etat = BookmarkSync(tmp_config, tmp_db).get_cached_state()
+        assert etat["online_count"] == 1
+        assert etat["has_cache"] is True

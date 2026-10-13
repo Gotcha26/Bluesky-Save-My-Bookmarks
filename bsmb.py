@@ -19,6 +19,7 @@ from core.colors import c
 from core.orchestrator import run
 from core.ui import pause, confirm, set_yes, is_interactive
 from core import cli
+from core.bookmarks_cache import load_cache, post_views_index
 
 
 def clear_screen():
@@ -362,6 +363,8 @@ def do_sync(config):
             print(c.config_line("Nouveaux", f"{c.OK}{result['new_count']}{c.RESET}"))
         else:
             print(c.config_line("Nouveaux", f"{c.DIM}0 - tout est à jour{c.RESET}"))
+        if result.get("cache_error"):
+            print(c.warning(f"Cache des bookmarks non écrit : {result['cache_error']}"))
 
     pause()
 
@@ -769,7 +772,12 @@ def download_media(config, force=False):
     print(c.info("Lancement du téléchargement..."))
     print()
 
-    stats = run(urls_to_process, config)
+    # Vues hydratées de la dernière synchro : évitent un getRecord par post
+    post_views = post_views_index(load_cache(resolve_path(config, "bookmarks_cache")))
+    if post_views:
+        stats = run(urls_to_process, config, post_views=post_views)
+    else:
+        stats = run(urls_to_process, config)
     _proposer_ouverture(config, stats)
     return stats["success"] > 0
 

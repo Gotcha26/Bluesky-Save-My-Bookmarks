@@ -195,7 +195,7 @@ def _base_de_nom(url, data):
     return nom_base_texte(handle, post_id, data.get("created_at", ""))
 
 
-def _archiver_citation(url, quote_uri, depth, base, ctx):
+def _archiver_citation(url, quote_uri, depth, base, ctx, post_view=None):
     """
     Archive le post cité par la citation `url` (de profondeur `depth`), puis, tant que
     la profondeur le permet, les citations de ce post cité.
@@ -207,7 +207,8 @@ def _archiver_citation(url, quote_uri, depth, base, ctx):
     genre valant "failed" (erreur réseau/serveur) ou un état de QuoteTarget
     ("not_found", "blocked", "detached").
     """
-    cible = ctx.resolver.resolve(url)
+    # `post_view` (vue hydratée du citant) n'existe que pour le bookmark lui-même
+    cible = ctx.resolver.resolve(url) if post_view is None else ctx.resolver.resolve(url, post_view=post_view)
     if cible is None:
         ref = quote_uri or url
         ctx.buf_print(c.warning("Citation non résolue"))
@@ -261,7 +262,7 @@ def _archiver_citation(url, quote_uri, depth, base, ctx):
 
 
 def process_post(url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_dir, log_func, config=None,
-                 depth=0, quotes_unresolved=None):
+                 depth=0, quotes_unresolved=None, post_view=None):
     """
     Traite un post unique et retourne les stats.
     Returns: (has_success, img_count, vid_count, text_count, status, output_lines)
@@ -272,6 +273,8 @@ def process_post(url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_d
         les citations ne sont suivies que tant que depth < PROFONDEUR_MAX.
     quotes_unresolved : liste complétée avec `url` quand le post est archivé mais
         que le post qu'il cite n'a pas pu l'être (erreur réseau ou serveur).
+    post_view : vue hydratée du post (getBookmarks) ; l'analyse se fait alors sans
+        getRecord, et le résolveur y lit l'état du post cité.
 
     Une citation est archivée comme un post normal (texte, média d'un recordWithMedia),
     puis le post cité l'est à son tour ; tous les fichiers sont enregistrés sous `url`.
@@ -285,7 +288,10 @@ def process_post(url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_d
     post_id = url.rstrip("/").split("/")[-1]
 
     # === ANALYSE PRÉALABLE ===
-    post_type, data, debug_info = analyzer.analyze(url)
+    if post_view is None:
+        post_type, data, debug_info = analyzer.analyze(url)
+    else:
+        post_type, data, debug_info = analyzer.analyze(url, post_view=post_view)
     buf_print(f"  {c.KEY}Type détecté :{c.RESET} {c.VALUE}{post_type.value}{c.RESET}")
 
     # Tracking DB
@@ -341,7 +347,8 @@ def process_post(url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_d
     # 2. Le post qu'il cite (profondeur max PROFONDEUR_MAX)
     problemes = []
     if est_citation and depth < PROFONDEUR_MAX:
-        cites, problemes = _archiver_citation(url, data.get("quote_uri"), depth, _base_de_nom(url, data), ctx)
+        cites, problemes = _archiver_citation(url, data.get("quote_uri"), depth, _base_de_nom(url, data), ctx,
+                                              post_view=post_view)
         results = results + cites
 
     # Une image sautée (cid déjà archivé) est affichée mais ni comptée ni enregistrée
@@ -524,7 +531,7 @@ def _save_problem_logs(stats, logs_dir):
     return generated
 
 
-def run(urls, config, no_db=False, on_progress=None, quiet=False) -> dict:
+def run(urls, config, no_db=False, on_progress=None, quiet=False, post_views=None) -> dict:
     """
     Télécharge les médias des posts `urls` dans les sous-dossiers de config["download_dir"].
 
@@ -534,6 +541,8 @@ def run(urls, config, no_db=False, on_progress=None, quiet=False) -> dict:
         no_db: ne pas lire ni écrire la base (mode dev)
         on_progress: callback(termines, total) appelé après chaque post
         quiet: aucune sortie console (ni progression ni rapport)
+        post_views: {URL du post: postView brut} issu du cache des bookmarks ; les posts
+            qui y figurent sont analysés sans getRecord (None = mode dev, getRecord partout)
 
     Returns:
         dict: {"total", "success", "images", "videos", "texts",
@@ -542,11 +551,12 @@ def run(urls, config, no_db=False, on_progress=None, quiet=False) -> dict:
         bookmarks archivés dont le post cité ne l'a pas été, "reposts" est son ancien nom)
     """
     return _run(urls, config, media_dirs=get_media_dirs(config), no_db=no_db,
-                on_progress=on_progress, quiet=quiet)
+                on_progress=on_progress, quiet=quiet, post_views=post_views)
 
 
-def _run(urls, config, media_dirs, no_db=False, on_progress=None, quiet=False):
+def _run(urls, config, media_dirs, no_db=False, on_progress=None, quiet=False, post_views=None):
     """run() avec des dossiers médias explicites (utilisé par la CLI)."""
+    post_views = post_views or {}
     start_time = time.time()
     IMG_DIR = media_dirs["img_dir"]
     VID_DIR = media_dirs["vid_dir"]
@@ -606,7 +616,7 @@ def _run(urls, config, media_dirs, no_db=False, on_progress=None, quiet=False):
         log(f"Job {idx}/{total_jobs}: {url}", to_console=False)
         has_success, imgs, vids, texts, status, output_lines = process_post(
             url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_dir, log, config,
-            quotes_unresolved=quotes_unresolved_urls,
+            quotes_unresolved=quotes_unresolved_urls, post_view=post_views.get(url),
         )
         return idx, url, has_success, imgs, vids, texts, status, output_lines
 

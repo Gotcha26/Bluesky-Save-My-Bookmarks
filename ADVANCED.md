@@ -98,13 +98,14 @@ Pendant le téléchargement, BSMB détecte les posts problématiques :
 | Status | Signification |
 |--------|---------------|
 | `ok` | Post normal, traité avec succès |
-| `deleted` | Post supprimé (erreur HTTP 400) |
+| `deleted` | Post supprimé (erreur HTTP 400, ou `notFoundPost` renvoyé par `getBookmarks` dès la synchronisation) |
+| `blocked` | Post bloqué (`blockedPost` renvoyé par `getBookmarks`) ; jamais retenté |
 | `error_500` | Erreur serveur temporaire (HTTP 500) |
 
 Les liens morts sont visibles dans **Stockage local** et peuvent être nettoyés.
 
 Le nettoyage :
-- Supprime les entrées `deleted` de la base de données
+- Supprime les entrées `deleted` et `blocked` de la base de données
 - Conserve les entrées `error_500` (potentiellement temporaires)
 - Ne supprime **jamais** les fichiers déjà téléchargés
 
@@ -120,6 +121,7 @@ bsmb/
 ├── core/                        # Logique métier
 │   ├── auth.py                 # createSession + get_token
 │   ├── bookmarks.py            # BookmarkSync (pont API ↔ DB)
+│   ├── bookmarks_cache.py      # Cache bookmarks.json (postView bruts)
 │   ├── colors.py               # Couleurs ANSI cross-platform
 │   ├── config.py               # Configuration JSON + migration
 │   ├── database.py             # SQLite (posts + media tracking)
@@ -148,7 +150,7 @@ bsmb/
 ```
 bsmb.py (menu)
   → core/auth.py (createSession → Bearer token)
-  → core/bookmarks.py (sync: API → urls.txt → compare DB)
+  → core/bookmarks.py (sync: API → urls.txt + bookmarks.json → compare DB)
   → core/orchestrator.run() (appel direct, ThreadPoolExecutor)
     → api/post_analyzer.py (détecte type)
     → api/quote_resolver.py (résout le post cité d'une citation, profondeur max 2)
@@ -221,6 +223,7 @@ schtasks /Create /SC DAILY /TN BSMB /TR "\"C:\chemin\bsmb\.venv\Scripts\python.e
   "download_dir": "C:/Users/xxx/Downloads/BSMB",
   "token_file": "Token-Bearer.txt",
   "urls_file": "urls.txt",
+  "bookmarks_cache": "bookmarks.json",
   "db_file": "bsmb.db",
   "logs_dir": "logs",
   "max_logs": 5,
@@ -241,6 +244,7 @@ schtasks /Create /SC DAILY /TN BSMB /TR "\"C:\chemin\bsmb\.venv\Scripts\python.e
 | `download_dir` | Dossier racine des téléchargements | `~/Downloads/BSMB` |
 | `token_file` | Fichier token Bearer (fallback) | `Token-Bearer.txt` |
 | `urls_file` | Liste des bookmarks exportés | `urls.txt` |
+| `bookmarks_cache` | Dernière réponse `getBookmarks` (`postView` bruts, évite un `getRecord` par post ; absent en mode dev) | `bookmarks.json` |
 | `db_file` | Base de données SQLite | `bsmb.db` |
 | `logs_dir` | Dossier des logs | `logs` |
 | `pds_url` | PDS du compte, détecté à la connexion (`""` = inconnu, `https://bsky.social` utilisé) | `""` |
@@ -271,7 +275,7 @@ Les chemins relatifs (`token_file`, `urls_file`, `db_file`, `logs_dir`) sont ré
 | `handle` | TEXT | Handle de l'auteur |
 | `added_at` | TEXT | Date d'ajout (ISO) |
 | `last_check` | TEXT | Dernière vérification (ISO) |
-| `status` | TEXT | `ok`, `deleted`, `error_500`, `unknown` (`repost` : ancien statut des citations non résolues, plus écrit, encore retenté) |
+| `status` | TEXT | `ok`, `deleted`, `blocked`, `error_500`, `unknown` (`repost` : ancien statut des citations non résolues, plus écrit, encore retenté) |
 | `at_uri` | TEXT (UNIQUE) | Identité canonique `at://<did>/app.bsky.feed.post/<rkey>` (NULL pour les anciennes lignes, complété au prochain traitement) |
 | `did` | TEXT | DID de l'auteur |
 | `rkey` | TEXT | Clé du post |

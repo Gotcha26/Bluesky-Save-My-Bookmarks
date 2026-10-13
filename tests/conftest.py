@@ -38,6 +38,7 @@ def tmp_config(tmp_path):
         "download_dir": str(tmp_path / "downloads"),
         "token_file": str(tmp_path / "Token-Bearer.txt"),
         "urls_file": str(tmp_path / "urls.txt"),
+        "bookmarks_cache": str(tmp_path / "bookmarks.json"),
         "db_file": str(tmp_path / "test.db"),
         "logs_dir": str(tmp_path / "logs"),
         "max_logs": 5,
