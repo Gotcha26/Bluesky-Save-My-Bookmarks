@@ -18,6 +18,7 @@ import json
 from core import orchestrator, ui
 from core.auth import AuthError, NetworkError, get_session, has_credentials
 from core.bookmarks import BookmarkSync
+from core.bookmarks_cache import post_views_from_config
 from core.colors import c
 from core.config import (
     cleanup_old_logs, ensure_dirs, load_config, resolve_path, save_config,
@@ -121,6 +122,8 @@ def cmd_sync(config, args=None):
     print(c.config_line("Bookmarks en ligne", str(result["online_count"])))
     print(c.config_line("Déjà traités", str(result["local_count"])))
     print(c.config_line("Nouveaux", str(result["new_count"])))
+    if result.get("cache_error"):
+        print(c.warning(f"Cache des bookmarks non écrit : {result['cache_error']}"))
     return EXIT_OK
 
 
@@ -148,7 +151,12 @@ def cmd_download(config, args=None):
     if not ui.confirm(f"Traiter {len(a_traiter)} posts ?", default=True):
         return EXIT_OK
 
-    stats = orchestrator.run(a_traiter, config)
+    # Vues hydratées de la dernière synchro : évitent un getRecord par post
+    post_views = post_views_from_config(config)
+    if post_views:
+        stats = orchestrator.run(a_traiter, config, post_views=post_views)
+    else:
+        stats = orchestrator.run(a_traiter, config)
     if stats.get("failed") or stats.get("error_500"):
         return EXIT_DOWNLOAD
     return EXIT_OK

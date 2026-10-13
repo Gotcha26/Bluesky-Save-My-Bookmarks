@@ -11,6 +11,8 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+from core.config import resolve_path
+
 
 def save_cache(path, posts, pds_url=""):
     """
@@ -52,6 +54,11 @@ def post_views_index(cache):
         if entree.get("url"):
             index[entree["url"]] = vue
     return index
+
+
+def post_views_from_config(config):
+    """Index des postView du cache de la config ({} sans cache) : argument `post_views` de run()."""
+    return post_views_index(load_cache(resolve_path(config, "bookmarks_cache")))
 
 
 def load_cache(path):
