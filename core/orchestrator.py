@@ -166,7 +166,10 @@ def _contenu_propre(post_type, data, url, ctx, name_prefix=None, erreurs=None, d
                                record=record, existing_cid=_chemin_par_cid(ctx), **options)
     elif post_type == PostType.VIDEO:
         ctx.buf_print(c.info("Vidéo détectée"))
-        results = _telecharger(download_video, url, dirs["vid_dir"], *args, erreurs=erreurs, **options)
+        full = (debug_info or {}).get("full_data") or {}
+        results = _telecharger(download_video, url, dirs["vid_dir"], *args, erreurs=erreurs,
+                               record=full.get("value") or full.get("record"), did=data.get("did"),
+                               view_embed=data.get("view_embed"), **options)
     elif post_type == PostType.EXTERNAL and not cite:
         # Embed externe : carte de lien, GIF, lien tiers
         ctx.buf_print(c.info("Lien externe détecté"))

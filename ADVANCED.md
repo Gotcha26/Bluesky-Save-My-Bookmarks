@@ -259,6 +259,8 @@ schtasks /Create /SC DAILY /TN BSMB /TR "\"C:\chemin\bsmb\.venv\Scripts\python.e
 | `max_logs` | Nombre max de logs `download_*.log` conservés | `5` |
 | `image_quality` | `"original"` : blob d'origine (`com.atproto.sync.getBlob` via `https://bsky.social`, qui redirige vers le PDS de l'auteur ; repli automatique sur le CDN en cas d'échec) ; `"cdn"` : image `fullsize` du CDN Bluesky (recompressée) | `"original"` |
 | `skip_existing_cid` | Ne pas retélécharger une image dont le `cid` est déjà en base avec un fichier présent sur disque (ligne `[SKIP]`) | `true` |
+| `gif_subfolder` | Les GIF publiés depuis le client (vidéos `presentation: "gif"`) reçoivent par défaut le suffixe `_gif` (`..._01_gif.mp4`) ; à `true`, ils sont rangés dans `videos/gifs/` (sans suffixe) | `false` |
+| `download_video_thumbnail` | Télécharge aussi la miniature de la vidéo (`..._01_thumb.jpg`, comptée comme image) quand la vue hydratée du post est connue (cache `bookmarks.json`) | `false` |
 
 Les chemins relatifs (`token_file`, `urls_file`, `db_file`, `logs_dir`) sont résolus depuis le dossier d'installation de BSMB (celui de `bsmb.py`), pas depuis le dossier courant.
 
@@ -286,7 +288,7 @@ Les chemins relatifs (`token_file`, `urls_file`, `db_file`, `logs_dir`) sont ré
 |---------|------|-------------|
 | `id` | INTEGER (PK) | Auto-incrémenté |
 | `post_url` | TEXT (FK) | Référence vers posts.url (`ON DELETE CASCADE`) |
-| `media_type` | TEXT | `image`, `video`, `text` |
+| `media_type` | TEXT | `image`, `video`, `subtitle`, `text` |
 | `filename` | TEXT | Nom réel du fichier téléchargé (unique par post) |
 | `downloaded_at` | TEXT | Date de téléchargement (ISO) |
 | `cid` | TEXT | CID du blob AT Protocol (NULL si inconnu) |
@@ -321,6 +323,12 @@ Au lancement, BSMB applique les migrations numérotées manquantes aux bases exi
 | `comment` | Texte du post + URL complète |
 | `artist` | Handle de l'auteur |
 | `creation_time` | Date de création du post |
+| `description` | Texte alternatif (`alt`) de la vidéo, s'il existe |
+
+**Vidéos : limites et comportements.** Bluesky accepte désormais des vidéos de 10 minutes et 300 Mo : le téléchargement utilise un délai de connexion de 10 s et de lecture de 300 s, et écrit dans un fichier `.part` renommé seulement une fois la réponse complète et valide (jamais de `.mp4` tronqué). L'extension suit le `mimeType` du blob (`.mp4`, `.webm`, `.mov`).
+
+- **Sous-titres** : chaque fichier de `captions` est enregistré à côté de la vidéo en `<nom_video>.<lang>.vtt` (ex. `..._01.fr.vtt`). Un sous-titre en échec est journalisé sans faire échouer la vidéo. Ils ne sont pas incrustés dans le MP4.
+- **Repli HLS** : si `getBlob` échoue (blob purgé, PDS indisponible) et que la playlist HLS est connue (vue hydratée du post, cache `bookmarks.json`), la vidéo est reconstruite avec `ffmpeg -i <playlist> -c copy` (résultat en `.mp4`). Sans ffmpeg ou sans playlist, le téléchargement échoue.
 
 ---
 

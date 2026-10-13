@@ -62,7 +62,8 @@ class Downloaders:
         self.erreur = erreur or {}
 
     def _fabriquer(self, nom, media_type, ext):
-        def telecharger(url, dest, config, session=None, name_prefix=None, record=None, existing_cid=None):
+        def telecharger(url, dest, config, session=None, name_prefix=None, record=None, existing_cid=None,
+                        did=None, view_embed=None):
             self.appels.append((nom, url, name_prefix))
             cle = (nom, url) if (nom, url) in self.erreur else url
             if cle in self.erreur:

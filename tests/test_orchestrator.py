@@ -153,7 +153,8 @@ class TestProcessPostMedias:
 
     def test_video_avec_cid(self, tmp_db, tmp_path):
         resultat, mocks = _lancer(tmp_db, tmp_path, PostType.VIDEO, video=[_res("v.mp4", "video", "bafy")])
-        mocks["download_video"].assert_called_once_with(URL, "VID", {"max_filename_len": 64})
+        mocks["download_video"].assert_called_once_with(
+            URL, "VID", {"max_filename_len": 64}, record=None, did=None, view_embed=None)
         assert resultat[:5] == (True, 0, 1, 0, "success")
         assert _medias(tmp_db) == [("video", "v.mp4", "bafy")]
         assert any("[OK] Fichier enregistré : v.mp4" in ligne for ligne in resultat[5])

@@ -30,7 +30,9 @@ DEFAULT_CONFIG = {
     "warned_plaintext_secret": False,  # avertissement « App Password en clair » déjà affiché
     "image_quality": "original",  # "original" (blob getBlob, repli CDN) ou "cdn" (image fullsize du CDN)
     "skip_existing_cid": True,  # ne pas retélécharger un blob dont le cid est en base avec un fichier présent
-    "bookmarks_cache": "bookmarks.json"  # dernière réponse getBookmarks (postView bruts)
+    "bookmarks_cache": "bookmarks.json",  # dernière réponse getBookmarks (postView bruts)
+    "gif_subfolder": False,  # GIF (vidéo presentation=gif) rangés dans videos/gifs/ au lieu du suffixe _gif
+    "download_video_thumbnail": False  # télécharge aussi la miniature de la vidéo (_01_thumb.jpg)
 }
 
 def get_default_paths():
