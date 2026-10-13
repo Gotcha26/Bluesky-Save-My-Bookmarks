@@ -184,6 +184,7 @@ L'orchestrateur utilise `concurrent.futures.ThreadPoolExecutor` avec un nombre c
   "index_digits": 1,
   "bsky_handle": "monpseudo.bsky.social",
   "bsky_app_password": "xxxx-xxxx-xxxx-xxxx",
+  "pds_url": "https://morel.us-east.host.bsky.network",
   "max_workers": 4,
   "last_sync": "2026-02-08T14:30:00",
   "advanced_mode": false
@@ -197,6 +198,7 @@ L'orchestrateur utilise `concurrent.futures.ThreadPoolExecutor` avec un nombre c
 | `urls_file` | Liste des bookmarks exportés | `urls.txt` |
 | `db_file` | Base de données SQLite | `bsmb.db` |
 | `logs_dir` | Dossier des logs | `logs` |
+| `pds_url` | PDS du compte, détecté à la connexion (`""` = inconnu, `https://bsky.social` utilisé) | `""` |
 | `max_workers` | Workers parallèles | `4` |
 | `last_sync` | Date de dernière synchronisation | `""` |
 | `advanced_mode` | Mode avancé activé | `false` |

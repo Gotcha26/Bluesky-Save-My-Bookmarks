@@ -9,9 +9,23 @@ from pathlib import Path
 ENDPOINT = "https://bsky.social/xrpc/com.atproto.server.createSession"
 
 
+DEFAULT_PDS_URL = "https://bsky.social"
+
+
 class AuthError(Exception):
     """Erreur d'authentification Bluesky."""
     pass
+
+
+def _extract_pds_url(did_doc):
+    """Lit le PDS du compte dans le didDoc (service #atproto_pds), sinon bsky.social."""
+    if isinstance(did_doc, dict):
+        for service in did_doc.get("service") or []:
+            if isinstance(service, dict) and service.get("id") == "#atproto_pds":
+                endpoint = service.get("serviceEndpoint")
+                if isinstance(endpoint, str) and endpoint:
+                    return endpoint
+    return DEFAULT_PDS_URL
 
 
 def create_session(handle, app_password):
@@ -23,7 +37,12 @@ def create_session(handle, app_password):
         app_password: App Password (format xxxx-xxxx-xxxx-xxxx)
 
     Returns:
-        str: Token complet "Bearer xxx" pret a l'emploi
+        dict: {
+            "token": str,        # Token complet "Bearer xxx" prêt à l'emploi
+            "refresh_jwt": str|None,
+            "did": str|None,
+            "pds_url": str,      # PDS réel du compte (didDoc), sinon bsky.social
+        }
 
     Raises:
         AuthError: En cas d'echec d'authentification
@@ -48,7 +67,12 @@ def create_session(handle, app_password):
         if not access_jwt:
             raise AuthError("Réponse inattendue du serveur (pas de accessJwt).")
 
-        return f"Bearer {access_jwt}"
+        return {
+            "token": f"Bearer {access_jwt}",
+            "refresh_jwt": data.get("refreshJwt"),
+            "did": data.get("did"),
+            "pds_url": _extract_pds_url(data.get("didDoc")),
+        }
 
     except requests.exceptions.ConnectionError:
         raise AuthError("Impossible de se connecter à bsky.social. Vérifiez votre connexion.")
@@ -58,14 +82,16 @@ def create_session(handle, app_password):
         raise AuthError(f"Erreur HTTP {e.response.status_code}")
 
 
-def get_token(config):
+def get_session(config):
     """
-    Obtient un token Bearer, par ordre de priorité :
+    Obtient une session complète, par ordre de priorité :
     1. createSession si handle + app_password sont configurés
-    2. Lecture de Token-Bearer.txt (fallback)
+    2. Lecture de Token-Bearer.txt (fallback) ; le PDS vient alors de
+       config["pds_url"] (bsky.social si inconnu), did et refresh_jwt valent None.
 
     Returns:
-        str: Token "Bearer xxx" ou None si aucun moyen d'authentification
+        dict: {"token", "refresh_jwt", "did", "pds_url"} ou None si aucun moyen
+        d'authentification
     """
     handle = config.get("bsky_handle", "")
     app_password = config.get("bsky_app_password", "")
@@ -79,9 +105,25 @@ def get_token(config):
     if token_file.exists():
         content = token_file.read_text(encoding="utf-8").strip()
         if content.startswith("Bearer "):
-            return content
+            return {
+                "token": content,
+                "refresh_jwt": None,
+                "did": None,
+                "pds_url": config.get("pds_url") or DEFAULT_PDS_URL,
+            }
 
     return None
+
+
+def get_token(config):
+    """
+    Obtient un token Bearer (voir get_session).
+
+    Returns:
+        str: Token "Bearer xxx" ou None si aucun moyen d'authentification
+    """
+    session = get_session(config)
+    return session["token"] if session else None
 
 
 def has_credentials(config):

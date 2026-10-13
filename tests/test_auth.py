@@ -3,7 +3,7 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from core.auth import create_session, get_token, has_credentials, AuthError
+from core.auth import create_session, get_session, get_token, has_credentials, AuthError, DEFAULT_PDS_URL
 
 
 class TestCreateSession:
@@ -11,13 +11,58 @@ class TestCreateSession:
     def test_success(self, mock_post):
         mock_resp = MagicMock()
         mock_resp.status_code = 200
-        mock_resp.json.return_value = {"accessJwt": "eyJ.token.xyz"}
+        mock_resp.json.return_value = {
+            "accessJwt": "eyJ.token.xyz",
+            "refreshJwt": "eyJ.refresh.xyz",
+            "did": "did:plc:abc",
+            "didDoc": {
+                "service": [
+                    {
+                        "id": "#atproto_pds",
+                        "type": "AtprotoPersonalDataServer",
+                        "serviceEndpoint": "https://morel.us-east.host.bsky.network",
+                    }
+                ]
+            },
+        }
         mock_resp.raise_for_status.return_value = None
         mock_post.return_value = mock_resp
 
         result = create_session("user.bsky.social", "xxxx-xxxx-xxxx-xxxx")
-        assert result == "Bearer eyJ.token.xyz"
+        assert result == {
+            "token": "Bearer eyJ.token.xyz",
+            "refresh_jwt": "eyJ.refresh.xyz",
+            "did": "did:plc:abc",
+            "pds_url": "https://morel.us-east.host.bsky.network",
+        }
         mock_post.assert_called_once()
+
+    @patch("core.auth.requests.post")
+    def test_pds_url_fallback_without_service(self, mock_post):
+        """didDoc sans service #atproto_pds → bsky.social."""
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            "accessJwt": "eyJ.token.xyz",
+            "didDoc": {"service": [{"id": "#autre", "serviceEndpoint": "https://x.example"}]},
+        }
+        mock_resp.raise_for_status.return_value = None
+        mock_post.return_value = mock_resp
+
+        assert create_session("user", "pass")["pds_url"] == "https://bsky.social"
+
+    @patch("core.auth.requests.post")
+    def test_pds_url_fallback_without_didDoc(self, mock_post):
+        """Réponse sans didDoc du tout → bsky.social."""
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {"accessJwt": "eyJ.token.xyz"}
+        mock_resp.raise_for_status.return_value = None
+        mock_post.return_value = mock_resp
+
+        session = create_session("user", "pass")
+        assert session["pds_url"] == DEFAULT_PDS_URL == "https://bsky.social"
+        assert session["token"] == "Bearer eyJ.token.xyz"
 
     @patch("core.auth.requests.post")
     def test_invalid_credentials(self, mock_post):
@@ -68,7 +113,10 @@ class TestCreateSession:
 class TestGetToken:
     @patch("core.auth.create_session")
     def test_with_credentials(self, mock_session):
-        mock_session.return_value = "Bearer abc123"
+        mock_session.return_value = {
+            "token": "Bearer abc123", "refresh_jwt": "r", "did": "did:plc:x",
+            "pds_url": "https://bsky.social",
+        }
         config = {"bsky_handle": "user.bsky.social", "bsky_app_password": "xxxx-xxxx-xxxx-xxxx"}
         assert get_token(config) == "Bearer abc123"
 
@@ -99,6 +147,36 @@ class TestGetToken:
             "token_file": str(tmp_path / "nonexistent.txt"),
         }
         assert get_token(config) is None
+
+
+class TestGetSession:
+    @patch("core.auth.create_session")
+    def test_with_credentials_returns_full_dict(self, mock_session):
+        session = {
+            "token": "Bearer abc123", "refresh_jwt": "r", "did": "did:plc:x",
+            "pds_url": "https://morel.us-east.host.bsky.network",
+        }
+        mock_session.return_value = session
+        config = {"bsky_handle": "user.bsky.social", "bsky_app_password": "xxxx-xxxx-xxxx-xxxx"}
+        assert get_session(config) == session
+
+    def test_file_fallback_uses_configured_pds_url(self, tmp_path):
+        token_file = tmp_path / "Token-Bearer.txt"
+        token_file.write_text("Bearer file_token_123", encoding="utf-8")
+        config = {"token_file": str(token_file), "pds_url": "https://eurosky.social"}
+        session = get_session(config)
+        assert session["token"] == "Bearer file_token_123"
+        assert session["pds_url"] == "https://eurosky.social"
+        assert session["did"] is None and session["refresh_jwt"] is None
+
+    def test_file_fallback_unknown_pds_url_defaults(self, tmp_path):
+        token_file = tmp_path / "Token-Bearer.txt"
+        token_file.write_text("Bearer file_token_123", encoding="utf-8")
+        config = {"token_file": str(token_file), "pds_url": ""}
+        assert get_session(config)["pds_url"] == "https://bsky.social"
+
+    def test_nothing_available(self, tmp_path):
+        assert get_session({"token_file": str(tmp_path / "nope.txt")}) is None
 
 
 class TestHasCredentials:

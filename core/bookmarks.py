@@ -6,7 +6,7 @@ Pont entre l'API (export_bookmarks) et la base de données locale.
 from datetime import datetime
 from pathlib import Path
 
-from api.export_bookmarks import fetch_bookmarks
+from api.export_bookmarks import fetch_bookmarks, DEFAULT_PDS_URL
 from core.config import save_config
 
 
@@ -37,7 +37,8 @@ class BookmarkSync:
                 "dead_count": int,
             }
         """
-        result = fetch_bookmarks(token, on_progress)
+        pds_url = self.config.get("pds_url") or DEFAULT_PDS_URL
+        result = fetch_bookmarks(token, on_progress, pds_url=pds_url)
 
         if result["error"]:
             return {
