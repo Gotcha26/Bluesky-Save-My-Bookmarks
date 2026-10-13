@@ -49,16 +49,31 @@ class Database:
         if 'status' not in columns:
             cursor.execute("ALTER TABLE posts ADD COLUMN status TEXT DEFAULT 'ok'")
             self.conn.commit()
+
+        # Migration : identité par AT-URI (les anciennes lignes gardent NULL,
+        # complétées lors de leur prochain traitement, sans appel réseau)
+        for colonne in ('at_uri', 'did', 'rkey'):
+            if colonne not in columns:
+                cursor.execute(f"ALTER TABLE posts ADD COLUMN {colonne} TEXT")
+        # SQLite n'accepte pas ADD COLUMN ... UNIQUE : l'unicité passe par un index
+        # (plusieurs NULL restent autorisés)
+        cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_posts_at_uri ON posts(at_uri)")
+        self.conn.commit()
     
-    def add_post(self, url, post_id=None, handle=None):
-        """Ajoute un post à la DB (thread-safe)."""
+    def add_post(self, url, post_id=None, handle=None, at_uri=None, did=None):
+        """Ajoute un post à la DB (thread-safe).
+
+        `at_uri` est l'identité canonique : un même at_uri sous une autre URL
+        (handle changé) remplace la ligne existante au lieu de créer un doublon.
+        """
+        rkey = at_uri.rsplit("/", 1)[-1] if at_uri else None
         with self._lock:
             cursor = self.conn.cursor()
             now = datetime.now().isoformat()
             cursor.execute('''
-                INSERT OR REPLACE INTO posts (url, post_id, handle, added_at, last_check)
-                VALUES (?, ?, ?, ?, ?)
-            ''', (url, post_id, handle, now, now))
+                INSERT OR REPLACE INTO posts (url, post_id, handle, added_at, last_check, at_uri, did, rkey)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (url, post_id, handle, now, now, at_uri, did, rkey))
             self.conn.commit()
 
     def add_media(self, post_url, media_type, filename):
@@ -98,6 +113,24 @@ class Database:
                 if not cursor.fetchone():
                     new_posts.append(url)
             return new_posts
+
+    def get_new_refs(self, refs):
+        """Retourne les posts (dicts avec `at_uri` et `url`) non trackés (thread-safe).
+
+        Comparaison sur `at_uri` ; repli sur `url` pour les anciennes lignes
+        dont `at_uri` est encore NULL.
+        """
+        with self._lock:
+            cursor = self.conn.cursor()
+            new_refs = []
+            for ref in refs:
+                cursor.execute(
+                    'SELECT 1 FROM posts WHERE at_uri = ? OR (at_uri IS NULL AND url = ?)',
+                    (ref.get('at_uri'), ref['url']),
+                )
+                if not cursor.fetchone():
+                    new_refs.append(ref)
+            return new_refs
 
     def get_stats(self):
         """Retourne les statistiques (thread-safe).

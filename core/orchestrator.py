@@ -95,7 +95,7 @@ def process_post(url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_d
     # Tracking DB
     if db:
         handle = data.get("handle")
-        db.add_post(url, post_id, handle)
+        db.add_post(url, post_id, handle, at_uri=data.get("at_uri"), did=data.get("did"))
 
     has_success = False
     img_count = 0

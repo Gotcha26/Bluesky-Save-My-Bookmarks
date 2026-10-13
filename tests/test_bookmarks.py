@@ -27,6 +27,10 @@ class TestBookmarkSyncSync:
                 "https://bsky.app/profile/user/post/1",
                 "https://bsky.app/profile/user/post/2",
             ],
+            "posts": [
+                {"at_uri": None, "url": "https://bsky.app/profile/user/post/1"},
+                {"at_uri": None, "url": "https://bsky.app/profile/user/post/2"},
+            ],
             "count": 2,
             "pages": 1,
             "error": None,
@@ -70,6 +74,10 @@ class TestBookmarkSyncSync:
                 "https://bsky.app/profile/user/post/1",
                 "https://bsky.app/profile/user/post/2",
             ],
+            "posts": [
+                {"at_uri": None, "url": "https://bsky.app/profile/user/post/1"},
+                {"at_uri": None, "url": "https://bsky.app/profile/user/post/2"},
+            ],
             "count": 2,
             "pages": 1,
             "error": None,
@@ -92,7 +100,7 @@ class TestBookmarkSyncSync:
         tmp_config["db_file"] = str(tmp_path / "test.db")
 
         mock_fetch.return_value = {
-            "urls": [],
+            "urls": [], "posts": [],
             "count": 0,
             "pages": 0,
             "error": "Erreur réseau",
@@ -113,7 +121,7 @@ class TestBookmarkSyncSync:
         tmp_config["db_file"] = str(tmp_path / "test.db")
 
         mock_fetch.return_value = {
-            "urls": [],
+            "urls": [], "posts": [],
             "count": 0,
             "pages": 1,
             "error": "Token expiré",
@@ -136,7 +144,7 @@ class TestBookmarkSyncSync:
         tmp_config["db_file"] = str(tmp_path / "test.db")
 
         mock_fetch.return_value = {
-            "urls": [],
+            "urls": [], "posts": [],
             "count": 0,
             "pages": 1,
             "error": None,
@@ -161,7 +169,7 @@ class TestBookmarkSyncPdsUrl:
         db = Database(str(tmp_path / "test.db"))
         tmp_config["pds_url"] = "https://eurosky.social"
         mock_fetch.return_value = {
-            "urls": [], "count": 0, "pages": 1, "error": None, "expired": False,
+            "urls": [], "posts": [], "count": 0, "pages": 1, "error": None, "expired": False,
         }
         BookmarkSync(tmp_config, db).sync("Bearer test")
         assert mock_fetch.call_args[1]["pds_url"] == "https://eurosky.social"
@@ -173,7 +181,7 @@ class TestBookmarkSyncPdsUrl:
         db = Database(str(tmp_path / "test.db"))
         tmp_config["pds_url"] = ""
         mock_fetch.return_value = {
-            "urls": [], "count": 0, "pages": 1, "error": None, "expired": False,
+            "urls": [], "posts": [], "count": 0, "pages": 1, "error": None, "expired": False,
         }
         BookmarkSync(tmp_config, db).sync("Bearer test")
         assert mock_fetch.call_args[1]["pds_url"] == "https://bsky.social"
