@@ -333,7 +333,7 @@ class TestOrchestrateurStatuts:
         resolver.resolve.return_value = None
         res = _lancer(tmp_db, tmp_path, PostType.QUOTE, {}, "", resolver=resolver)
         assert res[4] == "failed"
-        assert self._statut(tmp_db) == "unknown"  # un échec ne change pas le statut
+        assert self._statut(tmp_db) == "failed"  # un échec est retenté plus tard (statut failed)
 
     def test_succes_remet_le_statut_a_ok_apres_une_erreur(self, tmp_db, tmp_path):
         tmp_db.add_post(URL)
@@ -342,11 +342,11 @@ class TestOrchestrateurStatuts:
         assert res[0] is True
         assert self._statut(tmp_db) == "ok"
 
-    def test_echec_ne_change_pas_le_statut(self, tmp_db, tmp_path):
+    def test_echec_pose_le_statut_failed(self, tmp_db, tmp_path):
         tmp_db.add_post(URL)
         tmp_db.mark_post_status(URL, "error_500")
         _lancer(tmp_db, tmp_path, PostType.TEXT_ONLY, {}, erreur=DownloadError("API"))
-        assert self._statut(tmp_db) == "error_500"
+        assert self._statut(tmp_db) == "failed"
 
     def test_citation_archivee_remet_le_citant_a_ok(self, tmp_db, tmp_path):
         tmp_db.add_post(URL)

@@ -202,7 +202,7 @@ Yes. A post that quotes another one is archived like any post, then the quoted p
 This is normal: a post is recorded as soon as it has been processed, even without media (text only, deleted, blocked, error). The reasons can be read in the `logs/` folder: `failed_downloads_*.txt`, `deleted_posts_*.txt`, `quotes_unresolved_*.txt`, `error_500_*.txt`, `rate_limited_*.txt`, `unknown_types_*.txt`, and `download_*.log` for the details of the session.
 
 **Some posts are in "Failure" or "Error 500".**
-Often a temporary network or server error (Bluesky). A server error 500 or a rate limit (429) is retried automatically after 7 days. A download failure (listed in `logs/failed_downloads_*.txt`), however, is not retried by itself: the post stays marked as processed. To retry it, use **Force DL** (or `python bsmb.py download --force`).
+Often a temporary network or server error (Bluesky). A server error 500, a rate limit (429) or a download failure (listed in `logs/failed_downloads_*.txt`) is retried automatically after 7 days (`retry_after_days`). To retry it right away, use **Force DL** (or `python bsmb.py download --force`).
 
 **What happens to a post that shares a link (article, YouTube, x.com…)?**
 BSMB archives the post text, the link, its title, its description and the card thumbnail. The content of the linked site is not downloaded (except a Tenor GIF or a direct `.gif` / `.mp4` / `.webp` file).

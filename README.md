@@ -198,7 +198,7 @@ Oui. Un post qui en cite un autre est archivé comme n'importe quel post, puis l
 C'est normal : un post est enregistré dès qu'il a été traité, même sans média (texte seul, supprimé, bloqué, erreur). Les raisons se lisent dans le dossier `logs/` : `failed_downloads_*.txt`, `deleted_posts_*.txt`, `quotes_unresolved_*.txt`, `error_500_*.txt`, `rate_limited_*.txt`, `unknown_types_*.txt`, et `download_*.log` pour le détail de la session.
 
 **Certains posts sont en « Échec » ou en « Erreur 500 ».**
-Souvent une erreur réseau ou serveur temporaire (Bluesky). Une erreur 500 ou une limite de débit (429) du serveur est retentée automatiquement après 7 jours. Un échec de téléchargement (liste dans `logs/failed_downloads_*.txt`) n'est en revanche pas retenté tout seul : le post reste marqué comme traité. Pour le retenter, utilisez **Force DL** (ou `python bsmb.py download --force`).
+Souvent une erreur réseau ou serveur temporaire (Bluesky). Une erreur 500, une limite de débit (429) du serveur ou un échec de téléchargement (liste dans `logs/failed_downloads_*.txt`) est retenté automatiquement après 7 jours (`retry_after_days`). Pour le retenter tout de suite, utilisez **Force DL** (ou `python bsmb.py download --force`).
 
 **Que devient un post qui partage un lien (article, YouTube, x.com…) ?**
 BSMB archive le texte du post, le lien, son titre, sa description et la vignette de la carte. Le contenu du site lié n'est pas téléchargé (sauf un GIF Tenor ou un fichier `.gif` / `.mp4` / `.webp` direct).

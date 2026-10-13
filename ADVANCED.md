@@ -113,12 +113,13 @@ Pendant le téléchargement, BSMB détecte les posts problématiques :
 | `blocked` | Post bloqué (`blockedPost` renvoyé par `getBookmarks`) ; jamais retenté |
 | `error_500` | Erreur serveur temporaire (HTTP 5xx) |
 | `error_429` | Limite de débit (HTTP 429) encore atteinte après les reprises automatiques ; retentée comme `error_500` |
+| `failed` | Téléchargement en échec, total ou partiel (les fichiers obtenus sont gardés) ; retenté comme `error_500`, après `retry_after_days` jours |
 
 Les liens morts sont visibles dans **Stockage local** et peuvent être nettoyés.
 
 Le nettoyage :
 - Supprime les entrées `deleted` et `blocked` de la base de données
-- Conserve les entrées `error_500` et `error_429` (potentiellement temporaires)
+- Conserve les entrées `error_500`, `error_429` et `failed` (potentiellement temporaires)
 - Ne supprime **jamais** les fichiers déjà téléchargés
 
 ---
@@ -148,7 +149,7 @@ Cite: at://did:plc:…/app.bsky.feed.post/3kcite
 Réponse à: at://did:plc:…/app.bsky.feed.post/3kparent
 ```
 
-Les lignes `Langue`, `[Image N : …]` / `[Vidéo : …]` (seulement si le texte alternatif n'est pas vide), `Lien/Titre/Description`, `Cite` et `Réponse à` n'apparaissent que lorsqu'elles s'appliquent. Un fichier déjà présent au même contenu n'est pas réécrit. Si tous les médias propres d'un post échouent, son texte n'est pas archivé tant que le post n'est pas retenté avec succès. Le texte alternatif des images est aussi écrit dans le champ EXIF `ImageDescription` (si `exiftool` est installé).
+Les lignes `Langue`, `[Image N : …]` / `[Vidéo : …]` (seulement si le texte alternatif n'est pas vide), `Lien/Titre/Description`, `Cite` et `Réponse à` n'apparaissent que lorsqu'elles s'appliquent. Un fichier déjà présent au même contenu n'est pas réécrit. Si tous les médias propres d'un post échouent, son texte n'est pas archivé tant que le post (statut `failed`) n'est pas retenté avec succès. Le texte alternatif des images est aussi écrit dans le champ EXIF `ImageDescription` (si `exiftool` est installé).
 
 **`<base>.json`** : la fiche (« sidecar »), archive fidèle du post, désactivable avec `save_sidecar: false` :
 
@@ -332,7 +333,7 @@ schtasks /Create /SC DAILY /TN BSMB /TR "\"C:\chemin\bsmb\.venv\Scripts\python.e
 | `logs_dir` | Dossier des logs | `logs` |
 | `pds_url` | PDS du compte, détecté à la connexion (`""` = inconnu, `https://bsky.social` utilisé) | `""` |
 | `max_workers` | Workers parallèles | `4` |
-| `retry_after_days` | Délai avant de retenter un post en erreur (`error_500`, `error_429`, `unknown`, `repost` hérité) | `7` |
+| `retry_after_days` | Délai avant de retenter un post en erreur (`error_500`, `error_429`, `unknown`, `failed`, `repost` hérité) | `7` |
 | `last_sync` | Date de dernière synchronisation | `""` |
 | `advanced_mode` | Mode avancé activé | `false` |
 | `open_folder_after_download` | Propose d'ouvrir le dossier après un téléchargement (ignoré en non interactif) | `true` |
@@ -362,7 +363,7 @@ Les chemins relatifs (`token_file`, `urls_file`, `db_file`, `logs_dir`) sont ré
 | `handle` | TEXT | Handle de l'auteur |
 | `added_at` | TEXT | Date d'ajout (ISO) |
 | `last_check` | TEXT | Dernière vérification (ISO) |
-| `status` | TEXT | `ok`, `deleted`, `blocked`, `error_500`, `error_429`, `unknown` (`repost` : ancien statut des citations non résolues, plus écrit, encore retenté) |
+| `status` | TEXT | `ok`, `deleted`, `blocked`, `error_500`, `error_429`, `unknown`, `failed` (`repost` : ancien statut des citations non résolues, plus écrit, encore retenté) |
 | `at_uri` | TEXT (UNIQUE) | Identité canonique `at://<did>/app.bsky.feed.post/<rkey>` (NULL pour les anciennes lignes, complété au prochain traitement) |
 | `did` | TEXT | DID de l'auteur |
 | `rkey` | TEXT | Clé du post |

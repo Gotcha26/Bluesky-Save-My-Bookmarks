@@ -548,11 +548,12 @@ def process_post(
     # Bilan
     if erreurs:
         # Le contenu propre du post n'est pas complet : on garde ce qui a été obtenu,
-        # mais le post reste retentable (comme un post simple en échec)
-        if db and results:
+        # mais le post reste retentable (statut `failed`, retenté après retry_after_days)
+        if db:
             for r in a_enregistrer:
                 db.add_media(url, r.media_type, r.filename, cid=r.cid)
             db.update_last_check(url)
+            db.mark_post_status(url, "failed")
         log_func(f"   ÉCHEC: {url}", to_console=False)
         return False, 0, 0, 0, "failed", output
 
@@ -577,6 +578,10 @@ def process_post(
             db.mark_post_status(url, "deleted")
         return False, 0, 0, 0, "error_400", output
 
+    # Rien d'archivé : retenté automatiquement après retry_after_days
+    if db:
+        db.update_last_check(url)
+        db.mark_post_status(url, "failed")
     log_func(f"   ÉCHEC: {url}", to_console=False)
     return False, 0, 0, 0, "failed", output
 

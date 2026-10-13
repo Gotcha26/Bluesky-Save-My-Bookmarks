@@ -283,7 +283,7 @@ class TestEchecDuContenuPropre:
             url, [charger("quote_text.json"), post_texte(D2, "3kcited0001")], tmp_db, tmp_path, downloaders=dl
         )
         assert res[0] is False and res[4] == "failed"
-        assert statut(tmp_db, url) == "unknown"  # reste retentable
+        assert statut(tmp_db, url) == "failed"  # reste retentable
         assert len(medias(tmp_db)) == 1
 
     def test_cite_externe_archive_par_son_texte_avec_note(self, tmp_db, tmp_path):
