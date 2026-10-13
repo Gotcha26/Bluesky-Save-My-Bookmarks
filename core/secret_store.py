@@ -55,6 +55,12 @@ def store_app_password(config, handle, pwd):
             return BACKEND_KEYRING
         except Exception:
             pass
+        try:
+            # Écriture impossible : retirer toute ancienne entrée, sinon
+            # load_app_password renverrait un mot de passe périmé.
+            kr.delete_password(SERVICE, handle)
+        except Exception:
+            pass
     config["bsky_app_password"] = pwd
     return BACKEND_CONFIG
 
@@ -73,14 +79,26 @@ def load_app_password(config, handle):
 
 
 def delete_app_password(config, handle):
-    """Supprime le secret de keyring (s'il y est) et de config.json. Ne lève jamais."""
-    kr = _get_keyring()
-    if kr is not None and handle:
-        try:
-            kr.delete_password(SERVICE, handle)
-        except Exception:
-            pass
+    """
+    Supprime le secret de keyring (s'il y est) et de config.json. Ne lève jamais.
+
+    Returns:
+        bool: True si supprimé ou déjà absent, False si le keyring a échoué
+    """
     config["bsky_app_password"] = ""
+    kr = _get_keyring()
+    if kr is None or not handle:
+        return True
+    try:
+        kr.delete_password(SERVICE, handle)
+        return True
+    except Exception:
+        pass
+    try:
+        # La suppression a levé : entrée simplement absente, ou vraie défaillance ?
+        return not kr.get_password(SERVICE, handle)
+    except Exception:
+        return False
 
 
 def migrate_secret_to_keyring(config):
@@ -103,5 +121,11 @@ def migrate_secret_to_keyring(config):
     except Exception:
         return False
     config["bsky_app_password"] = ""
-    save_config(config)
+    try:
+        save_config(config)
+    except OSError:
+        # Secret en keyring mais config.json non réécrit : rester cohérent (la clé
+        # en clair sera migrée de nouveau au prochain démarrage).
+        config["bsky_app_password"] = pwd
+        return False
     return True

@@ -1,11 +1,11 @@
-"""Tests de core/secrets.py : App Password via keyring, repli sur config.json (issue #12)."""
+"""Tests de core/secret_store.py : App Password via keyring, repli sur config.json (issue #12)."""
 import sys
 import types
 from unittest.mock import patch
 
 import pytest
 
-from core import secrets as sec
+from core import secret_store as sec
 
 HANDLE = "user.bsky.social"
 PWD = "abcd-efgh-ijkl-mnop"
@@ -135,7 +135,7 @@ class TestKeyringDefaillant:
 class TestMigration:
     def test_deplace_le_secret_vers_keyring(self, fake_kr, tmp_config):
         tmp_config.update(bsky_handle=HANDLE, bsky_app_password=PWD)
-        with patch("core.secrets.save_config") as save:
+        with patch("core.secret_store.save_config") as save:
             assert sec.migrate_secret_to_keyring(tmp_config) is True
         assert fake_kr.store[("bsmb", HANDLE)] == PWD
         assert tmp_config["bsky_app_password"] == ""
@@ -143,7 +143,7 @@ class TestMigration:
 
     def test_sans_keyring_rien_ne_change(self, no_kr, tmp_config):
         tmp_config.update(bsky_handle=HANDLE, bsky_app_password=PWD)
-        with patch("core.secrets.save_config") as save:
+        with patch("core.secret_store.save_config") as save:
             assert sec.migrate_secret_to_keyring(tmp_config) is False
         assert tmp_config["bsky_app_password"] == PWD
         save.assert_not_called()
@@ -151,14 +151,14 @@ class TestMigration:
     def test_keyring_defaillant_ne_plante_pas(self, monkeypatch, tmp_config):
         monkeypatch.setitem(sys.modules, "keyring", BrokenKeyring())
         tmp_config.update(bsky_handle=HANDLE, bsky_app_password=PWD)
-        with patch("core.secrets.save_config") as save:
+        with patch("core.secret_store.save_config") as save:
             assert sec.migrate_secret_to_keyring(tmp_config) is False
         assert tmp_config["bsky_app_password"] == PWD
         save.assert_not_called()
 
     def test_config_vide_rien_a_faire(self, fake_kr, tmp_config):
         tmp_config.update(bsky_handle=HANDLE, bsky_app_password="")
-        with patch("core.secrets.save_config") as save:
+        with patch("core.secret_store.save_config") as save:
             assert sec.migrate_secret_to_keyring(tmp_config) is False
         save.assert_not_called()
         assert fake_kr.store == {}
@@ -167,3 +167,36 @@ class TestMigration:
         tmp_config.update(bsky_handle="", bsky_app_password=PWD)
         assert sec.migrate_secret_to_keyring(tmp_config) is False
         assert tmp_config["bsky_app_password"] == PWD
+
+
+class TestRound1:
+    def test_migration_save_config_en_echec_renvoie_false(self, fake_kr, tmp_config):
+        tmp_config.update(bsky_handle=HANDLE, bsky_app_password=PWD)
+        with patch("core.secret_store.save_config", side_effect=OSError("disque")):
+            assert sec.migrate_secret_to_keyring(tmp_config) is False
+
+    def test_repli_config_supprime_l_ancienne_entree_keyring(self, monkeypatch, cfg):
+        class SetCasse(FakeKeyring):
+            def set_password(self, service, user, pwd):
+                raise RuntimeError("verrouillé")
+
+        kr = SetCasse()
+        kr.store[("bsmb", HANDLE)] = "ancien-secret"
+        monkeypatch.setitem(sys.modules, "keyring", kr)
+        assert sec.store_app_password(cfg, HANDLE, PWD) == "config.json"
+        assert ("bsmb", HANDLE) not in kr.store
+        assert sec.load_app_password(cfg, HANDLE) == PWD
+
+    def test_delete_renvoie_true_si_supprime_ou_absent(self, fake_kr, cfg):
+        sec.store_app_password(cfg, HANDLE, PWD)
+        assert sec.delete_app_password(cfg, HANDLE) is True
+        assert sec.delete_app_password(cfg, HANDLE) is True
+
+    def test_delete_renvoie_true_sans_keyring(self, no_kr):
+        assert sec.delete_app_password({"bsky_app_password": PWD}, HANDLE) is True
+
+    def test_delete_renvoie_false_si_keyring_leve(self, monkeypatch):
+        monkeypatch.setitem(sys.modules, "keyring", BrokenKeyring())
+        cfg = {"bsky_app_password": PWD}
+        assert sec.delete_app_password(cfg, HANDLE) is False
+        assert cfg["bsky_app_password"] == ""

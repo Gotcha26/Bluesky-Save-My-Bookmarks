@@ -10,7 +10,7 @@ from pathlib import Path
 from datetime import datetime
 
 from core.config import load_config, save_config, ensure_dirs, resolve_path, restrict_permissions
-from core.secrets import (
+from core.secret_store import (
     backend_name, store_app_password, load_app_password, delete_app_password,
     migrate_secret_to_keyring,
 )
@@ -304,11 +304,15 @@ def disconnect_account(config):
     if answer not in ("o", "oui"):
         return False
 
-    delete_app_password(config, handle)
+    nettoye = delete_app_password(config, handle)
     config["bsky_handle"] = ""
     config["pds_url"] = ""
     save_config(config)
-    print(c.success("Compte déconnecté"))
+    if nettoye:
+        print(c.success("Compte déconnecté"))
+    else:
+        print(c.warning("Compte déconnecté, mais le trousseau n'a pas pu être nettoyé : "
+                        "supprimez l'entrée « bsmb » à la main."))
     input(f"\n{c.DIM}  Appuyez sur Entrée...{c.RESET}")
     return True
 
