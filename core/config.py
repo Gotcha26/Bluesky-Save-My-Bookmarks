@@ -40,7 +40,8 @@ def get_default_paths():
 def load_config():
     """Charge la config ou crée celle par défaut"""
     if CONFIG_FILE.exists():
-        config = {**DEFAULT_CONFIG, **json.load(open(CONFIG_FILE, "r", encoding="utf-8"))}
+        with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+            config = {**DEFAULT_CONFIG, **json.load(f)}
     else:
         config = DEFAULT_CONFIG.copy()
 

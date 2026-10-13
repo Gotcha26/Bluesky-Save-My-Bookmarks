@@ -188,6 +188,47 @@ class TestRun:
         with patch("builtins.input", side_effect=AssertionError("input() dans run()")):
             run([URL], config)
 
+    def test_exception_inattendue_d_un_downloader_n_interrompt_pas_le_lot(self, env_run):
+        config, analyzer, mocks = env_run
+        _types(analyzer, {URL: PostType.IMAGES, URL2: PostType.TEXT_ONLY})
+        mocks["download_images"].side_effect = OSError("disque plein")
+        stats = run([URL, URL2], config, quiet=True)
+        assert stats["failed"] == [URL]
+        assert stats["success"] == 1
+        assert stats["texts"] == 1
+        logs = Path(config["logs_dir"])
+        (log,) = logs.glob("download_*.log")
+        assert "disque plein" in log.read_text(encoding="utf-8")
+        (echecs,) = logs.glob("failed_downloads_*.txt")
+        assert echecs.read_text(encoding="utf-8") == URL
+
+    def test_message_download_error_journalise(self, env_run):
+        config, analyzer, mocks = env_run
+        _types(analyzer, {URL: PostType.VIDEO})
+        mocks["download_video"].side_effect = DownloadError("Post supprimé ou inaccessible")
+        stats = run([URL], config, quiet=True)
+        assert stats["failed"] == [URL]
+        (log,) = Path(config["logs_dir"]).glob("download_*.log")
+        assert "Post supprimé ou inaccessible" in log.read_text(encoding="utf-8")
+
+    def test_max_logs_au_total_apres_un_lot(self, env_run):
+        import os
+        import time
+
+        config, analyzer, _ = env_run
+        _types(analyzer, {URL: PostType.TEXT_ONLY})
+        logs = Path(config["logs_dir"])
+        logs.mkdir(parents=True)
+        for i in range(5):
+            ancien = logs / f"download_2026010{i}_000000.log"
+            ancien.write_text("x")
+            t = time.time() - (10 - i) * 60
+            os.utime(ancien, (t, t))
+        run([URL], {**config, "max_logs": 3}, quiet=True)
+        restants = sorted(p.name for p in logs.glob("download_*.log"))
+        assert len(restants) == 3
+        assert restants[:2] == ["download_20260103_000000.log", "download_20260104_000000.log"]
+
     def test_logs_relatifs_ancres_sur_project_root(self, env_run, tmp_path, monkeypatch):
         config, analyzer, _ = env_run
         _types(analyzer, {URL: PostType.TEXT_ONLY})

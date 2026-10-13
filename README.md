@@ -42,7 +42,7 @@ pipx install .
 bsmb
 ```
 
-BSMB lit et écrit `config.json`, `bsmb.db` et `logs/` dans son dossier d'installation (celui de `bsmb.py`), quel que soit le dossier courant.
+BSMB lit et écrit `config.json`, `bsmb.db` et `logs/` dans son dossier d'installation (celui de `bsmb.py`), quel que soit le dossier courant. **Avec pipx, ce dossier est interne à l'environnement pipx : ces fichiers (identifiants, historique, logs) sont perdus à `pipx upgrade` ou `pipx reinstall`.** Sauvegardez-les avant, ou préférez l'installation par `git clone` ci-dessus.
 
 ---
 

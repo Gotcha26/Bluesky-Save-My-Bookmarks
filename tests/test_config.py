@@ -37,6 +37,22 @@ class TestCheminsAncres:
         monkeypatch.chdir(tmp_path)
         assert resolve_path({"logs_dir": "logs"}, "logs_dir") == PROJECT_ROOT / "logs"
 
+    def test_load_config_ferme_le_fichier(self, tmp_path, monkeypatch):
+        config_file = tmp_path / "config.json"
+        config_file.write_text(json.dumps({"db_file": "autre.db"}), encoding="utf-8")
+        monkeypatch.setattr("core.config.CONFIG_FILE", config_file)
+        ouverts = []
+        vrai_open = open
+
+        def espion(*a, **k):
+            f = vrai_open(*a, **k)
+            ouverts.append(f)
+            return f
+
+        monkeypatch.setattr("builtins.open", espion)
+        load_config()
+        assert ouverts and all(f.closed for f in ouverts)
+
     def test_load_config_ne_modifie_pas_les_chemins_relatifs(self, tmp_path, monkeypatch):
         config_file = tmp_path / "config.json"
         config_file.write_text(json.dumps({"db_file": "autre.db"}), encoding="utf-8")
