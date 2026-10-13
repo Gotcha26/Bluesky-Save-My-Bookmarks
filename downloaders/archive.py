@@ -13,20 +13,16 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlparse
 
+from core.version import __version__
 from downloaders import DownloadError, DownloadResult
 from downloaders.text import nom_base_texte
 
 FACET_LIEN = "app.bsky.richtext.facet#link"
-VERSION_PAR_DEFAUT = "3.1.0"
 
 
 def bsmb_version():
-    """Version de BSMB (métadonnées du paquet, repli sur la version courante)."""
-    try:
-        from importlib.metadata import version
-        return version("bsmb")
-    except Exception:
-        return VERSION_PAR_DEFAUT
+    """Version de BSMB (source unique : core/version.py)."""
+    return __version__
 
 
 # -------------------- Facets --------------------

@@ -19,6 +19,7 @@ from core.colors import c
 from core.orchestrator import run
 from core.ui import pause, confirm, set_yes, is_interactive
 from core import cli
+from core.version import __version__
 from core.bookmarks_cache import post_views_from_config
 
 
@@ -112,7 +113,7 @@ def get_app_state(config):
 
 def print_header(config, state):
     """Affiche l'en-tête avec ligne de statut."""
-    print(c.box_header("BSMB - BSKY SAVE MY BOOKMARKS"))
+    print(c.box_header(f"BSMB v{__version__} - BSKY SAVE MY BOOKMARKS"))
 
     # Ligne de statut
     if state["has_account"]:

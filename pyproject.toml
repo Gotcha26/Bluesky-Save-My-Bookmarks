@@ -4,8 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bsmb"
-# TODO Task 9 : passer en dynamic via core/version.py
-version = "3.1.0"
+dynamic = ["version"]
 description = "Bsky Save My Bookmarks : archive localement les médias et textes de vos bookmarks Bluesky."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -18,6 +17,9 @@ keyring = ["keyring>=24"]
 
 [project.scripts]
 bsmb = "bsmb:main"
+
+[tool.setuptools.dynamic]
+version = {attr = "core.version.__version__"}
 
 [tool.setuptools]
 py-modules = ["bsmb"]
