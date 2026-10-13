@@ -30,10 +30,9 @@ testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 110
+# Copie telle quelle de Tools/i18n/msgfmt.py de CPython 3.13 (licence PSF) : style d'origine conservé
+extend-exclude = ["tools/msgfmt.py"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP"]
 
-[tool.ruff.lint.per-file-ignores]
-# Copie de Tools/i18n/msgfmt.py de CPython : on garde son style d'origine
-"tools/msgfmt.py" = ["E741", "F821", "UP031"]
