@@ -6,7 +6,7 @@ import pytest
 import requests
 
 from core.config import DEFAULT_CONFIG
-from downloaders import DownloadResult, lignes_console
+from downloaders import DownloadError, DownloadResult, lignes_console
 from downloaders.images import download_images
 from tests.test_images import IMG1, IMG2, URL, _reponse, _thread
 
@@ -81,12 +81,65 @@ class TestModeOriginal:
         download_images(URL, tmp_path, DEFAULT_CONFIG, session=session, record=RECORD)
         assert GET_RECORD not in _urls(session)
 
-    def test_pds_url_de_la_config(self, tmp_path):
+    def test_getblob_toujours_sur_bsky_social_avec_redirections(self, tmp_path):
         session = _session()
         config = {**DEFAULT_CONFIG, "pds_url": "https://morel.us-east.host.bsky.network"}
         download_images(URL, tmp_path, config, session=session, record=RECORD)
-        assert (f"https://morel.us-east.host.bsky.network/xrpc/com.atproto.sync.getBlob"
-                f"?did={DID}&cid={CID1}") in _urls(session)
+        assert BLOB1 in _urls(session)
+        assert not any("morel" in u for u in _urls(session))
+        appel = next(c for c in session.get.call_args_list if c.args[0] == BLOB1)
+        assert appel.kwargs["allow_redirects"] is True
+
+    def test_blob_200_vide_repli_cdn(self, tmp_path):
+        session = _session(blobs={BLOB1: b""})
+        res = download_images(URL, tmp_path, DEFAULT_CONFIG, session=session, record=RECORD)
+        assert IMG1 in _urls(session)
+        assert res[0].path.read_bytes() == b"img"
+
+    def test_blob_200_text_html_repli_cdn(self, tmp_path):
+        session = _session()
+        get = session.get.side_effect
+
+        def get_html(url, **kw):
+            if url == BLOB1:
+                return _reponse(content=b"<html>", headers={"content-type": "text/html"})
+            return get(url, **kw)
+
+        session.get.side_effect = get_html
+        res = download_images(URL, tmp_path, DEFAULT_CONFIG, session=session, record=RECORD)
+        assert IMG1 in _urls(session)
+        assert res[0].path.read_bytes() == b"img"
+
+    def test_blob_et_cdn_invalides_donnent_une_erreur(self, tmp_path):
+        session = _session(blobs={BLOB1: b"", IMG1: b""})
+        embed = {"$type": "app.bsky.embed.images#view", "images": [{"fullsize": IMG1}]}
+        session = _session(embed=embed, blobs={BLOB1: b"", IMG1: b""})
+        with pytest.raises(DownloadError):
+            download_images(URL, tmp_path, DEFAULT_CONFIG, session=session,
+                            record={"embed": {"images": [_img(CID1)]}})
+
+    def test_exif_lien_du_post_est_l_url_du_post(self, tmp_path, _exiftool):
+        download_images(URL, tmp_path, DEFAULT_CONFIG, session=_session(), record=RECORD)
+        cmd = _exiftool.call_args_list[0].args[0]
+        assert f"-XPComment=Bonjour\n\nLien du post : {URL}" in cmd
+        assert f"-Copyright={URL}" in cmd
+
+    def test_vue_a_2_images_pour_un_record_a_3_apparie_par_cid(self, tmp_path):
+        cdn = lambda cid: f"https://cdn.bsky.app/img/feed_fullsize/plain/{DID}/{cid}@jpeg"
+        record = {"embed": {"images": [_img(CID1, "image/png"), _img("bafkreicid3", "image/webp"),
+                                         _img(CID2, "image/jpeg")]}}
+        embed = {"$type": "app.bsky.embed.images#view",
+                 "images": [{"fullsize": cdn(CID1)}, {"fullsize": cdn(CID2)}]}
+        res = download_images(URL, tmp_path, DEFAULT_CONFIG, session=_session(embed=embed), record=record)
+        assert [r.cid for r in res] == [CID1, CID2]
+        assert [r.filename[-4:] for r in res] == [".png", ".jpg"]
+
+    def test_longueurs_differentes_sans_cid_dans_l_url_pas_de_blob(self, tmp_path):
+        record = {"embed": {"images": [_img(CID1), _img(CID2), _img("bafkreicid3")]}}
+        session = _session()
+        res = download_images(URL, tmp_path, DEFAULT_CONFIG, session=session, record=record)
+        assert [r.cid for r in res] == [None, None]
+        assert not any("getBlob" in u for u in _urls(session))
 
     def test_repli_cdn_sur_404_du_blob(self, tmp_path):
         session = _session(indisponibles=(BLOB1,))

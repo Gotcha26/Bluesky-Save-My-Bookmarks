@@ -97,7 +97,7 @@ class TestDownloadImages:
         assert cmd == [
             "exiftool",
             "-Title=3abc",
-            f"-XPComment=Bonjour\n\nLien du post : {IMG1}",
+            f"-XPComment=Bonjour\n\nLien du post : {URL}",
             "-Artist=user.bsky.social",
             "-DateTimeOriginal=2026-01-02T10:00:00.000",
             f"-Copyright={URL}",
