@@ -25,7 +25,6 @@ MODULES = [
     "core.bookmarks_cache",
     "core.cli",
     "core.http",
-    "core.logger",
     "core.orchestrator",
     "core.secret_store",
     "core.ui",
@@ -40,7 +39,6 @@ MODULES = [
     "downloaders.images",
     "downloaders.videos",
     "downloaders.text",
-    "debug_post",  # tools/debug_post.py (script autonome, hors paquet)
 ]
 
 SCRIPT = (
@@ -61,7 +59,7 @@ def test_import_sans_effet_de_bord(module, tmp_path):
     home.mkdir()
     env = {
         **os.environ,
-        "PYTHONPATH": os.pathsep.join([str(PROJECT_ROOT), str(PROJECT_ROOT / "tools")]),
+        "PYTHONPATH": str(PROJECT_ROOT),
         "PYTHONIOENCODING": "utf-8",
         "HOME": str(home),
         "USERPROFILE": str(home),
@@ -86,8 +84,8 @@ def test_import_sans_effet_de_bord(module, tmp_path):
 
 
 def _modules_du_depot():
-    """Noms importables de tous les .py de bsmb.py, core/, api/ et downloaders/ (+ tools/debug_post.py)."""
-    noms = {"bsmb", "debug_post"}
+    """Noms importables de tous les .py de bsmb.py, core/, api/ et downloaders/."""
+    noms = {"bsmb"}
     for dossier in ("core", "api", "downloaders"):
         for fichier in sorted((PROJECT_ROOT / dossier).glob("*.py")):
             noms.add(dossier if fichier.stem == "__init__" else f"{dossier}.{fichier.stem}")

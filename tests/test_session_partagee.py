@@ -38,7 +38,7 @@ def test_aucun_import_direct_de_get_session():
     tests : les modules de production passent par `bsmb_http.get_session()`."""
     motif = re.compile(r"^\s*from\s+core\.http\s+import\s+.*\bget_session\b", re.MULTILINE)
     fautifs = []
-    for dossier in ("api", "core", "downloaders", "tools", "bsmb.py"):
+    for dossier in ("api", "core", "downloaders", "bsmb.py"):
         chemin = RACINE / dossier
         fichiers = [chemin] if chemin.is_file() else sorted(chemin.glob("*.py"))
         for fichier in fichiers:
