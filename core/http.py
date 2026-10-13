@@ -7,7 +7,8 @@ Tous les appels réseau passent par `get_session()` :
   - des reprises automatiques (backoff exponentiel) sur 429 / 500 / 502 / 503 / 504
     et sur les erreurs de connexion, en respectant `Retry-After` (borné à ATTENTE_MAX) ;
   - un limiteur global (`RateLimiter`) : au plus MAX_SIMULTANES requêtes en vol quel que soit
-    `max_workers`, et pause jusqu'à `RateLimit-Reset` quand `RateLimit-Remaining` passe sous le seuil.
+    `max_workers`, et pause jusqu'à `RateLimit-Reset`, par endpoint, quand `RateLimit-Remaining` passe
+    sous 5 % de `RateLimit-Limit`.
 
 Aucun code au niveau module au-delà des définitions : la session est créée à la demande.
 """
@@ -16,6 +17,7 @@ import logging
 import threading
 import time
 from contextlib import contextmanager
+from urllib.parse import urlparse
 
 import requests
 from requests.adapters import HTTPAdapter
@@ -26,7 +28,8 @@ from core.version import __version__
 log = logging.getLogger("bsmb.http")
 
 USER_AGENT = f"BSMB/{__version__} (+https://github.com/Gotcha26/Bluesky-Save-My-Bookmarks)"
-SEUIL_RESTANT = 50  # en dessous, on attend la réinitialisation de la fenêtre
+FRACTION_SEUIL = 0.05  # on attend la réinitialisation quand il reste au plus 5 % du quota
+SEUIL_RESTANT_DEFAUT = 10  # seuil absolu quand `RateLimit-Limit` est absent
 ATTENTE_MAX = 300  # secondes : borne d'une pause (limiteur et Retry-After)
 MAX_SIMULTANES = 8  # requêtes en vol en même temps, tous threads confondus
 TAILLE_POOL = 16
@@ -50,27 +53,44 @@ def _entier(valeur):
 class RateLimiter:
     """Borne la concurrence et respecte les en-têtes `RateLimit-*` de l'API.
 
+    Bluesky applique des quotas différents selon l'endpoint (30 par fenêtre pour `createSession`,
+    3000 pour les appels publics) : l'état est mémorisé par clé `hôte + chemin`, et une pause
+    ne retarde que les requêtes vers la même clé. Le seuil est proportionnel au quota
+    (`RateLimit-Limit`), avec un repli absolu quand cet en-tête manque.
+
     `horloge` et `sleep` sont injectables pour les tests.
     """
 
     def __init__(
         self,
-        seuil=SEUIL_RESTANT,
+        seuil_defaut=SEUIL_RESTANT_DEFAUT,
+        fraction=FRACTION_SEUIL,
         attente_max=ATTENTE_MAX,
         max_simultanes=MAX_SIMULTANES,
         horloge=time.time,
         sleep=time.sleep,
     ):
-        self.seuil = seuil
+        self.seuil_defaut = seuil_defaut
+        self.fraction = fraction
         self.attente_max = attente_max
         self.max_simultanes = max_simultanes
         self._horloge = horloge
         self._sleep = sleep
         self._semaphore = threading.Semaphore(max_simultanes)
-        self._etat = threading.Lock()  # protège _reprise
-        self._pause = threading.Lock()  # un seul thread dort, les autres attendent derrière
-        self._reprise = 0.0  # epoch avant lequel on ne lance plus de requête
-        self._restant = None  # dernier RateLimit-Remaining bas (pour le journal)
+        self._etat = threading.Lock()  # protège _reprises, _infos et _pauses
+        self._reprises = {}  # clé -> epoch avant lequel on ne lance plus de requête vers cette clé
+        self._infos = {}  # clé -> (restant, limite) du dernier quota bas (pour le journal)
+        self._pauses = {}  # clé -> verrou : un seul thread dort, les autres attendent derrière
+
+    @staticmethod
+    def _cle(url):
+        parts = urlparse(str(url))
+        return f"{parts.netloc}{parts.path}"
+
+    def _seuil(self, limite):
+        if limite is None:
+            return self.seuil_defaut
+        return max(1, limite * self.fraction)
 
     @contextmanager
     def creneau(self):
@@ -79,27 +99,39 @@ class RateLimiter:
             yield
 
     def observer(self, response, **kwargs):
-        """Hook `response` : lit RateLimit-Remaining / RateLimit-Reset."""
+        """Hook `response` : lit RateLimit-Remaining / -Limit / -Reset pour l'endpoint appelé."""
         restant = _entier(response.headers.get("RateLimit-Remaining"))
+        limite = _entier(response.headers.get("RateLimit-Limit"))
         reset = _entier(response.headers.get("RateLimit-Reset"))
-        if restant is None or reset is None or restant >= self.seuil:
+        if restant is None or reset is None or restant > self._seuil(limite):
             return
         if reset <= self._horloge():
             return
+        cle = self._cle(response.url)
         with self._etat:
-            self._reprise = max(self._reprise, float(reset))
-            self._restant = restant
+            self._reprises[cle] = max(self._reprises.get(cle, 0.0), float(reset))
+            self._infos[cle] = (restant, limite)
 
-    def attendre(self):
-        """Dort (par tranches de 1 s) tant que la fenêtre de débit n'est pas rouverte."""
-        with self._pause:
+    def attendre(self, url):
+        """Dort (par tranches de 1 s) tant que la fenêtre de débit de cet endpoint n'est pas rouverte."""
+        cle = self._cle(url)
+        with self._etat:
+            if cle not in self._reprises:
+                return
+            verrou = self._pauses.setdefault(cle, threading.Lock())
+        with verrou:
             with self._etat:
-                cible = self._reprise
+                cible = self._reprises.get(cle, 0.0)
                 duree = min(cible - self._horloge(), self.attente_max)
+                restant, limite = self._infos.get(cle, (None, None))
             if duree <= 0:
                 return
+            quota = f"{restant}/{limite}" if limite is not None else f"{restant}"
             log.warning(
-                "Limite de débit proche (RateLimit-Remaining=%s) : pause de %.0f s", self._restant, duree
+                "Limite de débit proche (RateLimit-Remaining=%s sur %s) : pause de %.0f s",
+                quota,
+                urlparse(str(url)).path,
+                duree,
             )
             ecoule = 0.0
             while ecoule < duree:
@@ -109,8 +141,8 @@ class RateLimiter:
             with self._etat:
                 # Pause bornée : si Reset était plus loin que la borne, on repart quand même
                 # (sauf si une réponse arrivée entre-temps a fixé une échéance plus récente)
-                if self._reprise == cible:
-                    self._reprise = 0.0
+                if self._reprises.get(cle) == cible:
+                    del self._reprises[cle]
 
 
 class _AdaptateurBsmb(HTTPAdapter):
@@ -126,7 +158,7 @@ class _AdaptateurBsmb(HTTPAdapter):
         self.limiteur = limiteur
 
     def send(self, request, **kwargs):
-        self.limiteur.attendre()
+        self.limiteur.attendre(request.url)
         with self.limiteur.creneau():
             return self._envoyer(request, **kwargs)
 

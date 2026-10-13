@@ -178,36 +178,122 @@ def test_429_final_est_rendu_sans_exception(serveur_local):
 # ---------------------------------------------------------------- limiteur
 
 
+URL_SESSION = "http://exemple.test/xrpc/com.atproto.server.createSession"
+URL_MARQUES = "http://exemple.test/xrpc/app.bsky.bookmark.getBookmarks"
+
+
+def _pause_apres(remaining, limit=None, reset_dans=5):
+    """Durée totale de pause sur le 2e appel, après une 1re réponse portant ces en-têtes."""
+    horloge = Horloge()
+    entetes = {"RateLimit-Remaining": str(remaining), "RateLimit-Reset": str(int(horloge.t) + reset_dans)}
+    if limit is not None:
+        entetes["RateLimit-Limit"] = str(limit)
+    session, _, _, horloge = _session_factice(
+        [_reponse(200, entetes, url=URL_SESSION), _reponse(200, url=URL_SESSION)], horloge
+    )
+    session.get(URL_SESSION)
+    assert horloge.pauses == []  # rien à attendre avant la première réponse
+    session.get(URL_SESSION)
+    return sum(horloge.pauses)
+
+
 def test_pause_quand_remaining_sous_le_seuil(caplog):
     horloge = Horloge()
-    entetes = {"RateLimit-Remaining": "10", "RateLimit-Reset": str(int(horloge.t) + 5)}
+    entetes = {"RateLimit-Remaining": "5", "RateLimit-Reset": str(int(horloge.t) + 5)}
     session, limiteur, adaptateur, horloge = _session_factice(
-        [_reponse(200, entetes), _reponse(200)], horloge
+        [_reponse(200, entetes, url=URL_SESSION), _reponse(200, url=URL_SESSION)], horloge
     )
     with caplog.at_level(logging.INFO, logger="bsmb.http"):
-        session.get("http://exemple.test/a")
+        session.get(URL_SESSION)
         assert horloge.pauses == []  # rien à attendre avant la première réponse
-        session.get("http://exemple.test/b")
+        session.get(URL_SESSION)
     assert sum(horloge.pauses) == pytest.approx(5)
     assert all(p <= 1 for p in horloge.pauses)
-    assert len([m for m in caplog.messages if "pause" in m.lower()]) == 1
+    pauses = [m for m in caplog.messages if "pause" in m.lower()]
+    assert len(pauses) == 1
+    assert "/xrpc/com.atproto.server.createSession" in pauses[0]
+
+
+def test_journal_indique_endpoint_et_quota(caplog):
+    horloge = Horloge()
+    entetes = {
+        "RateLimit-Remaining": "1",
+        "RateLimit-Limit": "30",
+        "RateLimit-Reset": str(int(horloge.t) + 2),
+    }
+    session, _, _, horloge = _session_factice(
+        [_reponse(200, entetes, url=URL_SESSION), _reponse(200, url=URL_SESSION)], horloge
+    )
+    with caplog.at_level(logging.INFO, logger="bsmb.http"):
+        session.get(URL_SESSION)
+        session.get(URL_SESSION)
+    assert any(
+        "RateLimit-Remaining=1/30 sur /xrpc/com.atproto.server.createSession" in m for m in caplog.messages
+    )
+
+
+def test_quota_de_30_pas_de_pause_a_29_restants():
+    assert _pause_apres(29, 30) == 0
+
+
+def test_quota_de_30_pause_a_1_restant():
+    assert _pause_apres(1, 30) == pytest.approx(5)
+
+
+def test_quota_de_3000_pause_a_140_restants():
+    assert _pause_apres(140, 3000) == pytest.approx(5)
+
+
+def test_quota_de_3000_pas_de_pause_a_200_restants():
+    assert _pause_apres(200, 3000) == 0
+
+
+def test_sans_limit_seuil_absolu_de_10():
+    assert _pause_apres(9) == pytest.approx(5)
+    assert _pause_apres(11) == 0
+
+
+def test_pause_d_un_endpoint_ne_bloque_pas_les_autres():
+    horloge = Horloge()
+    entetes = {
+        "RateLimit-Remaining": "0",
+        "RateLimit-Limit": "30",
+        "RateLimit-Reset": str(int(horloge.t) + 60),
+    }
+    session, _, _, horloge = _session_factice(
+        [
+            _reponse(200, entetes, url=URL_SESSION),
+            _reponse(200, url=URL_MARQUES),
+            _reponse(200, url=URL_SESSION),
+        ],
+        horloge,
+    )
+    session.get(URL_SESSION)
+    session.get(URL_MARQUES)
+    assert horloge.pauses == []  # getBookmarks n'est pas retardé par createSession
+    session.get(URL_SESSION)
+    assert sum(horloge.pauses) == pytest.approx(60)
 
 
 def test_pas_de_pause_au_dessus_du_seuil():
     horloge = Horloge()
     entetes = {"RateLimit-Remaining": "500", "RateLimit-Reset": str(int(horloge.t) + 60)}
-    session, _, _, horloge = _session_factice([_reponse(200, entetes), _reponse(200)], horloge)
-    session.get("http://exemple.test/a")
-    session.get("http://exemple.test/b")
+    session, _, _, horloge = _session_factice(
+        [_reponse(200, entetes, url=URL_SESSION), _reponse(200, url=URL_SESSION)], horloge
+    )
+    session.get(URL_SESSION)
+    session.get(URL_SESSION)
     assert horloge.pauses == []
 
 
 def test_pause_bornee():
     horloge = Horloge()
     entetes = {"RateLimit-Remaining": "0", "RateLimit-Reset": str(int(horloge.t) + 99999)}
-    session, _, _, horloge = _session_factice([_reponse(200, entetes), _reponse(200)], horloge)
-    session.get("http://exemple.test/a")
-    session.get("http://exemple.test/b")
+    session, _, _, horloge = _session_factice(
+        [_reponse(200, entetes, url=URL_SESSION), _reponse(200, url=URL_SESSION)], horloge
+    )
+    session.get(URL_SESSION)
+    session.get(URL_SESSION)
     assert sum(horloge.pauses) == pytest.approx(bsmb_http.ATTENTE_MAX)
 
 
@@ -230,8 +316,8 @@ def test_reset_deja_passe_aucune_pause():
     horloge = Horloge()
     entetes = {"RateLimit-Remaining": "1", "RateLimit-Reset": str(int(horloge.t) - 10)}
     session, _, _, horloge = _session_factice([_reponse(200, entetes), _reponse(200)], horloge)
-    session.get("http://exemple.test/a")
-    session.get("http://exemple.test/b")
+    session.get("http://exemple.test/")
+    session.get("http://exemple.test/")
     assert horloge.pauses == []
 
 
@@ -302,6 +388,7 @@ def test_redirection_avec_un_seul_creneau_ne_bloque_pas():
 
 def test_limiteur_par_defaut():
     limiteur = bsmb_http.RateLimiter()
-    assert limiteur.seuil == 50
+    assert limiteur.seuil_defaut == 10
+    assert limiteur.fraction == 0.05
     assert limiteur.max_simultanes == 8
     assert bsmb_http.ATTENTE_MAX == 300

@@ -20,6 +20,7 @@ Chantier issu de l'audit d'octobre 2026 (issues #1 à #18). Un point par issue.
 - **Cache des bookmarks** (#3) : la réponse complète de `getBookmarks` est conservée dans `bookmarks.json`. Les posts supprimés ou bloqués sont repérés dès la synchronisation et l'analyse se fait sans `getRecord` par post.
 - **Ligne de commande** (#13) : `bsmb sync`, `download [--force]`, `run`, `status [--json]`, `--version` et `--yes`, codes de retour 0 à 4, mode non interactif automatique quand l'entrée n'est pas un terminal (planification Windows et cron documentées).
 - **Robustesse réseau** (#11) : session HTTP partagée (User-Agent BSMB, reprises avec délai croissant sur 429 et 5xx, limiteur de débit), statut `error_429`, renouvellement automatique du token expiré (`refreshSession`).
+  - Le limiteur de débit est proportionnel au quota (pause à 5 % restants de `RateLimit-Limit`, 10 requêtes sans cet en-tête) et suit chaque endpoint séparément : la connexion (quota de 30) ne provoque plus une pause de 5 minutes.
 - **Version affichée** (#15) : `core/version.py` est la source unique ; l'en-tête du menu affiche `BSMB v3.1.0`, `bsmb --version` et les fiches JSON la reprennent.
 
 ### 🐛 Corrections de bugs
