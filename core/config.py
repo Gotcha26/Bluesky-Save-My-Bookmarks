@@ -26,6 +26,7 @@ DEFAULT_CONFIG = {
     "retry_after_days": 7,  # délai avant de retenter un post en erreur (500, inconnu, repost)
     "last_sync": "",
     "advanced_mode": False,
+    "open_folder_after_download": True,  # propose d'ouvrir le dossier après un téléchargement (ignoré en non interactif)
     "warned_plaintext_secret": False  # avertissement « App Password en clair » déjà affiché
 }
 

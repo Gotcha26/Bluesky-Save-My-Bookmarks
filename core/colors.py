@@ -24,6 +24,10 @@ class Colors:
         if os.environ.get("FORCE_COLOR"):
             return True
 
+        # Sortie redirigée (fichier, pipe, tâche planifiée) : pas de séquences ANSI
+        if not (hasattr(sys.stdout, "isatty") and sys.stdout.isatty()):
+            return False
+
         # Windows Terminal, ConEmu
         if os.environ.get("WT_SESSION"):
             return True

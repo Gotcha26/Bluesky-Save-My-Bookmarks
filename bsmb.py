@@ -17,9 +17,13 @@ from core.secret_store import (
 from core.database import Database
 from core.colors import c
 from core.orchestrator import run
+from core.ui import pause, confirm, set_yes, is_interactive
+from core import cli
 
 
 def clear_screen():
+    if not is_interactive():
+        return  # sortie non interactive : pas de séquence d'effacement dans les logs
     subprocess.run("cls" if sys.platform == "win32" else "clear", shell=True)
 
 
@@ -300,8 +304,7 @@ def disconnect_account(config):
     print()
     print(c.warning(f"Le compte {handle} sera déconnecté (App Password supprimé de cet ordinateur)."))
     print(f"  {c.DIM}Vos fichiers téléchargés et la base ne sont pas touchés.{c.RESET}")
-    answer = input(c.prompt("  Confirmer ? [o/N]: ")).strip().lower()
-    if answer not in ("o", "oui"):
+    if not confirm("Confirmer ?", default=False):
         return False
 
     nettoye = delete_app_password(config, handle)
@@ -313,7 +316,7 @@ def disconnect_account(config):
     else:
         print(c.warning("Compte déconnecté, mais le trousseau n'a pas pu être nettoyé : "
                         "supprimez l'entrée « bsmb » à la main."))
-    input(f"\n{c.DIM}  Appuyez sur Entrée...{c.RESET}")
+    pause()
     return True
 
 
@@ -326,7 +329,7 @@ def do_sync(config):
     if not session:
         print(c.error("Impossible d'obtenir un token d'authentification"))
         print(f"  {c.DIM}Vérifiez vos identifiants dans Paramètres{c.RESET}")
-        input(f"\n{c.DIM}  Appuyez sur Entrée...{c.RESET}")
+        pause()
         return
 
     token = session["token"]
@@ -360,7 +363,7 @@ def do_sync(config):
         else:
             print(c.config_line("Nouveaux", f"{c.DIM}0 - tout est à jour{c.RESET}"))
 
-    input(f"\n{c.DIM}  Appuyez sur Entrée...{c.RESET}")
+    pause()
 
 
 # ─── Stockage local ──────────────────────────────────────────
@@ -424,7 +427,7 @@ def menu_local_storage(config, state):
             state = get_app_state(config)
         else:
             print(c.error(f"Choix invalide : \"{choice}\""))
-            input(f"\n{c.DIM}  Appuyez sur Entrée...{c.RESET}")
+            pause()
 
 
 def cleanup_dead_links(config):
@@ -452,15 +455,14 @@ def cleanup_dead_links(config):
     print(f"  {c.DIM}Les fichiers déjà téléchargés ne seront pas supprimés.{c.RESET}")
     print()
 
-    confirm = input(c.prompt("  Confirmer le nettoyage ? [O/n]: ")).strip().lower()
-    if not confirm or confirm in ("o", "oui", "y", "yes"):
+    if confirm("Confirmer le nettoyage ?"):
         count = db.cleanup_dead_posts()
         print(c.success(f"{count} entrée(s) supprimée(s)"))
     else:
         print(f"\n  {c.DIM}Nettoyage annulé{c.RESET}")
 
     db.close()
-    input(f"\n{c.DIM}  Appuyez sur Entrée...{c.RESET}")
+    pause()
 
 
 def reset_database(config):
@@ -476,8 +478,8 @@ def reset_database(config):
     print(c.separator())
     print()
 
-    confirm = input(c.prompt("  Confirmer ? (tapez 'RESET'): ")).strip()
-    if confirm == "RESET":
+    saisie = input(c.prompt("  Confirmer ? (tapez 'RESET'): ")).strip()
+    if saisie == "RESET":
         db_file = resolve_path(config, "db_file")
         if db_file.exists():
             db_file.unlink()
@@ -487,7 +489,7 @@ def reset_database(config):
     else:
         print(f"\n  {c.DIM}Réinitialisation annulée{c.RESET}")
 
-    input(f"\n{c.DIM}  Appuyez sur Entrée...{c.RESET}")
+    pause()
 
 
 # ─── Paramètres ──────────────────────────────────────────────
@@ -549,7 +551,7 @@ def menu_settings(config, state):
             save_config(config)
             mode_str = "activé" if config["advanced_mode"] else "désactivé"
             print(c.success(f"Mode avancé {mode_str}"))
-            input(f"\n{c.DIM}  Appuyez sur Entrée...{c.RESET}")
+            pause()
         elif choice == "5" and advanced:
             _edit_config_value(config, "token_file", "Fichier token")
         elif choice == "6" and advanced:
@@ -558,16 +560,16 @@ def menu_settings(config, state):
             from core.config import cleanup_logs
             deleted = cleanup_logs(config)
             print(c.success(f"{deleted} fichier(s) log supprimé(s)"))
-            input(f"\n{c.DIM}  Appuyez sur Entrée...{c.RESET}")
+            pause()
         elif choice == "8" and advanced:
             download_media_dev(config)
-            input(f"\n{c.DIM}  Appuyez sur Entrée...{c.RESET}")
+            pause()
         elif choice == "9" and advanced:
             download_media(config, force=True)
-            input(f"\n{c.DIM}  Appuyez sur Entrée...{c.RESET}")
+            pause()
         else:
             print(c.error(f"Choix invalide : \"{choice}\""))
-            input(f"\n{c.DIM}  Appuyez sur Entrée...{c.RESET}")
+            pause()
 
 
 def configure_credentials(config):
@@ -601,7 +603,7 @@ def configure_credentials(config):
     handle = input(c.prompt("  Handle Bluesky (ENTRÉE pour garder): ")).strip()
     if not handle and not current_handle:
         print(f"\n  {c.DIM}Configuration annulée{c.RESET}")
-        input(f"\n{c.DIM}  Appuyez sur Entrée...{c.RESET}")
+        pause()
         return
     if not handle:
         handle = current_handle
@@ -609,7 +611,7 @@ def configure_credentials(config):
     app_password = input(c.prompt("  App Password (xxxx-xxxx-xxxx-xxxx): ")).strip()
     if not app_password:
         print(f"\n  {c.DIM}Configuration annulée{c.RESET}")
-        input(f"\n{c.DIM}  Appuyez sur Entrée...{c.RESET}")
+        pause()
         return
 
     # Test immédiat
@@ -639,7 +641,7 @@ def configure_credentials(config):
         print(c.error(f"Échec : {e}"))
         print(f"  {c.DIM}Identifiants non sauvegardés{c.RESET}")
 
-    input(f"\n{c.DIM}  Appuyez sur Entrée...{c.RESET}")
+    pause()
 
 
 def _edit_config_value(config, key, label, after_save=None):
@@ -657,7 +659,7 @@ def _edit_config_value(config, key, label, after_save=None):
     else:
         print(c.success("Valeur inchangée"))
 
-    input(f"\n{c.DIM}  Appuyez sur Entrée...{c.RESET}")
+    pause()
 
 
 def _edit_workers(config):
@@ -684,7 +686,7 @@ def _edit_workers(config):
     else:
         print(c.success("Valeur inchangée"))
 
-    input(f"\n{c.DIM}  Appuyez sur Entrée...{c.RESET}")
+    pause()
 
 
 # ─── Téléchargement ──────────────────────────────────────────
@@ -699,7 +701,7 @@ def menu_download_new(config, state):
         print()
         print(f"  {c.KEY}Connectez d'abord votre compte :{c.RESET}")
         print(f"    {c.DIM}Menu principal > 1. Mon compte{c.RESET}")
-        input(f"\n{c.DIM}  Appuyez sur Entrée...{c.RESET}")
+        pause()
         return
 
     # Si pas de sync récente, proposer d'en faire une
@@ -709,8 +711,7 @@ def menu_download_new(config, state):
         print()
         print(c.info("Aucune synchronisation effectuée"))
         print()
-        confirm = input(c.prompt("  Synchroniser les bookmarks maintenant ? [O/n]: ")).strip().lower()
-        if confirm and confirm not in ("o", "oui", "y", "yes"):
+        if not confirm("Synchroniser les bookmarks maintenant ?"):
             return
         do_sync(config)
         state = get_app_state(config)
@@ -718,11 +719,11 @@ def menu_download_new(config, state):
     if state["new_count"] == 0:
         print()
         print(c.success("Tout est à jour — aucun nouveau bookmark à télécharger"))
-        input(f"\n{c.DIM}  Appuyez sur Entrée...{c.RESET}")
+        pause()
         return
 
     download_media(config, force=False)
-    input(f"\n{c.DIM}  Appuyez sur Entrée...{c.RESET}")
+    pause()
 
 
 def download_media(config, force=False):
@@ -758,8 +759,7 @@ def download_media(config, force=False):
         return True
 
     print()
-    confirm = input(c.prompt(f"  Traiter {len(urls_to_process)} posts ? [O/n]: ")).strip().lower()
-    if confirm and confirm not in ("o", "oui", "y", "yes"):
+    if not confirm(f"Traiter {len(urls_to_process)} posts ?"):
         db.close()
         return False
 
@@ -799,8 +799,7 @@ def download_media_dev(config):
     print(c.separator())
     print()
 
-    confirm = input(c.prompt(f"  Traiter {len(urls)} posts en mode dev ? [O/n]: ")).strip().lower()
-    if confirm and confirm not in ("o", "oui", "y", "yes"):
+    if not confirm(f"Traiter {len(urls)} posts en mode dev ?"):
         return False
 
     stats = run(urls, config, no_db=True)
@@ -810,10 +809,9 @@ def download_media_dev(config):
 
 def _proposer_ouverture(config, stats):
     """Propose d'ouvrir le dossier de téléchargements si au moins un post a réussi."""
-    if stats["success"] > 0:
+    if stats["success"] > 0 and config.get("open_folder_after_download", True):
         print()
-        confirm = input(c.prompt("  Ouvrir le dossier de téléchargements ? [O/n]: ")).strip().lower()
-        if not confirm or confirm in ("o", "oui", "y", "yes"):
+        if confirm("Ouvrir le dossier de téléchargements ?"):
             open_download_folder(config)
 
 
@@ -830,13 +828,33 @@ def open_download_folder(config):
 
 # ─── Boucle principale ──────────────────────────────────────
 
-def main():
+def main(argv=None):
+    """Point d'entrée : sous-commande -> CLI non interactive, sinon menu interactif.
+
+    Retourne le code de retour du processus (voir core/cli.py).
+    """
+    argv = sys.argv[1:] if argv is None else list(argv)
+    args = cli.build_parser().parse_args(argv)
+    if args.command is not None:
+        return cli.main(argv)
+
+    if args.yes:
+        set_yes(True)
     config = load_config()
     migrate_secret_to_keyring(config)  # App Password en clair -> keyring si disponible
     ensure_dirs(config)
     from core.config import cleanup_old_logs
     cleanup_old_logs(config)
 
+    try:
+        run_menu(config)
+    except (EOFError, KeyboardInterrupt):
+        print(f"\n  {c.DIM}Entrée interrompue — fin du programme{c.RESET}")
+    return 0
+
+
+def run_menu(config):
+    """Boucle du menu interactif."""
     while True:
         clear_screen()
         state = get_app_state(config)
@@ -858,7 +876,7 @@ def main():
             menu_download_new(config, state)
         else:
             print(c.error(f"Choix invalide : \"{choice}\""))
-            input(f"\n{c.DIM}  Appuyez sur Entrée...{c.RESET}")
+            pause()
 
 
 if __name__ == "__main__":
@@ -868,4 +886,4 @@ if __name__ == "__main__":
         import io
         sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
         sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
-    main()
+    sys.exit(main())

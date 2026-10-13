@@ -16,6 +16,16 @@ def _sans_keyring_reel(monkeypatch):
     monkeypatch.setitem(sys.modules, "keyring", None)
 
 
+@pytest.fixture(autouse=True)
+def _terminal_interactif(monkeypatch):
+    """Sous pytest l'entrée standard n'est pas un terminal : on simule une session
+    interactive par défaut (les tests du menu mockent input()). Les tests du mode
+    non interactif surchargent `core.ui.is_interactive`."""
+    from core import ui
+    ui.set_yes(False)
+    monkeypatch.setattr(ui, "is_interactive", lambda: not ui._etat["yes"])
+
+
 @pytest.fixture
 def tmp_config(tmp_path):
     """Config temporaire pour les tests."""

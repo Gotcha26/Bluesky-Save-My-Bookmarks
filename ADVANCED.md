@@ -176,6 +176,44 @@ L'orchestrateur utilise `concurrent.futures.ThreadPoolExecutor` avec un nombre c
 
 ---
 
+## Planification
+
+BSMB s'utilise sans menu, pour une tâche planifiée ou un script :
+
+```
+python bsmb.py sync                 # synchronise les bookmarks
+python bsmb.py download [--force]   # télécharge les nouveaux posts
+python bsmb.py run --yes            # sync puis download, sans aucune question
+python bsmb.py status [--json]      # état du compte et compteurs
+```
+
+Sans sous-commande, le menu interactif s'ouvre. Quand l'entrée standard n'est pas un terminal (tâche planifiée, cron, pipe) ou avec `--yes`, BSMB ne pose aucune question : les confirmations prennent leur valeur par défaut, « Appuyez sur Entrée » disparaît, et la sortie est sans couleur si elle est redirigée. `--yes` s'écrit avant ou après la sous-commande.
+
+Codes de retour :
+
+| Code | Signification |
+|------|---------------|
+| `0` | Succès |
+| `1` | Erreur d'authentification (aucun identifiant, identifiants refusés, token expiré) |
+| `2` | Erreur réseau pendant la synchronisation |
+| `3` | Au moins un téléchargement en échec (ou erreur 500) |
+
+`run` s'arrête au premier code non nul. Prérequis : un compte déjà configuré via le menu (App Password).
+
+### Windows (Planificateur de tâches)
+
+```
+schtasks /Create /SC DAILY /TN BSMB /TR "\"C:\chemin\bsmb\.venv\Scripts\python.exe\" \"C:\chemin\bsmb\bsmb.py\" run --yes"
+```
+
+### Linux / macOS (cron)
+
+```
+0 3 * * * cd /chemin/bsmb && .venv/bin/python bsmb.py run --yes >> logs/cron.log 2>&1
+```
+
+---
+
 ## Configuration avancée (config.json)
 
 ```json
@@ -210,6 +248,7 @@ L'orchestrateur utilise `concurrent.futures.ThreadPoolExecutor` avec un nombre c
 | `retry_after_days` | Délai avant de retenter un post en erreur (`error_500`, `unknown`, `repost` hérité) | `7` |
 | `last_sync` | Date de dernière synchronisation | `""` |
 | `advanced_mode` | Mode avancé activé | `false` |
+| `open_folder_after_download` | Propose d'ouvrir le dossier après un téléchargement (ignoré en non interactif) | `true` |
 | `max_filename_len` | Longueur max des noms de fichiers | `64` |
 | `min_postid_short` | Longueur min de l'ID du post dans un nom d'image tronqué | `4` |
 | `index_digits` | Nombre de chiffres de l'index d'image (`_1`, `_01`…) | `1` |
