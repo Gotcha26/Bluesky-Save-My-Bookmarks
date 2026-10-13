@@ -9,7 +9,7 @@ Pas d'usage manuel : l'orchestrateur et les downloaders texte / external fournis
 """
 import json
 import os
-from datetime import datetime, timezone, UTC
+from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import urlparse
 
