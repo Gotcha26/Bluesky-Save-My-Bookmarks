@@ -6,7 +6,7 @@ Pont entre l'API (export_bookmarks) et la base de données locale.
 from datetime import datetime
 
 from api.export_bookmarks import fetch_bookmarks, DEFAULT_PDS_URL
-from core.auth import AuthError, refresh_session
+from core.auth import AuthError, NetworkError, refresh_session
 from core.bookmarks_cache import load_cache, save_cache
 from core.config import resolve_path, save_config
 
@@ -31,7 +31,9 @@ class BookmarkSync:
             on_progress: callback(page, count) optionnel
             session_info: dict de core.auth.get_session() (optionnel). Si l'export renvoie
                 `expired` et qu'il porte un `refresh_jwt`, le token est renouvelé UNE fois
-                (refreshSession) et l'export relancé ; le dict est mis à jour en place.
+                (refreshSession) et l'export relancé depuis la page 1 (la progression
+                repart de zéro) ; le dict est mis à jour en place. Un échec réseau du
+                renouvellement donne `expired=False` et une erreur réseau.
 
         Returns:
             dict: {
@@ -55,8 +57,12 @@ class BookmarkSync:
         if result["error"] and result["expired"] and (session_info or {}).get("refresh_jwt"):
             try:
                 nouvelle = refresh_session(session_info["refresh_jwt"], pds_url)
+            except NetworkError as e:
+                # Panne réseau pendant le renouvellement : erreur réseau, pas « token expiré »
+                result = {**result, "error": f"Erreur réseau pendant le renouvellement de la session : {e}",
+                          "expired": False}
             except AuthError:
-                pass  # on rend le résultat « expiré » d'origine
+                pass  # jeton de rafraîchissement refusé : on rend le résultat « expiré » d'origine
             else:
                 session_info.update(nouvelle)
                 result = fetch_bookmarks(nouvelle["token"], on_progress, pds_url=pds_url)

@@ -6,7 +6,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import pytest
 import requests
-from requests.adapters import BaseAdapter, HTTPAdapter
+from requests.adapters import HTTPAdapter
 
 from core import http as bsmb_http
 from core.version import __version__
@@ -22,22 +22,19 @@ def _reponse(statut=200, entetes=None, url="http://exemple.test/"):
     return r
 
 
-class AdaptateurFactice(BaseAdapter):
-    """Renvoie des réponses prédéfinies, sans réseau."""
+class AdaptateurFactice(bsmb_http._AdaptateurBsmb):
+    """Adaptateur de BSMB (limiteur compris) dont l'envoi réel renvoie des réponses prédéfinies."""
 
-    def __init__(self, reponses):
-        super().__init__()
+    def __init__(self, limiteur, reponses):
+        super().__init__(limiteur)
         self.reponses = list(reponses)
         self.appels = 0
 
-    def send(self, request, **kwargs):
+    def _envoyer(self, request, **kwargs):
         self.appels += 1
         r = self.reponses.pop(0)
         r.request = request
         return r
-
-    def close(self):
-        pass
 
 
 class Horloge:
@@ -59,7 +56,7 @@ def _session_factice(reponses, horloge=None, **kw):
     horloge = horloge or Horloge()
     limiteur = bsmb_http.RateLimiter(horloge=horloge.now, sleep=horloge.sleep, **kw)
     session = bsmb_http.build_session(limiteur)
-    adaptateur = AdaptateurFactice(reponses)
+    adaptateur = AdaptateurFactice(limiteur, reponses)
     session.mount("http://", adaptateur)
     return session, limiteur, adaptateur, horloge
 
@@ -103,7 +100,9 @@ def test_get_session_est_un_singleton_partage():
     assert isinstance(a, requests.Session)
 
 
-def test_get_session_singleton_sous_concurrence():
+def test_get_session_singleton_sous_concurrence(monkeypatch):
+    # Repart d'un singleton vide, sinon la course à la création n'est pas exercée
+    monkeypatch.setattr(bsmb_http, "_session", None)
     vues = []
     barriere = threading.Barrier(6)
 
@@ -243,7 +242,7 @@ def test_le_semaphore_borne_la_concurrence(monkeypatch):
             actifs.pop()
         return _reponse(200)
 
-    monkeypatch.setattr(requests.Session, "send", faux_send)
+    monkeypatch.setattr(bsmb_http._AdaptateurBsmb, "_envoyer", faux_send)
     limiteur = bsmb_http.RateLimiter(max_simultanes=2)
     session = bsmb_http.build_session(limiteur)
     fils = [threading.Thread(target=session.get, args=("http://exemple.test/",)) for _ in range(8)]
@@ -252,6 +251,45 @@ def test_le_semaphore_borne_la_concurrence(monkeypatch):
     for f in fils:
         f.join()
     assert max(maxi) == 2
+
+
+class _Redirection(BaseHTTPRequestHandler):
+    def do_GET(self):
+        if self.path == "/a":
+            self.send_response(302)
+            self.send_header("Location", "/b")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+        else:
+            corps = b"fin"
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(corps)))
+            self.end_headers()
+            self.wfile.write(corps)
+
+    def log_message(self, *args):
+        pass
+
+
+def test_redirection_avec_un_seul_creneau_ne_bloque_pas():
+    """Régression : chaque saut de redirection prend puis rend son créneau (pas d'interblocage)."""
+    srv = HTTPServer(("127.0.0.1", 0), _Redirection)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        session = bsmb_http.build_session(bsmb_http.RateLimiter(max_simultanes=1))
+        session.trust_env = False
+        resultat = []
+        fil = threading.Thread(
+            target=lambda: resultat.append(session.get(f"http://127.0.0.1:{srv.server_port}/a", timeout=5)),
+            daemon=True)
+        fil.start()
+        fil.join(timeout=10)
+        assert not fil.is_alive(), "interblocage : le créneau est retenu pendant la redirection"
+        assert resultat[0].status_code == 200 and resultat[0].text == "fin"
+        assert len(resultat[0].history) == 1
+    finally:
+        srv.shutdown()
+        srv.server_close()
 
 
 def test_limiteur_par_defaut():
