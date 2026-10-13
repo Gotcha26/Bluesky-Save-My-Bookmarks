@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from urllib3.util import connection as urllib3_connection
 
 # Ajouter la racine du projet au path
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -42,6 +43,16 @@ def _barriere_reseau(monkeypatch):
         return reel(address, *args, **kwargs)
 
     monkeypatch.setattr(socket, "create_connection", create_connection)
+
+    # urllib3 (donc requests) appelle sa propre `create_connection` : même règle
+    reel_urllib3 = urllib3_connection.create_connection
+
+    def create_connection_urllib3(address, *args, **kwargs):
+        if address[0] not in ("127.0.0.1", "localhost", "::1"):
+            raise AssertionError(f"accès réseau réel interdit pendant les tests : {address!r}")
+        return reel_urllib3(address, *args, **kwargs)
+
+    monkeypatch.setattr(urllib3_connection, "create_connection", create_connection_urllib3)
 
 
 @pytest.fixture

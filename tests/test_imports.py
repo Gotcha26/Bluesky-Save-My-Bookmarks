@@ -22,12 +22,21 @@ MODULES = [
     "core.post_ref",
     "core.auth",
     "core.bookmarks",
+    "core.bookmarks_cache",
+    "core.cli",
+    "core.http",
     "core.logger",
     "core.orchestrator",
+    "core.secret_store",
+    "core.ui",
+    "core.version",
     "api.export_bookmarks",
     "api.post_analyzer",
+    "api.quote_resolver",
     "api.repost_resolver",
     "downloaders",
+    "downloaders.archive",
+    "downloaders.external",
     "downloaders.images",
     "downloaders.videos",
     "downloaders.text",
@@ -74,3 +83,19 @@ def test_import_sans_effet_de_bord(module, tmp_path):
     assert proc.stdout == ""
     assert list(cwd.iterdir()) == []
     assert list(home.iterdir()) == []
+
+
+def _modules_du_depot():
+    """Noms importables de tous les .py de bsmb.py, core/, api/ et downloaders/ (+ tools/debug_post.py)."""
+    noms = {"bsmb", "debug_post"}
+    for dossier in ("core", "api", "downloaders"):
+        for fichier in sorted((PROJECT_ROOT / dossier).glob("*.py")):
+            noms.add(dossier if fichier.stem == "__init__" else f"{dossier}.{fichier.stem}")
+    return noms
+
+
+def test_modules_listes_couvrent_tout_le_depot():
+    """Un nouveau module doit être ajouté à MODULES (et donc vérifié sans effet de bord)."""
+    # les paquets core et api n'ont pas de code à l'import : seul downloaders est listé comme paquet
+    attendus = _modules_du_depot() - {"core", "api"}
+    assert attendus == set(MODULES)

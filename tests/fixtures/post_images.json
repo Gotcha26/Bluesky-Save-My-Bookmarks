@@ -1,0 +1,47 @@
+{
+  "uri": "at://did:plc:test000000000000000000000/app.bsky.feed.post/3ktest000010",
+  "cid": "bafyreitest000000000000000000000000000000000000000000000010",
+  "value": {
+    "text": "Voici mes photos",
+    "$type": "app.bsky.feed.post",
+    "embed": {
+      "$type": "app.bsky.embed.images",
+      "images": [
+        {
+          "alt": "Un chat endormi",
+          "image": {
+            "$type": "blob",
+            "ref": {
+              "$link": "bafkreitestimage0000000000000000000000000000000000000001"
+            },
+            "mimeType": "image/jpeg",
+            "size": 245760
+          },
+          "aspectRatio": {
+            "width": 2000,
+            "height": 1500
+          }
+        },
+        {
+          "alt": "",
+          "image": {
+            "$type": "blob",
+            "ref": {
+              "$link": "bafkreitestimage0000000000000000000000000000000000000002"
+            },
+            "mimeType": "image/png",
+            "size": 98304
+          },
+          "aspectRatio": {
+            "width": 1000,
+            "height": 1000
+          }
+        }
+      ]
+    },
+    "langs": [
+      "fr"
+    ],
+    "createdAt": "2026-01-15T10:00:00.000Z"
+  }
+}
