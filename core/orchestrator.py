@@ -103,7 +103,8 @@ def _telecharger(downloader, url, dest_dir, config, buf_print, log_func, erreurs
     ne jamais interrompre le lot.
     options : paramètres nommés transmis au downloader (name_prefix).
     erreurs : liste (optionnelle) à laquelle l'exception est ajoutée.
-    Returns: la liste de DownloadResult (vide en cas d'erreur ou sans média).
+    Returns: la liste de DownloadResult (vide sans média ; en cas d'erreur, les résultats
+    partiels portés par la DownloadError, à enregistrer avec le post en échec).
     """
     try:
         results = downloader(url, dest_dir, config, **options)
@@ -112,7 +113,9 @@ def _telecharger(downloader, url, dest_dir, config, buf_print, log_func, erreurs
         log_func(f"   ERREUR DE TÉLÉCHARGEMENT: {url} - {e}", to_console=False)
         if erreurs is not None:
             erreurs.append(e)
-        return []
+        for ligne in lignes_console(e.partial):
+            buf_print(f"    {ligne}")
+        return list(e.partial)
     except Exception as e:
         buf_print("       [ERR] " + _("Erreur inattendue : {erreur}").format(erreur=e))
         log_func(f"   ERREUR INATTENDUE: {url} - {type(e).__name__}: {e}", to_console=False)

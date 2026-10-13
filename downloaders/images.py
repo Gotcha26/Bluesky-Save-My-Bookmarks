@@ -348,7 +348,8 @@ def download_images(
         list[DownloadResult] : une entrée par image écrite ; les images sautées ont
         skipped=True. Liste vide si le post ne contient aucune image.
     Raises:
-        DownloadError : API inaccessible, ou aucune image n'a pu être téléchargée.
+        DownloadError : API inaccessible, ou au moins une image n'a pu être téléchargée ;
+            en cas d'échec partiel, `partial` porte les DownloadResult déjà obtenus.
     """
     http = session or bsmb_http.get_session()
     details = {}
@@ -442,8 +443,9 @@ def download_images(
             DownloadResult(ecrit[0], ecrit[1], "image", ecrit[1].stat().st_size, cid, alt=alt or None)
         )
 
-    if erreurs and not results:
-        raise DownloadError(" ; ".join(erreurs))
+    if erreurs:
+        # Échec partiel : les images obtenues accompagnent l'erreur (le post reste à retenter)
+        raise DownloadError(" ; ".join(erreurs), partial=results)
     return results
 
 

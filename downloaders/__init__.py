@@ -27,7 +27,15 @@ class DownloadResult:
 
 
 class DownloadError(Exception):
-    """Erreur technique d'un downloader (API, réseau, écriture)."""
+    """Erreur technique d'un downloader (API, réseau, écriture).
+
+    partial : résultats déjà écrits sur le disque avant l'échec (échec partiel d'un
+    lot, par exemple 2 images sur 3) ; liste vide par défaut.
+    """
+
+    def __init__(self, *args, partial=None):
+        super().__init__(*args)
+        self.partial = list(partial or [])
 
 
 def _marqueurs():
