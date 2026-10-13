@@ -28,6 +28,18 @@ def fake_session(monkeypatch):
     return session
 
 
+@pytest.fixture
+def mock_get(fake_session):
+    """Raccourci : `fake_session.get`."""
+    return fake_session.get
+
+
+@pytest.fixture
+def mock_post(fake_session):
+    """Raccourci : `fake_session.post`."""
+    return fake_session.post
+
+
 @pytest.fixture(autouse=True)
 def _sans_keyring_reel(monkeypatch):
     """Les tests ne touchent jamais au trousseau de l'OS : keyring est absent par défaut

@@ -11,6 +11,7 @@ from pathlib import Path
 # Permet `python api/export_bookmarks.py` (le dossier du script est alors seul dans sys.path)
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from core import http as bsmb_http  # noqa: E402
 from core.post_ref import PostRef  # noqa: E402
 
 DEFAULT_PDS_URL = "https://bsky.social"
@@ -28,7 +29,7 @@ def _item_type(item):
     return "postView" if item.get("record") else "unknown"
 
 
-def fetch_bookmarks(token, on_progress=None, pds_url=DEFAULT_PDS_URL):
+def fetch_bookmarks(token, on_progress=None, pds_url=DEFAULT_PDS_URL, session=None):
     """
     Récupère tous les bookmarks depuis l'API Bluesky.
 
@@ -36,6 +37,7 @@ def fetch_bookmarks(token, on_progress=None, pds_url=DEFAULT_PDS_URL):
         token: Token complet "Bearer xxx"
         on_progress: callback(page, count) optionnel pour suivre la progression
         pds_url: PDS du compte (le token n'est valable que sur celui-ci)
+        session: session HTTP (défaut : session partagée de core.http)
 
     Returns:
         dict: {
@@ -66,12 +68,14 @@ def fetch_bookmarks(token, on_progress=None, pds_url=DEFAULT_PDS_URL):
     page = 0
 
     try:
-        session = requests.Session()
-        session.headers.update({
+        # Session partagée (reprises, limiteur) : les en-têtes d'authentification sont
+        # passés par requête, jamais posés sur la session commune.
+        session = session or bsmb_http.get_session()
+        en_tetes = {
             "Authorization": token,
             "Accept": "application/json",
             "atproto-proxy": "did:web:api.bsky.app#bsky_appview",
-        })
+        }
 
         while True:
             page += 1
@@ -81,7 +85,7 @@ def fetch_bookmarks(token, on_progress=None, pds_url=DEFAULT_PDS_URL):
                 params["cursor"] = cursor
 
             try:
-                r = session.get(api_url, params=params, timeout=20)
+                r = session.get(api_url, params=params, headers=en_tetes, timeout=20)
 
                 if r.status_code == 400:
                     error_data = r.json()

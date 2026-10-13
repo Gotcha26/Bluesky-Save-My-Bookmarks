@@ -168,10 +168,9 @@ class TestDownloadVideo:
         assert len(res[0].filename) == 20
         assert res[0].filename.endswith(".mp4")
 
-    def test_sans_session_utilise_requests(self, tmp_path, ffmpeg):
-        session = _session(_record(EMBED_VIDEO))
-        with patch("downloaders.videos.requests.get", side_effect=session.get.side_effect):
-            assert len(download_video(URL, tmp_path, DEFAULT_CONFIG)) == 1
+    def test_sans_session_utilise_la_session_partagee(self, tmp_path, ffmpeg, fake_session):
+        fake_session.get.side_effect = _session(_record(EMBED_VIDEO)).get.side_effect
+        assert len(download_video(URL, tmp_path, DEFAULT_CONFIG)) == 1
 
 
 class TestModeManuel:

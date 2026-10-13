@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from typing import Optional
 from urllib.parse import urlparse
 
-import requests
+from core import http as bsmb_http
 
 from core.post_ref import INVALID_HANDLE, POST_COLLECTION, PostRef
 
@@ -62,8 +62,13 @@ def _record_de_la_vue(post_view):
 
 
 class QuoteResolver:
-    def __init__(self):
+    def __init__(self, session=None):
         self.api_base = "https://bsky.social/xrpc/com.atproto.repo.getRecord"
+        self.session = session
+
+    def _http(self):
+        """Session fournie, sinon session partagée de core.http."""
+        return self.session or bsmb_http.get_session()
 
     def resolve(self, post_url, post_view=None):
         """
@@ -116,7 +121,7 @@ class QuoteResolver:
     def _uri_du_record_cite(self, actor, rkey):
         """Lit le record du citant (getRecord) et renvoie l'URI qu'il cite ('' si aucune)."""
         params = {"repo": actor, "collection": POST_COLLECTION, "rkey": rkey}
-        resp = requests.get(self.api_base, params=params, timeout=15)
+        resp = self._http().get(self.api_base, params=params, timeout=15)
         resp.raise_for_status()
         embed = resp.json().get("value", {}).get("embed", {})
         if embed.get("$type") not in ("app.bsky.embed.record", "app.bsky.embed.recordWithMedia"):
@@ -126,7 +131,7 @@ class QuoteResolver:
     def _etat_du_post(self, did, rkey):
         """'post' si le post cité existe, 'not_found' si getRecord répond 400, None sinon."""
         params = {"repo": did, "collection": POST_COLLECTION, "rkey": rkey}
-        resp = requests.get(self.api_base, params=params, timeout=15)
+        resp = self._http().get(self.api_base, params=params, timeout=15)
         if resp.status_code == 400:
             return "not_found"
         resp.raise_for_status()
@@ -136,7 +141,7 @@ class QuoteResolver:
         """Résout un DID en handle via l'API"""
         try:
             profile_api = "https://public.api.bsky.app/xrpc/app.bsky.actor.getProfile"
-            resp = requests.get(profile_api, params={"actor": did}, timeout=10)
+            resp = self._http().get(profile_api, params={"actor": did}, timeout=10)
             if resp.status_code == 200:
                 data = resp.json()
                 return data.get("handle")

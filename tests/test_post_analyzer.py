@@ -26,7 +26,6 @@ class TestAnalyzeURLParsing:
         post_type, data, debug = self.analyzer.analyze("https://bsky.app/bad")
         assert post_type == PostType.UNKNOWN
 
-    @patch("api.post_analyzer.requests.get")
     def test_error_400(self, mock_get):
         mock_resp = MagicMock()
         mock_resp.status_code = 400
@@ -39,7 +38,6 @@ class TestAnalyzeURLParsing:
         assert data["handle"] == "user.bsky.social"
         assert data["post_id"] == "deleted123"
 
-    @patch("api.post_analyzer.requests.get")
     def test_error_500(self, mock_get):
         mock_resp = MagicMock()
         mock_resp.status_code = 500
@@ -55,7 +53,6 @@ class TestAnalyzePostTypes:
     def setup_method(self):
         self.analyzer = PostAnalyzer()
 
-    @patch("api.post_analyzer.requests.get")
     def test_detect_images(self, mock_get):
         mock_resp = MagicMock()
         mock_resp.status_code = 200
@@ -83,7 +80,6 @@ class TestAnalyzePostTypes:
         assert data["image_count"] == 2
         assert len(data["images"]) == 2
 
-    @patch("api.post_analyzer.requests.get")
     def test_detect_video(self, mock_get):
         mock_resp = MagicMock()
         mock_resp.status_code = 200
@@ -112,7 +108,6 @@ class TestAnalyzePostTypes:
         assert "video_url" in data
         assert data["video_cid"] == "bafkrei_vid1"
 
-    @patch("api.post_analyzer.requests.get")
     def test_detect_quote(self, mock_get):
         mock_resp = MagicMock()
         mock_resp.status_code = 200
@@ -136,7 +131,6 @@ class TestAnalyzePostTypes:
         assert post_type == PostType.QUOTE
         assert data["is_quote"] is True
 
-    @patch("api.post_analyzer.requests.get")
     def test_detect_text_only(self, mock_get):
         mock_resp = MagicMock()
         mock_resp.status_code = 200
@@ -155,7 +149,6 @@ class TestAnalyzePostTypes:
         )
         assert post_type == PostType.TEXT_ONLY
 
-    @patch("api.post_analyzer.requests.get")
     def test_detect_record_with_media_images(self, mock_get):
         mock_resp = MagicMock()
         mock_resp.status_code = 200
@@ -183,7 +176,6 @@ class TestAnalyzePostTypes:
         assert post_type == PostType.IMAGES
         assert data["image_count"] == 1
 
-    @patch("api.post_analyzer.requests.get")
     def test_network_error(self, mock_get):
         import requests
         mock_get.side_effect = requests.exceptions.ConnectionError()
@@ -218,12 +210,12 @@ def _post_view(embed_record=None, embed_view=None, text="Bonjour"):
 
 
 @pytest.fixture
-def sans_reseau(monkeypatch):
+def sans_reseau(fake_session):
     """Toute requête réseau fait échouer le test."""
+
     def interdit(*args, **kwargs):
-        raise AssertionError("requests.get ne doit pas être appelé avec un post_view")
-    monkeypatch.setattr("api.post_analyzer.requests.get", interdit)
-    monkeypatch.setattr("requests.get", interdit)
+        raise AssertionError("la session ne doit pas être appelée avec un post_view")
+    fake_session.get.side_effect = interdit
 
 
 class TestAnalyzeAvecPostView:
@@ -292,7 +284,6 @@ class TestAnalyzeAvecPostView:
         assert t == PostType.UNKNOWN
         assert debug["embed_type"] == "app.bsky.embed.autre"
 
-    @patch("api.post_analyzer.requests.get")
     def test_post_view_sans_record_repli_sur_get_record(self, mock_get):
         mock_get.return_value = MagicMock(status_code=400)
         t, _, _ = self.analyzer.analyze(URL_PV, post_view={"uri": "at://x/app.bsky.feed.post/3k"})
@@ -307,7 +298,7 @@ class TestAnalyzeAvecPostView:
         _, data, _ = self.analyzer.analyze(URL_PV, post_view=_post_view())
         assert "labels" not in data and "viewer" not in data
 
-    def test_meme_resultat_que_get_record(self, sans_reseau, monkeypatch):
+    def test_meme_resultat_que_get_record(self, sans_reseau, fake_session):
         """Un même record donne les mêmes champs de classification par les deux chemins."""
         embed = {"$type": "app.bsky.embed.images", "images": [{"image": {"ref": {"$link": "bafkrei_a"}}}]}
         vue = _post_view(embed)
@@ -315,14 +306,14 @@ class TestAnalyzeAvecPostView:
 
         reponse = MagicMock(status_code=200)
         reponse.json.return_value = {"uri": vue["uri"], "value": vue["record"]}
-        monkeypatch.setattr("api.post_analyzer.requests.get", lambda *a, **k: reponse)
+        fake_session.get.side_effect = None
+        fake_session.get.return_value = reponse
         t_rec, d_rec, _ = self.analyzer.analyze(URL_PV)
 
         assert t_vue == t_rec
         for cle in ("images", "image_count", "text", "created_at", "did", "at_uri", "embed_type"):
             assert d_vue[cle] == d_rec[cle]
 
-    @patch("api.post_analyzer.requests.get")
     def test_sans_post_view_get_record_comme_avant(self, mock_get):
         mock_get.return_value = MagicMock(status_code=400)
         t, _, _ = self.analyzer.analyze(URL_PV)
@@ -331,7 +322,7 @@ class TestAnalyzeAvecPostView:
 
 
 class TestHandleInvalide:
-    def test_handle_invalid_equivalent_a_get_record(self, monkeypatch):
+    def test_handle_invalid_equivalent_a_get_record(self, fake_session):
         """Un author.handle = handle.invalid donne le même handle (le DID de l'URL) par les deux chemins."""
         analyzer = PostAnalyzer()
         url = f"https://bsky.app/profile/{DID}/post/3kpv00000001"
@@ -341,7 +332,8 @@ class TestHandleInvalide:
 
         reponse = MagicMock(status_code=200)
         reponse.json.return_value = {"uri": vue["uri"], "value": vue["record"]}
-        monkeypatch.setattr("api.post_analyzer.requests.get", lambda *a, **k: reponse)
+        fake_session.get.side_effect = None
+        fake_session.get.return_value = reponse
         t_rec, d_rec, _ = analyzer.analyze(url)
 
         assert d_vue["handle"] == d_rec["handle"] == DID

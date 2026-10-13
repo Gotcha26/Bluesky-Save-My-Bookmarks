@@ -23,10 +23,8 @@ class TestFetchBookmarksValidation:
 
 
 class TestFetchBookmarksSuccess:
-    @patch("api.export_bookmarks.requests.Session")
-    def test_single_page(self, mock_session_cls):
-        session = MagicMock()
-        mock_session_cls.return_value = session
+    def test_single_page(self, fake_session):
+        session = fake_session
 
         response = MagicMock()
         response.status_code = 200
@@ -51,10 +49,8 @@ class TestFetchBookmarksSuccess:
         assert "user.bsky.social" in result["urls"][0]
         assert "123" in result["urls"][0]
 
-    @patch("api.export_bookmarks.requests.Session")
-    def test_empty_bookmarks(self, mock_session_cls):
-        session = MagicMock()
-        mock_session_cls.return_value = session
+    def test_empty_bookmarks(self, fake_session):
+        session = fake_session
 
         response = MagicMock()
         response.status_code = 200
@@ -67,10 +63,8 @@ class TestFetchBookmarksSuccess:
         assert result["count"] == 0
         assert result["urls"] == []
 
-    @patch("api.export_bookmarks.requests.Session")
-    def test_multiple_pages(self, mock_session_cls):
-        session = MagicMock()
-        mock_session_cls.return_value = session
+    def test_multiple_pages(self, fake_session):
+        session = fake_session
 
         page1 = MagicMock()
         page1.status_code = 200
@@ -99,10 +93,8 @@ class TestFetchBookmarksSuccess:
         assert result["pages"] == 2
         assert len(result["urls"]) == 2
 
-    @patch("api.export_bookmarks.requests.Session")
-    def test_progress_callback(self, mock_session_cls):
-        session = MagicMock()
-        mock_session_cls.return_value = session
+    def test_progress_callback(self, fake_session):
+        session = fake_session
 
         response = MagicMock()
         response.status_code = 200
@@ -120,10 +112,8 @@ class TestFetchBookmarksSuccess:
         assert len(calls) == 1
         assert calls[0] == (1, 1)
 
-    @patch("api.export_bookmarks.requests.Session")
-    def test_fallback_to_did_when_no_handle(self, mock_session_cls):
-        session = MagicMock()
-        mock_session_cls.return_value = session
+    def test_fallback_to_did_when_no_handle(self, fake_session):
+        session = fake_session
 
         response = MagicMock()
         response.status_code = 200
@@ -141,9 +131,8 @@ class TestFetchBookmarksSuccess:
 
 
 class TestFetchBookmarksPdsUrl:
-    def _setup(self, mock_session_cls):
-        session = MagicMock()
-        mock_session_cls.return_value = session
+    def _setup(self, fake_session):
+        session = fake_session
         response = MagicMock()
         response.status_code = 200
         response.json.return_value = {"bookmarks": [], "cursor": None}
@@ -151,35 +140,30 @@ class TestFetchBookmarksPdsUrl:
         session.get.return_value = response
         return session
 
-    @patch("api.export_bookmarks.requests.Session")
-    def test_uses_provided_pds_url(self, mock_session_cls):
-        session = self._setup(mock_session_cls)
+    def test_uses_provided_pds_url(self, fake_session):
+        session = self._setup(fake_session)
         fetch_bookmarks("Bearer t", pds_url="https://morel.us-east.host.bsky.network/")
         assert session.get.call_args[0][0] == (
             "https://morel.us-east.host.bsky.network/xrpc/app.bsky.bookmark.getBookmarks"
         )
 
-    @patch("api.export_bookmarks.requests.Session")
-    def test_default_pds_url_is_bsky_social(self, mock_session_cls):
-        session = self._setup(mock_session_cls)
+    def test_default_pds_url_is_bsky_social(self, fake_session):
+        session = self._setup(fake_session)
         fetch_bookmarks("Bearer t")
         assert session.get.call_args[0][0] == (
             "https://bsky.social/xrpc/app.bsky.bookmark.getBookmarks"
         )
 
-    @patch("api.export_bookmarks.requests.Session")
-    def test_keeps_appview_proxy_header(self, mock_session_cls):
-        session = self._setup(mock_session_cls)
+    def test_keeps_appview_proxy_header(self, fake_session):
+        session = self._setup(fake_session)
         fetch_bookmarks("Bearer t", pds_url="https://eurosky.social")
-        headers = session.headers.update.call_args[0][0]
+        headers = session.get.call_args.kwargs["headers"]
         assert headers["atproto-proxy"] == "did:web:api.bsky.app#bsky_appview"
 
 
 class TestFetchBookmarksErrors:
-    @patch("api.export_bookmarks.requests.Session")
-    def test_expired_token(self, mock_session_cls):
-        session = MagicMock()
-        mock_session_cls.return_value = session
+    def test_expired_token(self, fake_session):
+        session = fake_session
 
         response = MagicMock()
         response.status_code = 400
@@ -193,10 +177,8 @@ class TestFetchBookmarksErrors:
         assert result["expired"] is True
         assert result["error"] is not None
 
-    @patch("api.export_bookmarks.requests.Session")
-    def test_api_error_400(self, mock_session_cls):
-        session = MagicMock()
-        mock_session_cls.return_value = session
+    def test_api_error_400(self, fake_session):
+        session = fake_session
 
         response = MagicMock()
         response.status_code = 400
@@ -211,11 +193,9 @@ class TestFetchBookmarksErrors:
         assert result["error"] is not None
         assert "Something went wrong" in result["error"]
 
-    @patch("api.export_bookmarks.requests.Session")
-    def test_network_error(self, mock_session_cls):
+    def test_network_error(self, fake_session):
         import requests
-        session = MagicMock()
-        mock_session_cls.return_value = session
+        session = fake_session
         session.get.side_effect = requests.exceptions.ConnectionError("Network error")
 
         result = fetch_bookmarks("Bearer test")
@@ -226,13 +206,11 @@ class TestFetchBookmarksErrors:
 class TestFetchBookmarksItemTypes:
     """Les trois formes de `item` (issue #3) : postView, notFoundPost, blockedPost."""
 
-    @patch("api.export_bookmarks.requests.Session")
-    def test_item_type_post_view_et_created_at(self, mock_session_cls):
+    def test_item_type_post_view_et_created_at(self, fake_session):
         import json
         from pathlib import Path
         page = json.loads((Path(__file__).parent / "fixtures" / "bookmarks_page.json").read_text(encoding="utf-8"))
-        session = MagicMock()
-        mock_session_cls.return_value = session
+        session = fake_session
         response = MagicMock(status_code=200)
         response.json.return_value = page
         session.get.return_value = response
@@ -254,10 +232,8 @@ class TestFetchBookmarksItemTypes:
         assert par_type["notFoundPost"]["url"].startswith("https://bsky.app/profile/did:plc:test2")
         assert len(result["urls"]) == 3
 
-    @patch("api.export_bookmarks.requests.Session")
-    def test_item_sans_type_reste_post_view_si_record(self, mock_session_cls):
-        session = MagicMock()
-        mock_session_cls.return_value = session
+    def test_item_sans_type_reste_post_view_si_record(self, fake_session):
+        session = fake_session
         response = MagicMock(status_code=200)
         response.json.return_value = {"bookmarks": [{"item": {
             "uri": "at://did:plc:abc/app.bsky.feed.post/123",

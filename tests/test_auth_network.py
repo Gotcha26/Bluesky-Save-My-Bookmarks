@@ -11,20 +11,17 @@ class TestNetworkError:
     def test_est_une_auth_error(self):
         assert issubclass(NetworkError, AuthError)
 
-    @patch("core.auth.requests.post")
     def test_connection_error(self, mock_post):
         mock_post.side_effect = requests.exceptions.ConnectionError()
         with pytest.raises(NetworkError):
             create_session("user", "pass")
 
-    @patch("core.auth.requests.post")
     def test_timeout(self, mock_post):
         mock_post.side_effect = requests.exceptions.Timeout()
         with pytest.raises(NetworkError):
             create_session("user", "pass")
 
     @pytest.mark.parametrize("statut,reseau", [(500, True), (503, True), (400, False)])
-    @patch("core.auth.requests.post")
     def test_statut_http(self, mock_post, statut, reseau):
         resp = MagicMock(status_code=statut)
         resp.raise_for_status.side_effect = requests.exceptions.HTTPError(response=resp)
@@ -34,7 +31,6 @@ class TestNetworkError:
         assert isinstance(exc.value, NetworkError) is reseau
 
     @pytest.mark.parametrize("statut", [401, 429])
-    @patch("core.auth.requests.post")
     def test_401_et_429_restent_auth_error(self, mock_post, statut):
         mock_post.return_value = MagicMock(status_code=statut)
         with pytest.raises(AuthError) as exc:

@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from typing import Optional
 from urllib.parse import urlparse
 
-import requests
+from core import http as bsmb_http
 
 INVALID_HANDLE = "handle.invalid"
 PUBLIC_API = "https://public.api.bsky.app"
@@ -62,13 +62,13 @@ class PostRef:
         return cls(did=parts[2], rkey=parts[4], handle=handle)
 
 
-def resolve_handle(handle):
+def resolve_handle(handle, session=None):
     """Résout un handle en DID (com.atproto.identity.resolveHandle).
 
     Utilitaire : à ne pas appeler post par post. Lève une exception `requests`
     en cas d'échec réseau ou HTTP.
     """
-    resp = requests.get(
+    resp = (session or bsmb_http.get_session()).get(
         f"{PUBLIC_API}/xrpc/com.atproto.identity.resolveHandle",
         params={"handle": handle},
         timeout=10,

@@ -36,7 +36,7 @@ def post_texte(did, rkey, texte="Le post cité", embed=None):
 
 
 class Reseau:
-    """requests.get factice : getRecord par rkey, getProfile par DID."""
+    """session.get factice : getRecord par rkey, getProfile par DID."""
 
     def __init__(self, records, statuts=None):
         self.records = {r["uri"].split("/")[-1]: r for r in records}
@@ -97,9 +97,11 @@ def lancer(url, records, tmp_db, tmp_path, statuts=None, downloaders=None, non_r
     reseau = Reseau(records, statuts)
     downloaders = downloaders or Downloaders()
     journal = []
-    with patch("requests.get", side_effect=reseau), downloaders.patch():
+    session = MagicMock()
+    session.get.side_effect = reseau
+    with downloaders.patch():
         resultat = process_post(
-            url, "IMG", "VID", "TXT", tmp_db, PostAnalyzer(), QuoteResolver(), tmp_path,
+            url, "IMG", "VID", "TXT", tmp_db, PostAnalyzer(session), QuoteResolver(session), tmp_path,
             lambda msg, **k: journal.append(msg), config={"max_filename_len": 120, "save_sidecar": sidecar},
             quotes_unresolved=non_resolues,
         )
@@ -303,8 +305,10 @@ class TestRecordCiteNonArchivable:
             return [] if name_prefix is None else original(u, d, c, session, name_prefix)
 
         reseau = Reseau([charger("quote_text.json"), post_texte(D2, "3kcited0001")])
-        with patch("requests.get", side_effect=reseau), dl.patch(), patch.object(orchestrator, "save_text", save_text):
-            res = process_post(url, "IMG", "VID", "TXT", tmp_db, PostAnalyzer(), QuoteResolver(), tmp_path,
+        session = MagicMock()
+        session.get.side_effect = reseau
+        with dl.patch(), patch.object(orchestrator, "save_text", save_text):
+            res = process_post(url, "IMG", "VID", "TXT", tmp_db, PostAnalyzer(session), QuoteResolver(session), tmp_path,
                                lambda *a, **k: None, config={})
         assert res[4] == "success" and statut(tmp_db, url) == "ok"
 

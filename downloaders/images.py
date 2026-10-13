@@ -23,13 +23,13 @@ from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse
 
-import requests
 
 if __package__ in (None, ""):
     # Exécution directe (python downloaders/images.py) : rendre la racine importable
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from core.config import DEFAULT_CONFIG, get_default_paths, load_config  # noqa: E402
+from core import http as bsmb_http  # noqa: E402
 from downloaders import DownloadError, DownloadResult, lignes_console  # noqa: E402
 
 SPACER = " - "
@@ -56,7 +56,8 @@ def guess_ext_from_ct(ct: str) -> str:
     if 'tiff' in ct: return '.tif'
     return mimetypes.guess_extension(ct) or ''
 
-def get_extension_for_url(url: str, http=requests) -> str:
+def get_extension_for_url(url: str, http=None) -> str:
+    http = http or bsmb_http.get_session()
     if not url: return '.jpg'
     path_ext = os.path.splitext(urlparse(url).path)[1]
     if path_ext and len(path_ext) <= 8:
@@ -104,13 +105,14 @@ def build_filename(handle: str, date_str: str, post_id: str, index: int, ext: st
     return filename
 
 # -------------------- Bluesky API / Extraction --------------------
-def fetch_post_json(handle: str, post_id: str, http=requests):
+def fetch_post_json(handle: str, post_id: str, http=None):
+    http = http or bsmb_http.get_session()
     api_url = f"https://public.api.bsky.app/xrpc/app.bsky.feed.getPostThread?uri=at://{handle}/app.bsky.feed.post/{post_id}"
     resp = http.get(api_url, timeout=15)
     resp.raise_for_status()
     return resp.json()
 
-def extract_images_from_bsky(post_url: str, http=requests, details: dict | None = None):
+def extract_images_from_bsky(post_url: str, http=None, details: dict | None = None):
     """
     Lit le post via getPostThread et extrait les URLs des images.
     Lève DownloadError si l'API échoue.
@@ -204,8 +206,9 @@ def images_du_record(record: dict | None) -> list[dict]:
     return resultat
 
 
-def fetch_record(handle_or_did: str, post_id: str, http=requests):
+def fetch_record(handle_or_did: str, post_id: str, http=None):
     """Record brut (`value`) du post via getRecord, ou None si indisponible."""
+    http = http or bsmb_http.get_session()
     try:
         resp = http.get(GET_RECORD_URL, params={"repo": handle_or_did, "collection": "app.bsky.feed.post",
                                                 "rkey": post_id}, timeout=15)
@@ -226,10 +229,11 @@ def ext_from_mime(mime: str) -> str:
     return MIME_EXT.get(mime) or mimetypes.guess_extension(mime) or ".jpg"
 
 # -------------------- Téléchargement --------------------
-def download_image(url, filepath, handle, post_id, post_url, post_text, created_at, http=requests, alt=""):
+def download_image(url, filepath, handle, post_id, post_url, post_text, created_at, http=None, alt=""):
     """Télécharge une image dans filepath puis ajoute les métadonnées EXIF (best effort).
 
     alt : texte alternatif, écrit dans ImageDescription s'il n'est pas vide."""
+    http = http or bsmb_http.get_session()
     r = http.get(url, timeout=30, allow_redirects=True)
     r.raise_for_status()
     type_contenu = (r.headers.get("content-type") or "").strip().lower()
@@ -312,7 +316,7 @@ def download_images(post_url, dest_dir, config, session=None, name_prefix=None,
     Raises:
         DownloadError : API inaccessible, ou aucune image n'a pu être téléchargée.
     """
-    http = session or requests
+    http = session or bsmb_http.get_session()
     details = {}
     handle, date_str, post_id, image_urls, post_text, created_at, _ = extract_images_from_bsky(
         post_url, http, details)

@@ -11,17 +11,18 @@ from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse
 
-import requests
 
 if __package__ in (None, ""):
     # Exécution directe (python downloaders/text.py) : rendre la racine importable
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from core.config import get_default_paths, load_config  # noqa: E402
+from core import http as bsmb_http  # noqa: E402
 from downloaders import DownloadError, DownloadResult, lignes_console  # noqa: E402
 
 
-def fetch_post(handle, post_id, http=requests):
+def fetch_post(handle, post_id, http=None):
+    http = http or bsmb_http.get_session()
     api_url = f"https://public.api.bsky.app/xrpc/app.bsky.feed.getPostThread?uri=at://{handle}/app.bsky.feed.post/{post_id}"
     resp = http.get(api_url, timeout=15)
     resp.raise_for_status()
@@ -57,7 +58,7 @@ def save_text(post_url, dest_dir, config, session=None, name_prefix=None):
     Raises:
         DownloadError : API inaccessible.
     """
-    http = session or requests
+    http = session or bsmb_http.get_session()
     parts = urlparse(post_url).path.strip("/").split("/")
     if len(parts) < 4:
         return []

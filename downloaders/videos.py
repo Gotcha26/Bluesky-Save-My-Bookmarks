@@ -17,13 +17,13 @@ from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse
 
-import requests
 
 if __package__ in (None, ""):
     # Exécution directe (python downloaders/videos.py) : rendre la racine importable
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from core.config import DEFAULT_CONFIG, get_default_paths, load_config  # noqa: E402
+from core import http as bsmb_http  # noqa: E402
 from downloaders import DownloadError, DownloadResult, lignes_console  # noqa: E402
 
 
@@ -39,8 +39,9 @@ def _blob_url(did, cid):
     return f"{BLOB_HOST}/xrpc/com.atproto.sync.getBlob?did={did}&cid={cid}"
 
 
-def get_post_data(post_url, http=requests):
+def get_post_data(post_url, http=None):
     """Récupère le record brut du post via l'API ; lève DownloadError en cas d'échec."""
+    http = http or bsmb_http.get_session()
     parts = urlparse(post_url).path.strip("/").split("/")
     handle_from_url = parts[-3] if len(parts) >= 3 else parts[-2]
     post_id = parts[-1]
@@ -278,7 +279,7 @@ def download_video(post_url, dest_dir, config, session=None, name_prefix=None,
         DownloadError : URL invalide, API inaccessible ou téléchargement en échec
         (blob et repli HLS compris).
     """
-    http = session or requests
+    http = session or bsmb_http.get_session()
     parts = urlparse(post_url).path.strip("/").split("/")
     if len(parts) < 4:
         raise DownloadError("URL invalide")

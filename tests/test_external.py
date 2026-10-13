@@ -230,10 +230,8 @@ class TestMediaDirect:
         assert [r.media_type for r in res] == ["text", "image"]
         assert res[1].filename.endswith("_thumb.jpg")
 
-    def test_session_par_defaut_est_requests(self, dirs, monkeypatch):
-        faux = MagicMock()
-        faux.get.return_value = _reponse()
-        monkeypatch.setattr("downloaders.external.requests", faux)
+    def test_session_par_defaut_est_la_session_partagee(self, dirs, fake_session):
+        fake_session.get.return_value = _reponse()
         res = download_external(URL, _data(), dirs, DEFAULT_CONFIG)
         assert len(res) == 2
-        faux.get.assert_called_once()
+        fake_session.get.assert_called_once()
