@@ -1,7 +1,7 @@
 """Tests de la base de données : statut conservé, doublons, relance des erreurs, migrations (issue #9)."""
 import sqlite3
 from datetime import datetime, timedelta
-from types import SimpleNamespace
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -11,6 +11,7 @@ from core.bookmarks import BookmarkSync
 from core.config import DEFAULT_CONFIG
 from core.database import Database
 from core.orchestrator import process_post
+from downloaders import DownloadError, DownloadResult
 
 URL = "https://bsky.app/profile/user.bsky.social/post/3k1"
 URL2 = "https://bsky.app/profile/user.bsky.social/post/3k2"
@@ -237,11 +238,23 @@ class TestMigrations:
         db.close()
 
 
-def _lancer(db, tmp_path, post_type, data, stdout="", returncode=0, resolver=None, url=URL):
+def _res(nom, media_type):
+    return DownloadResult(nom, Path(nom), media_type, 1)
+
+
+def _downloaders(resultats=(), erreur=None):
+    """Les trois downloaders mockés, renvoyant tous `resultats` (ou levant `erreur`)."""
+    return patch.multiple(
+        "core.orchestrator",
+        **{nom: MagicMock(return_value=list(resultats), side_effect=erreur)
+           for nom in ("download_images", "download_video", "save_text")},
+    )
+
+
+def _lancer(db, tmp_path, post_type, data, resultats=(), erreur=None, resolver=None, url=URL):
     analyzer = MagicMock()
     analyzer.analyze.return_value = (post_type, data, {"embed_type": "x"})
-    proc = SimpleNamespace(returncode=returncode, stdout=stdout)
-    with patch("core.orchestrator.subprocess.run", return_value=proc):
+    with _downloaders(resultats, erreur):
         return process_post(url, "IMG", "VID", "TXT", db, analyzer, resolver or MagicMock(),
                             tmp_path, lambda *a, **k: None)
 
@@ -252,19 +265,19 @@ def _medias(db):
 
 class TestOrchestrateurNomsReels:
     def test_images_enregistrees_avec_leur_nom(self, tmp_db, tmp_path):
-        sortie = "   [DL] Téléchargé -> u_1_01.jpg\n   [DL] Téléchargé -> u_1_02.png\n"
+        sortie = [_res("u_1_01.jpg", "image"), _res("u_1_02.png", "image")]
         res = _lancer(tmp_db, tmp_path, PostType.IMAGES, {"image_count": 2}, sortie)
         assert res[1] == 2
         assert _medias(tmp_db) == [("image", "u_1_01.jpg"), ("image", "u_1_02.png")]
 
     def test_video_enregistree_avec_son_nom(self, tmp_db, tmp_path):
-        sortie = "   [DL] Téléchargement en cours...\n   [OK] Fichier enregistré : u_1_01.mp4\n   [OK] Métadonnées ajoutées\n"
+        sortie = [_res("u_1_01.mp4", "video")]
         res = _lancer(tmp_db, tmp_path, PostType.VIDEO, {}, sortie)
         assert res[2] == 1
         assert _medias(tmp_db) == [("video", "u_1_01.mp4")]
 
     def test_retraitement_ne_cree_pas_de_doublon(self, tmp_db, tmp_path):
-        sortie = "   [DL] Téléchargé -> u_1_01.jpg\n"
+        sortie = [_res("u_1_01.jpg", "image")]
         _lancer(tmp_db, tmp_path, PostType.IMAGES, {"image_count": 1}, sortie)
         _lancer(tmp_db, tmp_path, PostType.IMAGES, {"image_count": 1}, sortie)
         assert _medias(tmp_db) == [("image", "u_1_01.jpg")]
@@ -287,14 +300,14 @@ class TestOrchestrateurStatuts:
     def test_succes_remet_le_statut_a_ok_apres_une_erreur(self, tmp_db, tmp_path):
         tmp_db.add_post(URL)
         tmp_db.mark_post_status(URL, "error_500")
-        res = _lancer(tmp_db, tmp_path, PostType.TEXT_ONLY, {}, "   [TXT] t.txt\n")
+        res = _lancer(tmp_db, tmp_path, PostType.TEXT_ONLY, {}, [_res("t.txt", "text")])
         assert res[0] is True
         assert self._statut(tmp_db) == "ok"
 
     def test_echec_ne_change_pas_le_statut(self, tmp_db, tmp_path):
         tmp_db.add_post(URL)
         tmp_db.mark_post_status(URL, "error_500")
-        _lancer(tmp_db, tmp_path, PostType.TEXT_ONLY, {}, "", returncode=1)
+        _lancer(tmp_db, tmp_path, PostType.TEXT_ONLY, {}, erreur=DownloadError("API"))
         assert self._statut(tmp_db) == "error_500"
 
     def test_repost_resolu_remet_le_citant_a_ok(self, tmp_db, tmp_path):
@@ -307,24 +320,23 @@ class TestOrchestrateurStatuts:
             (PostType.REPOST, {}, {}),
             (PostType.TEXT_ONLY, {}, {}),
         ]
-        proc = SimpleNamespace(returncode=0, stdout="   [TXT] t.txt\n")
-        with patch("core.orchestrator.subprocess.run", return_value=proc):
+        with _downloaders([_res("t.txt", "text")]):
             process_post(URL, "IMG", "VID", "TXT", tmp_db, analyzer, resolver, tmp_path, lambda *a, **k: None)
         assert self._statut(tmp_db) == "ok"
 
 
 class TestRepostOriginalEnEchec:
-    def _citant_dont_l_original(self, db, tmp_path, type_original, **proc):
+    def _citant_dont_l_original(self, db, tmp_path, type_original, erreur=None):
         db.add_post(URL)
         resolver = MagicMock()
         resolver.resolve.return_value = (URL2, "user", "3k2")
         analyzer = MagicMock()
         analyzer.analyze.side_effect = [(PostType.REPOST, {}, {}), (type_original, {}, {"embed_type": "x"})]
-        with patch("core.orchestrator.subprocess.run", return_value=SimpleNamespace(**proc)):
+        with _downloaders(erreur=erreur):
             return process_post(URL, "IMG", "VID", "TXT", db, analyzer, resolver, tmp_path, lambda *a, **k: None)
 
     def test_original_en_erreur_500_le_citant_reste_retentable(self, tmp_db, tmp_path):
-        res = self._citant_dont_l_original(tmp_db, tmp_path, PostType.ERROR_500, returncode=0, stdout="")
+        res = self._citant_dont_l_original(tmp_db, tmp_path, PostType.ERROR_500)
         assert res[4] == "error_500"
         assert _ligne(tmp_db, URL)["status"] == "error_500"
         assert tmp_db.get_pending_posts([URL]) == []  # trop récent
@@ -332,14 +344,14 @@ class TestRepostOriginalEnEchec:
         assert tmp_db.get_pending_posts([URL]) == [URL]
 
     def test_original_en_echec_de_telechargement_le_citant_n_est_pas_ok(self, tmp_db, tmp_path):
-        res = self._citant_dont_l_original(tmp_db, tmp_path, PostType.TEXT_ONLY, returncode=1, stdout="")
+        res = self._citant_dont_l_original(tmp_db, tmp_path, PostType.TEXT_ONLY, erreur=DownloadError("API"))
         assert res[4] == "failed"
         assert _ligne(tmp_db, URL)["status"] == "unknown"
         _vieillir(tmp_db, URL, 8)
         assert tmp_db.get_pending_posts([URL]) == [URL]
 
     def test_original_supprime_le_citant_est_deleted(self, tmp_db, tmp_path):
-        self._citant_dont_l_original(tmp_db, tmp_path, PostType.ERROR_400, returncode=0, stdout="")
+        self._citant_dont_l_original(tmp_db, tmp_path, PostType.ERROR_400)
         assert _ligne(tmp_db, URL)["status"] == "deleted"
 
 

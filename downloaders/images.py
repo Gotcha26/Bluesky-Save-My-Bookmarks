@@ -1,62 +1,38 @@
 #!/usr/bin/env python3
 """
-bsky_img_downloader.py
-Télécharge les images d'un post Bluesky et les renomme:
-  <handle>_<YYYYMMDD>_<postid_short>_<nnn>.<ext>
-Ajoute les métadonnées EXIF suivantes :
+Téléchargement des images d'un post Bluesky, renommées :
+  <handle>_<YYYYMMDD>_<postid_short>_<n>.<ext>
+Ajoute les métadonnées EXIF suivantes (si exiftool est installé) :
   - Titre : ID du post
   - Commentaire : texte du post
   - Auteur : identifiant du compte Bluesky
   - Date d'acquisition : date du post
   - Copyright : URL du post
 Ne télécharge QUE les images (pas les thumbs de vidéo).
-Codes de sortie:
-  0 = succès (au moins une image téléchargée)
-  1 = erreur technique
-  2 = aucun média image trouvé / aucun post fourni
+
+Usage manuel : python downloaders/images.py <dossier> <url_post | fichier_urls>
+Codes de sortie : 0 = au moins une image, 1 = erreur technique, 2 = aucune image.
 """
 import os
 import re
-import requests
+import sys
 import mimetypes
 import subprocess
-from urllib.parse import urlparse
 from datetime import datetime
-import sys
-import json
 from pathlib import Path
+from urllib.parse import urlparse
 
-# Ajouter le répertoire parent au path pour les imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
+import requests
 
-# --- Récupère les arguments ---
-DEBUG_MODE = "--debug" in sys.argv
+if __package__ in (None, ""):
+    # Exécution directe (python downloaders/images.py) : rendre la racine importable
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-# Charger config si disponible
-from core.config import get_default_paths
+from core.config import DEFAULT_CONFIG, get_default_paths, load_config  # noqa: E402
+from downloaders import DownloadError, DownloadResult, lignes_console  # noqa: E402
 
-default_paths = get_default_paths()
-default_img = default_paths["img_dir"]
-
-IMG_DIR = sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith("--") else default_img
-
-if len(sys.argv) > 2:
-    url_input = sys.argv[2]
-else:
-    url_input = input("👉 Collez une URL : ").strip()
-
-MAX_FILENAME_LEN = 64
-MIN_POSTID_SHORT = 4
-INDEX_DIGITS = 1
 SPACER = " - "
 
-os.makedirs(IMG_DIR, exist_ok=True)
-
-def print_debug(data):
-    if DEBUG_MODE:
-        print("--- Réponse complète de l'API ---")
-        print(json.dumps(data, indent=2))
-        print("--- Fin de la réponse ---")
 
 def safe_part(s: str) -> str:
     s = (s or "").strip()
@@ -77,28 +53,28 @@ def guess_ext_from_ct(ct: str) -> str:
     if 'tiff' in ct: return '.tif'
     return mimetypes.guess_extension(ct) or ''
 
-def get_extension_for_url(url: str) -> str:
+def get_extension_for_url(url: str, http=requests) -> str:
     if not url: return '.jpg'
     path_ext = os.path.splitext(urlparse(url).path)[1]
     if path_ext and len(path_ext) <= 8:
         return path_ext.lower()
     try:
-        h = requests.head(url, allow_redirects=True, timeout=10)
+        h = http.head(url, allow_redirects=True, timeout=10)
         ext = guess_ext_from_ct(h.headers.get('content-type',''))
         if ext: return ext
-    except: pass
+    except Exception: pass
     try:
-        r = requests.get(url, stream=True, timeout=10)
+        r = http.get(url, stream=True, timeout=10)
         ext = guess_ext_from_ct(r.headers.get('content-type',''))
         r.close()
         if ext: return ext
-    except: pass
+    except Exception: pass
     return '.jpg'
 
 def build_filename(handle: str, date_str: str, post_id: str, index: int, ext: str,
-                   max_len=MAX_FILENAME_LEN,
-                   min_postid=MIN_POSTID_SHORT,
-                   index_digits=INDEX_DIGITS,
+                   max_len=DEFAULT_CONFIG["max_filename_len"],
+                   min_postid=DEFAULT_CONFIG["min_postid_short"],
+                   index_digits=DEFAULT_CONFIG["index_digits"],
                    spacer=SPACER) -> str:
     handle = safe_part(handle)
     post_id = safe_part(post_id)
@@ -124,65 +100,64 @@ def build_filename(handle: str, date_str: str, post_id: str, index: int, ext: st
         filename = filename[:max_len - ext_len] + ext
     return filename
 
-def next_index_for_base(idx: int) -> int:
-    return idx + 1
-
 # -------------------- Bluesky API / Extraction --------------------
-def fetch_post_json(handle: str, post_id: str):
+def fetch_post_json(handle: str, post_id: str, http=requests):
     api_url = f"https://public.api.bsky.app/xrpc/app.bsky.feed.getPostThread?uri=at://{handle}/app.bsky.feed.post/{post_id}"
-    resp = requests.get(api_url, timeout=15)
+    resp = http.get(api_url, timeout=15)
     resp.raise_for_status()
     return resp.json()
 
-def extract_images_from_bsky(post_url: str):
+def extract_images_from_bsky(post_url: str, http=requests):
+    """
+    Lit le post via getPostThread et extrait les URLs des images.
+    Lève DownloadError si l'API échoue.
+    """
     parsed = urlparse(post_url)
     parts = parsed.path.strip("/").split("/")
     if len(parts) < 3 or parts[0] != "profile":
         return "_unknown_", datetime.now().strftime("%Y%m%d"), "_unknown_", [], "", "", False
-    
+
     handle_from_url = parts[1]
     post_id = parts[-1]
-    
+
     try:
-        data = fetch_post_json(handle_from_url, post_id)
+        data = fetch_post_json(handle_from_url, post_id, http)
     except Exception as e:
         error_msg = str(e)
         if "400 Client Error: Bad Request" in error_msg:
-            print("   [!] Post supprimé ou inaccessible")
+            raise DownloadError("Post supprimé ou inaccessible") from e
         elif "500 Server Error" in error_msg:
-            print("   [!] Erreur serveur (lien invalide)")
-        else:
-            print(f"   [!] Erreur API : {e}")
-        return handle_from_url, datetime.now().strftime("%Y%m%d"), post_id, [], "", "", False
+            raise DownloadError("Erreur serveur (lien invalide)") from e
+        raise DownloadError(f"Erreur API : {e}") from e
 
     post = data.get("thread", {}).get("post", {})
     author = post.get("author", {})
     handle = author.get("handle", handle_from_url)
     created_at = post.get("record", {}).get("createdAt", "")
-    
+
     date_str = datetime.now().strftime("%Y%m%d")
     if created_at:
         try:
             date_str = datetime.fromisoformat(created_at.replace("Z", "")).strftime("%Y%m%d")
-        except:
+        except ValueError:
             date_str = created_at[:10].replace("-", "")
 
     post_text = post.get("record", {}).get("text", "")
     embed = post.get("embed", {})
     embed_type = embed.get("$type", "")
-    
+
     images = []
     is_repost = False
-    
+
     # ORDRE : 1. Images directes, 2. RecordWithMedia, 3. Repost
-    
+
     # 1. Images directes
     if embed_type == "app.bsky.embed.images#view":
         for img in embed.get("images", []):
             full_url = img.get("fullsize")
             if full_url:
                 images.append(full_url)
-    
+
     # 2. Record avec média (quote post + image)
     elif embed_type == "app.bsky.embed.recordWithMedia#view":
         media = embed.get("media", {})
@@ -191,7 +166,7 @@ def extract_images_from_bsky(post_url: str):
                 full_url = img.get("fullsize")
                 if full_url:
                     images.append(full_url)
-    
+
     # 3. Repost pur (dernier recours)
     elif embed_type == "app.bsky.embed.record#view":
         is_repost = True
@@ -207,88 +182,101 @@ def extract_images_from_bsky(post_url: str):
     return handle, date_str, post_id, images, post_text, created_at, is_repost
 
 # -------------------- Téléchargement --------------------
-def download_image(url, handle, date_str, post_id, post_url, post_text, created_at, idx):
-    ext = get_extension_for_url(url) or ".jpg"
-    filename = build_filename(handle, date_str, post_id, idx, ext)
-    filepath = os.path.join(IMG_DIR, filename)
+def download_image(url, filepath, handle, post_id, post_url, post_text, created_at, http=requests):
+    """Télécharge une image dans filepath puis ajoute les métadonnées EXIF (best effort)."""
+    r = http.get(url, timeout=30)
+    r.raise_for_status()
+    with open(filepath, "wb") as f:
+        f.write(r.content)
+    # --- Ajout des métadonnées EXIF ---
     try:
-        r = requests.get(url, timeout=30)
-        r.raise_for_status()
-        with open(filepath, "wb") as f:
-            f.write(r.content)
-        print(f"   [DL] Téléchargé -> {filename}")
-        # --- Ajout des métadonnées EXIF ---
-        try:
-            full_comment = f"{post_text}\n\nLien du post : {url}"
-            
-            exif_cmd = [
-                "exiftool",
-                f"-Title={post_id}",
-                f"-XPComment={full_comment}",
-                f"-Artist={handle}",
-                f"-DateTimeOriginal={created_at.replace('Z','') if created_at else ''}",
-                f"-Copyright={post_url}",
-                "-overwrite_original",
-                filepath
-            ]
-            subprocess.run(exif_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        except Exception:
-            pass
-        return True
-    except Exception as e:
-        print(f"   [ERR] Impossible de télécharger {url} : {e}")
-        return False
+        full_comment = f"{post_text}\n\nLien du post : {url}"
 
-# -------------------- Main --------------------
-def main():
-    urls = []
+        exif_cmd = [
+            "exiftool",
+            f"-Title={post_id}",
+            f"-XPComment={full_comment}",
+            f"-Artist={handle}",
+            f"-DateTimeOriginal={created_at.replace('Z','') if created_at else ''}",
+            f"-Copyright={post_url}",
+            "-overwrite_original",
+            str(filepath)
+        ]
+        subprocess.run(exif_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception:
+        pass
+
+def download_images(post_url, dest_dir, config, session=None):
+    """
+    Télécharge les images d'un post dans dest_dir.
+
+    Returns:
+        list[DownloadResult] : une entrée par image écrite ; liste vide si le
+        post ne contient aucune image.
+    Raises:
+        DownloadError : API inaccessible, ou aucune image n'a pu être téléchargée.
+    """
+    http = session or requests
+    handle, date_str, post_id, image_urls, post_text, created_at, _ = extract_images_from_bsky(post_url, http)
+    if not image_urls:
+        return []
+
+    dest_dir = Path(dest_dir)
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    max_len = config.get("max_filename_len", DEFAULT_CONFIG["max_filename_len"])
+    min_postid = config.get("min_postid_short", DEFAULT_CONFIG["min_postid_short"])
+    index_digits = config.get("index_digits", DEFAULT_CONFIG["index_digits"])
+
+    results = []
+    erreurs = []
+    for idx, img_url in enumerate(image_urls, start=1):
+        ext = get_extension_for_url(img_url, http) or ".jpg"
+        filename = build_filename(handle, date_str, post_id, idx, ext,
+                                  max_len=max_len, min_postid=min_postid, index_digits=index_digits)
+        filepath = dest_dir / filename
+        try:
+            download_image(img_url, filepath, handle, post_id, post_url, post_text, created_at, http)
+        except Exception as e:
+            erreurs.append(f"Impossible de télécharger {img_url} : {e}")
+            continue
+        results.append(DownloadResult(filename, filepath, "image", filepath.stat().st_size))
+
+    if erreurs and not results:
+        raise DownloadError(" ; ".join(erreurs))
+    return results
+
+# -------------------- Usage manuel --------------------
+def main(argv=None):
+    """python downloaders/images.py <dossier> <url_post | fichier_urls>"""
+    argv = sys.argv[1:] if argv is None else argv
+    dest_dir = argv[0] if argv else get_default_paths()["img_dir"]
+    url_input = argv[1] if len(argv) > 1 else input("👉 Collez une URL : ").strip()
+
     if os.path.isfile(url_input):
         with open(url_input, "r", encoding="utf-8") as f:
-            for line in f:
-                u = line.strip()
-                if u: urls.append(u)
+            urls = [line.strip() for line in f if line.strip()]
     else:
-        urls = [url_input]  # ← FIX : simplifier, toujours une liste
-    
-    
+        urls = [url_input] if url_input else []
     if not urls:
-        sys.exit(2)
-    
-    success = False
+        return 2
+
+    config = load_config()
+    code = 2
     for post_url in urls:
         try:
-            result = extract_images_from_bsky(post_url)
-            handle, date_str, post_id, images, post_text, created_at, is_repost = result
-        except Exception as e:
-            print(f"   [!] Erreur API : {e}")
-            import traceback
-            traceback.print_exc()
+            results = download_images(post_url, dest_dir, config)
+        except DownloadError as e:
+            print(f"   [ERR] {e}")
+            code = 1 if code == 2 else code
             continue
-        
-        if is_repost and not images:
-            print("   [REPOST] Post sans média directement accessible")
-            continue
-        
-        if not images:
+        if not results:
             print("   [!] Aucune image trouvée")
             continue
-        
-        if is_repost:
-            print(f"   [REPOST] {len(images)} image(s) du post cité")
-        else:
-            print(f"   [OK] {len(images)} image(s) trouvée(s)")
-        
-        idx = 1
-        for img_url in images:
-            try:
-                if download_image(img_url, handle, date_str, post_id, post_url, post_text, created_at, idx):
-                    success = True
-            except Exception as e:
-                import traceback
-                traceback.print_exc()
-            idx = next_index_for_base(idx)
-    
-    sys.exit(0 if success else 2)
+        print(f"   [OK] {len(results)} image(s) téléchargée(s)")
+        for ligne in lignes_console(results):
+            print(ligne)
+        code = 0
+    return code
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
