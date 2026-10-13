@@ -1,0 +1,44 @@
+{
+  "uri": "at://did:plc:test000000000000000000000/app.bsky.feed.post/3ktest000001",
+  "cid": "bafyreitest000000000000000000000000000000000000000000000000",
+  "value": {
+    "text": "Un GIF https://media.tenor.com/abc/tenor.gif",
+    "$type": "app.bsky.feed.post",
+    "embed": {
+      "$type": "app.bsky.embed.external",
+      "external": {
+        "uri": "https://media.tenor.com/abc/tenor.gif",
+        "title": "Titre de la carte",
+        "description": "Description de la carte."
+      }
+    },
+    "langs": [
+      "en"
+    ],
+    "reply": {
+      "root": {
+        "cid": "bafyreitest000000000000000000000000000000000000000000000000",
+        "uri": "at://did:plc:test000000000000000000000/app.bsky.feed.post/3ktest000000"
+      },
+      "parent": {
+        "cid": "bafyreitest000000000000000000000000000000000000000000000000",
+        "uri": "at://did:plc:test000000000000000000000/app.bsky.feed.post/3ktest000000"
+      }
+    },
+    "facets": [
+      {
+        "index": {
+          "byteStart": 0,
+          "byteEnd": 44
+        },
+        "features": [
+          {
+            "$type": "app.bsky.richtext.facet#link",
+            "uri": "https://media.tenor.com/abc/tenor.gif"
+          }
+        ]
+      }
+    ],
+    "createdAt": "2026-01-05T17:24:26.493Z"
+  }
+}

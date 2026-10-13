@@ -1,0 +1,7 @@
+# BSMB - Dépendances de développement
+# Installation : pip install -r requirements-dev.txt
+
+-r requirements.txt
+pytest
+pytest-cov
+ruff

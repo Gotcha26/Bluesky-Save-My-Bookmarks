@@ -1,0 +1,1077 @@
+# Catalogue de BSMB (anglais). Généré par tools/extract_strings.py.
+msgid ""
+msgstr ""
+"Project-Id-Version: BSMB\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: bsmb.py:55 core/orchestrator.py:73
+msgid "o"
+msgstr "B"
+
+#: bsmb.py:55 core/orchestrator.py:73
+msgid "Ko"
+msgstr "KB"
+
+#: bsmb.py:55 core/orchestrator.py:73
+msgid "Mo"
+msgstr "MB"
+
+#: bsmb.py:55 core/orchestrator.py:73
+msgid "Go"
+msgstr "GB"
+
+#: bsmb.py:59 core/orchestrator.py:77
+msgid "To"
+msgstr "TB"
+
+#: bsmb.py:70
+msgid "à l'instant"
+msgstr "just now"
+
+#: bsmb.py:73
+msgid "il y a {n} min"
+msgstr "{n} min ago"
+
+#: bsmb.py:76
+msgid "il y a {n}h"
+msgstr "{n}h ago"
+
+#: bsmb.py:79
+msgid "il y a {n} jour"
+msgid_plural "il y a {n} jours"
+msgstr[0] "{n} day ago"
+msgstr[1] "{n} days ago"
+
+#: bsmb.py:127 bsmb.py:531 core/cli.py:239
+msgid "non connecté"
+msgstr "not connected"
+
+#: bsmb.py:131
+msgid "{n} fichiers"
+msgstr "{n} files"
+
+#: bsmb.py:133
+msgid "aucun"
+msgstr "none"
+
+#: bsmb.py:135
+msgid "Compte: {compte} | Médias: {medias}"
+msgstr "Account: {compte} | Media: {medias}"
+
+#: bsmb.py:140
+msgid "Dernière synchronisation: {date}"
+msgstr "Last synchronization: {date}"
+
+#: bsmb.py:150
+msgid "Mon compte     - Connexion et bookmarks en ligne"
+msgstr "My account     - Sign-in and online bookmarks"
+
+#: bsmb.py:151
+msgid "Stockage local - Dossier et statistiques"
+msgstr "Local storage  - Folder and statistics"
+
+#: bsmb.py:152
+msgid "Paramètres     - Configuration de l'application"
+msgstr "Settings       - Application settings"
+
+#: bsmb.py:157
+msgid "4. Télécharger    - (connectez d'abord votre compte)"
+msgstr "4. Download       - (connect your account first)"
+
+#: bsmb.py:160
+msgid "Télécharger {n} nouveaux bookmarks"
+msgstr "Download {n} new bookmarks"
+
+#: bsmb.py:163
+msgid "4. Tout est à jour"
+msgstr "4. Everything is up to date"
+
+#: bsmb.py:165
+msgid "4. Télécharger    - (synchronisez d'abord via Mon compte)"
+msgstr "4. Download       - (synchronize first via My account)"
+
+#: bsmb.py:169
+msgid "Quitter"
+msgstr "Quit"
+
+#: bsmb.py:210
+msgid "Votre choix"
+msgstr "Your choice"
+
+#: bsmb.py:215
+msgid "Choix invalide : \"{choix}\""
+msgstr "Invalid choice: \"{choix}\""
+
+#: bsmb.py:225
+msgid "MON COMPTE"
+msgstr "MY ACCOUNT"
+
+#: bsmb.py:230 bsmb.py:788
+msgid "Aucun compte Bluesky connecté"
+msgstr "No Bluesky account connected"
+
+#: bsmb.py:232
+msgid "Pour sauvegarder vos bookmarks, connectez votre compte :"
+msgstr "To save your bookmarks, connect your account:"
+
+#: bsmb.py:234
+msgid "Connecter mon compte Bluesky"
+msgstr "Connect my Bluesky account"
+
+#: bsmb.py:236 bsmb.py:276 bsmb.py:423 bsmb.py:561
+msgid "Retour"
+msgstr "Back"
+
+#: bsmb.py:249 core/cli.py:239
+msgid "Compte"
+msgstr "Account"
+
+#: bsmb.py:253
+msgid "Dernière sync"
+msgstr "Last sync"
+
+#: bsmb.py:258 bsmb.py:364 core/cli.py:158 core/cli.py:241
+msgid "Bookmarks en ligne"
+msgstr "Online bookmarks"
+
+#: bsmb.py:259 bsmb.py:391 core/cli.py:242 core/orchestrator.py:664
+msgid "Posts traités"
+msgstr "Posts processed"
+
+#: bsmb.py:261 bsmb.py:263 bsmb.py:367 bsmb.py:369 core/cli.py:160 core/cli.py:243
+msgid "Nouveaux"
+msgstr "New"
+
+#: bsmb.py:263 bsmb.py:369
+msgid "0 - tout est à jour"
+msgstr "0 - all up to date"
+
+#: bsmb.py:266 bsmb.py:800
+msgid "Aucune synchronisation effectuée"
+msgstr "No synchronization done yet"
+
+#: bsmb.py:269 core/cli.py:244
+msgid "Liens morts"
+msgstr "Dead links"
+
+#: bsmb.py:274
+msgid "Synchroniser les bookmarks"
+msgstr "Synchronize bookmarks"
+
+#: bsmb.py:275
+msgid "Déconnecter mon compte"
+msgstr "Disconnect my account"
+
+#: bsmb.py:303
+msgid "Le compte {handle} sera déconnecté (App Password supprimé de cet ordinateur)."
+msgstr "The account {handle} will be disconnected (App Password removed from this computer)."
+
+#: bsmb.py:308
+msgid "Vos fichiers téléchargés et la base ne sont pas touchés."
+msgstr "Your downloaded files and the database are left untouched."
+
+#: bsmb.py:309
+msgid "Confirmer ?"
+msgstr "Confirm?"
+
+#: bsmb.py:317
+msgid "Compte déconnecté"
+msgstr "Account disconnected"
+
+#: bsmb.py:321
+msgid "Compte déconnecté, mais le trousseau n'a pas pu être nettoyé : supprimez l'entrée « bsmb » à la main."
+msgstr "Account disconnected, but the keyring could not be cleaned: delete the 'bsmb' entry by hand."
+
+#: bsmb.py:334 core/cli.py:124
+msgid "Connexion à Bluesky..."
+msgstr "Connecting to Bluesky..."
+
+#: bsmb.py:338
+msgid "Impossible d'obtenir un token d'authentification"
+msgstr "Could not obtain an authentication token"
+
+#: bsmb.py:339
+msgid "Vérifiez vos identifiants dans Paramètres"
+msgstr "Check your credentials in Settings"
+
+#: bsmb.py:343
+msgid "Authentification réussie"
+msgstr "Authentication successful"
+
+#: bsmb.py:344
+msgid "Récupération des bookmarks..."
+msgstr "Fetching bookmarks..."
+
+#: bsmb.py:347 core/cli.py:144
+msgid "Page {page}... {count} bookmarks"
+msgstr "Page {page}... {count} bookmarks"
+
+#: bsmb.py:358 core/cli.py:152
+msgid "Token expiré — reconnectez votre compte"
+msgstr "Token expired — reconnect your account"
+
+#: bsmb.py:360
+msgid "Erreur : {erreur}"
+msgstr "Error: {erreur}"
+
+#: bsmb.py:363 core/cli.py:157
+msgid "Synchronisation terminée"
+msgstr "Synchronization complete"
+
+#: bsmb.py:365 core/cli.py:159
+msgid "Déjà traités"
+msgstr "Already processed"
+
+#: bsmb.py:372 core/cli.py:162
+msgid "Cache des bookmarks non écrit : {erreur}"
+msgstr "Bookmarks cache not written: {erreur}"
+
+#: bsmb.py:385
+msgid "STOCKAGE LOCAL"
+msgstr "LOCAL STORAGE"
+
+#: bsmb.py:392 core/orchestrator.py:665
+msgid "Images téléchargées"
+msgstr "Images downloaded"
+
+#: bsmb.py:393 core/orchestrator.py:666
+msgid "Vidéos téléchargées"
+msgstr "Videos downloaded"
+
+#: bsmb.py:394 core/orchestrator.py:667
+msgid "Textes sauvegardés"
+msgstr "Texts saved"
+
+#: bsmb.py:395
+msgid "Total médias"
+msgstr "Total media"
+
+#: bsmb.py:401
+msgid "Taille du dossier"
+msgstr "Folder size"
+
+#: bsmb.py:403 core/cli.py:251
+msgid "Destination"
+msgstr "Destination"
+
+#: bsmb.py:415
+msgid "Ouvrir le dossier de téléchargements"
+msgstr "Open the downloads folder"
+
+#: bsmb.py:419
+msgid "Nettoyer les liens morts ({n})"
+msgstr "Clean up dead links ({n})"
+
+#: bsmb.py:422
+msgid "Réinitialiser la base de données"
+msgstr "Reset the database"
+
+#: bsmb.py:445
+msgid "{n} lien mort détecté"
+msgid_plural "{n} liens morts détectés"
+msgstr[0] "{n} dead link detected"
+msgstr[1] "{n} dead links detected"
+
+#: bsmb.py:454
+msgid "NETTOYAGE DES LIENS MORTS"
+msgstr "DEAD LINKS CLEANUP"
+
+#: bsmb.py:457
+msgid "{n} lien mort détecté :"
+msgid_plural "{n} liens morts détectés :"
+msgstr[0] "{n} dead link detected:"
+msgstr[1] "{n} dead links detected:"
+
+#: bsmb.py:461 core/orchestrator.py:159
+msgid "supprimé"
+msgstr "deleted"
+
+#: bsmb.py:465
+msgid "... et {n} autres"
+msgstr "... and {n} more"
+
+#: bsmb.py:471
+msgid "Cette action va supprimer ces entrées de la base."
+msgstr "This will remove these entries from the database."
+
+#: bsmb.py:472
+msgid "Les fichiers déjà téléchargés ne seront pas supprimés."
+msgstr "Files already downloaded will not be deleted."
+
+#: bsmb.py:475
+msgid "Confirmer le nettoyage ?"
+msgstr "Confirm the cleanup?"
+
+#: bsmb.py:477
+msgid "{n} entrée supprimée"
+msgid_plural "{n} entrées supprimées"
+msgstr[0] "{n} entry deleted"
+msgstr[1] "{n} entries deleted"
+
+#: bsmb.py:479
+msgid "Nettoyage annulé"
+msgstr "Cleanup cancelled"
+
+#: bsmb.py:488
+msgid "RÉINITIALISATION"
+msgstr "RESET"
+
+#: bsmb.py:490
+msgid "Cette action va :"
+msgstr "This will:"
+
+#: bsmb.py:491
+msgid "Supprimer l'historique des posts traités"
+msgstr "Delete the history of processed posts"
+
+#: bsmb.py:492
+msgid "Supprimer l'historique des médias téléchargés"
+msgstr "Delete the history of downloaded media"
+
+#: bsmb.py:496
+msgid "{ne_pas} supprimer les fichiers déjà téléchargés"
+msgstr "{ne_pas} delete files already downloaded"
+
+#: bsmb.py:496
+msgid "NE PAS"
+msgstr "NOT"
+
+#: bsmb.py:502
+msgid "Confirmer ? (tapez 'RESET'):"
+msgstr "Confirm? (type 'RESET'):"
+
+#: bsmb.py:507
+msgid "Base de données réinitialisée"
+msgstr "Database reset"
+
+#: bsmb.py:509
+msgid "Aucune base de données à réinitialiser"
+msgstr "No database to reset"
+
+#: bsmb.py:511
+msgid "Réinitialisation annulée"
+msgstr "Reset cancelled"
+
+#: bsmb.py:523
+msgid "PARAMÈTRES"
+msgstr "SETTINGS"
+
+#: bsmb.py:529
+msgid "connecté"
+msgstr "connected"
+
+#: bsmb.py:534
+msgid "1. Identifiants Bluesky"
+msgstr "1. Bluesky credentials"
+
+#: bsmb.py:535
+msgid "2. Dossier téléchargements"
+msgstr "2. Download folder"
+
+#: bsmb.py:536
+msgid "3. Workers parallèles"
+msgstr "3. Parallel workers"
+
+#: bsmb.py:539 bsmb.py:541
+msgid "4. Mode avancé"
+msgstr "4. Advanced mode"
+
+#: bsmb.py:539
+msgid "activé"
+msgstr "enabled"
+
+#: bsmb.py:541
+msgid "désactivé"
+msgstr "disabled"
+
+#: bsmb.py:542
+msgid "L. Langue"
+msgstr "L. Language"
+
+#: bsmb.py:546
+msgid "OPTIONS AVANCÉES"
+msgstr "ADVANCED OPTIONS"
+
+#: bsmb.py:548
+msgid "5. Fichier token (fallback)"
+msgstr "5. Token file (fallback)"
+
+#: bsmb.py:549
+msgid "6. Fichier URLs"
+msgstr "6. URLs file"
+
+#: bsmb.py:550
+msgid "Supprimer les logs"
+msgstr "Delete the logs"
+
+#: bsmb.py:551
+msgid "Mode dev - Depuis urls.txt, sans token"
+msgstr "Dev mode - From urls.txt, no token"
+
+#: bsmb.py:552
+msgid "{force_dl} - Re-télécharger tous les médias"
+msgstr "{force_dl} - Download all media again"
+
+#: bsmb.py:559
+msgid "Entrez le numéro pour modifier, ou 0 pour revenir"
+msgstr "Enter the number to edit, or 0 to go back"
+
+#: bsmb.py:578
+msgid "Dossier de téléchargements"
+msgstr "Downloads folder"
+
+#: bsmb.py:587
+msgid "Mode avancé activé"
+msgstr "Advanced mode enabled"
+
+#: bsmb.py:589
+msgid "Mode avancé désactivé"
+msgstr "Advanced mode disabled"
+
+#: bsmb.py:592
+msgid "Fichier token"
+msgstr "Token file"
+
+#: bsmb.py:594
+msgid "Fichier URLs"
+msgstr "URLs file"
+
+#: bsmb.py:601
+msgid "{n} fichier log supprimé"
+msgid_plural "{n} fichiers log supprimés"
+msgstr[0] "{n} log file deleted"
+msgstr[1] "{n} log files deleted"
+
+#: bsmb.py:619
+msgid "IDENTIFIANTS BLUESKY"
+msgstr "BLUESKY CREDENTIALS"
+
+#: bsmb.py:625
+msgid "non configuré"
+msgstr "not set"
+
+#: bsmb.py:626
+msgid "Handle actuel"
+msgstr "Current handle"
+
+#: bsmb.py:627
+msgid "App Password"
+msgstr "App Password"
+
+#: bsmb.py:627
+msgid "configuré"
+msgstr "set"
+
+#: bsmb.py:631
+msgid "Pour créer un App Password :"
+msgstr "To create an App Password:"
+
+#: bsmb.py:633
+msgid "Allez sur {chemin}"
+msgstr "Go to {chemin}"
+
+#: bsmb.py:635
+msgid "Cliquez sur {bouton}"
+msgstr "Click {bouton}"
+
+#: bsmb.py:636
+msgid "Nommez-le (ex: 'BSMB') et copiez le mot de passe généré"
+msgstr "Name it (e.g. 'BSMB') and copy the generated password"
+
+#: bsmb.py:639
+msgid "L'App Password sera stocké dans le trousseau du système (keyring)"
+msgstr "The App Password will be stored in the system keyring"
+
+#: bsmb.py:641
+msgid "L'App Password sera stocké dans config.json (fichier local, hors Git)"
+msgstr "The App Password will be stored in config.json (local file, kept out of Git)"
+
+#: bsmb.py:643
+msgid "Conseil : créez un App Password dédié à BSMB et révoquez-le en cas de doute."
+msgstr "Tip: create an App Password dedicated to BSMB and revoke it if in doubt."
+
+#: bsmb.py:649
+msgid "Handle Bluesky (ENTRÉE pour garder):"
+msgstr "Bluesky handle (ENTER to keep):"
+
+#: bsmb.py:651 bsmb.py:659
+msgid "Configuration annulée"
+msgstr "Configuration cancelled"
+
+#: bsmb.py:657
+msgid "App Password (xxxx-xxxx-xxxx-xxxx):"
+msgstr "App Password (xxxx-xxxx-xxxx-xxxx):"
+
+#: bsmb.py:665
+msgid "Test de connexion..."
+msgstr "Testing the connection..."
+
+#: bsmb.py:671
+msgid "Connexion réussie !"
+msgstr "Connection successful!"
+
+#: bsmb.py:679
+msgid "AVERTISSEMENT : l'App Password est stocké en clair dans config.json."
+msgstr "WARNING: the App Password is stored in plain text in config.json."
+
+#: bsmb.py:680
+msgid "Installez keyring (pip install keyring) pour le placer dans le trousseau du système."
+msgstr "Install keyring (pip install keyring) to store it in the system keyring instead."
+
+#: bsmb.py:687
+msgid "Identifiants sauvegardés (trousseau du système)"
+msgstr "Credentials saved (system keyring)"
+
+#: bsmb.py:689
+msgid "Identifiants sauvegardés"
+msgstr "Credentials saved"
+
+#: bsmb.py:692
+msgid "Échec : {erreur}"
+msgstr "Failed: {erreur}"
+
+#: bsmb.py:693
+msgid "Identifiants non sauvegardés"
+msgstr "Credentials not saved"
+
+#: bsmb.py:701 bsmb.py:731 bsmb.py:756
+msgid "Actuel:"
+msgstr "Current:"
+
+#: bsmb.py:702
+msgid "Nouveau {label} (ENTRÉE pour garder):"
+msgstr "New {label} (ENTER to keep):"
+
+#: bsmb.py:710
+msgid "Sauvegardé"
+msgstr "Saved"
+
+#: bsmb.py:712 bsmb.py:740 bsmb.py:774
+msgid "Valeur inchangée"
+msgstr "Value unchanged"
+
+#: bsmb.py:725
+msgid "Automatique ({langue})"
+msgstr "Automatic ({langue})"
+
+#: bsmb.py:735
+msgid "Automatique (langue du système)"
+msgstr "Automatic (system language)"
+
+#: bsmb.py:737
+msgid "Votre choix (ENTRÉE pour garder):"
+msgstr "Your choice (ENTER to keep):"
+
+#: bsmb.py:745
+msgid "Langue mise à jour : {langue}"
+msgstr "Language updated: {langue}"
+
+#: bsmb.py:756
+msgid "{n} workers"
+msgstr "{n} workers"
+
+#: bsmb.py:757
+msgid "Plage recommandée : 1 (séquentiel) à 8 (rapide)"
+msgstr "Recommended range: 1 (sequential) to 8 (fast)"
+
+#: bsmb.py:758
+msgid "Nombre de workers (ENTRÉE pour garder):"
+msgstr "Number of workers (ENTER to keep):"
+
+#: bsmb.py:767
+msgid "Limité à {n} workers maximum"
+msgstr "Limited to {n} workers at most"
+
+#: bsmb.py:770
+msgid "Workers mis à jour : {n}"
+msgstr "Workers updated: {n}"
+
+#: bsmb.py:772
+msgid "Valeur invalide (nombre entier attendu)"
+msgstr "Invalid value (whole number expected)"
+
+#: bsmb.py:786 bsmb.py:798
+msgid "TÉLÉCHARGER"
+msgstr "DOWNLOAD"
+
+#: bsmb.py:790
+msgid "Connectez d'abord votre compte :"
+msgstr "Connect your account first:"
+
+#: bsmb.py:791
+msgid "Menu principal > 1. Mon compte"
+msgstr "Main menu > 1. My account"
+
+#: bsmb.py:802
+msgid "Synchroniser les bookmarks maintenant ?"
+msgstr "Synchronize the bookmarks now?"
+
+#: bsmb.py:809
+msgid "Tout est à jour — aucun nouveau bookmark à télécharger"
+msgstr "Everything is up to date — no new bookmark to download"
+
+#: bsmb.py:821
+msgid "Fichier {fichier} introuvable"
+msgstr "File {fichier} not found"
+
+#: bsmb.py:827 bsmb.py:887
+msgid "Aucune URL à traiter"
+msgstr "No URL to process"
+
+#: bsmb.py:836
+msgid "Mode FORCE : {n} posts seront tous traités"
+msgstr "FORCE mode: all {n} posts will be processed"
+
+#: bsmb.py:845
+msgid "{total} URLs au total, {new} nouvelles"
+msgstr "{total} URLs in total, {new} new"
+
+#: bsmb.py:852 core/cli.py:186
+msgid "Tous les posts sont déjà traités"
+msgstr "All posts are already processed"
+
+#: bsmb.py:857 core/cli.py:189
+msgid "Traiter {n} posts ?"
+msgstr "Process {n} posts?"
+
+#: bsmb.py:864
+msgid "Lancement du téléchargement..."
+msgstr "Starting the download..."
+
+#: bsmb.py:880
+msgid "Aucune URL disponible dans urls.txt"
+msgstr "No URL available in urls.txt"
+
+#: bsmb.py:891
+msgid "MODE DÉVELOPPEMENT"
+msgstr "DEVELOPMENT MODE"
+
+#: bsmb.py:893
+msgid "Traitement direct depuis urls.txt"
+msgstr "Processing directly from urls.txt"
+
+#: bsmb.py:894
+msgid "non vérifié"
+msgstr "not checked"
+
+#: bsmb.py:895
+msgid "Base de données"
+msgstr "Database"
+
+#: bsmb.py:895
+msgid "non mise à jour"
+msgstr "not updated"
+
+#: bsmb.py:896
+msgid "Posts à traiter"
+msgstr "Posts to process"
+
+#: bsmb.py:901
+msgid "Traiter {n} posts en mode dev ?"
+msgstr "Process {n} posts in dev mode?"
+
+#: bsmb.py:913
+msgid "Ouvrir le dossier de téléchargements ?"
+msgstr "Open the downloads folder?"
+
+#: bsmb.py:958
+msgid "Entrée interrompue — fin du programme"
+msgstr "Input interrupted — exiting"
+
+#: bsmb.py:973
+msgid "Au revoir !"
+msgstr "Goodbye!"
+
+#: core/cli.py:68
+msgid "BSMB - Bsky Save My Bookmarks. Sans sous-commande : menu interactif."
+msgstr "BSMB - Bsky Save My Bookmarks. Without a subcommand: interactive menu."
+
+#: core/cli.py:72 core/cli.py:88
+msgid "mode non interactif : accepte les valeurs par défaut"
+msgstr "non-interactive mode: accept the default answers"
+
+#: core/cli.py:78 core/cli.py:95
+msgid "langue de l'interface (prioritaire sur la configuration)"
+msgstr "interface language (takes precedence over the configuration)"
+
+#: core/cli.py:99
+msgid "synchronise les bookmarks en ligne"
+msgstr "synchronize the online bookmarks"
+
+#: core/cli.py:100
+msgid "télécharge les posts pas encore traités"
+msgstr "download the posts not processed yet"
+
+#: core/cli.py:101
+msgid "retraite tous les posts de urls.txt"
+msgstr "reprocess every post in urls.txt"
+
+#: core/cli.py:102
+msgid "synchronise puis télécharge (pour la planification)"
+msgstr "synchronize, then download (for scheduled runs)"
+
+#: core/cli.py:103
+msgid "affiche l'état du compte et les compteurs"
+msgstr "show the account state and the counters"
+
+#: core/cli.py:104
+msgid "sortie JSON"
+msgstr "JSON output"
+
+#: core/cli.py:128
+msgid "Erreur réseau pendant l'authentification : {erreur}"
+msgstr "Network error during authentication: {erreur}"
+
+#: core/cli.py:131
+msgid "Authentification impossible : {erreur}"
+msgstr "Authentication failed: {erreur}"
+
+#: core/cli.py:134
+msgid "Aucun moyen d'authentification : configurez un compte (menu > Mon compte)"
+msgstr "No way to authenticate: configure an account (menu > My account)"
+
+#: core/cli.py:154
+msgid "Erreur réseau : {erreur}"
+msgstr "Network error: {erreur}"
+
+#: core/cli.py:171
+msgid "Aucune URL à traiter (lancez d'abord « sync »)"
+msgstr "No URL to process (run 'sync' first)"
+
+#: core/cli.py:240
+msgid "Dernière synchronisation"
+msgstr "Last synchronization"
+
+#: core/cli.py:240
+msgid "jamais"
+msgstr "never"
+
+#: core/cli.py:248
+msgid "Images / vidéos / textes"
+msgstr "Images / videos / texts"
+
+#: core/cli.py:274
+msgid "Erreur interne : {erreur}"
+msgstr "Internal error: {erreur}"
+
+#: core/colors.py:121 core/colors.py:135
+msgid "[OK]"
+msgstr "[OK]"
+
+#: core/colors.py:124 core/colors.py:138
+msgid "[ERREUR]"
+msgstr "[ERROR]"
+
+#: core/colors.py:127 core/colors.py:141
+msgid "[ATTENTION]"
+msgstr "[WARNING]"
+
+#: core/colors.py:130
+msgid "[INFO]"
+msgstr "[INFO]"
+
+#: core/orchestrator.py:121
+msgid "Erreur inattendue : {erreur}"
+msgstr "Unexpected error: {erreur}"
+
+#: core/orchestrator.py:127
+msgid "Aucun média trouvé"
+msgstr "No media found"
+
+#: core/orchestrator.py:160
+msgid "bloqué"
+msgstr "blocked"
+
+#: core/orchestrator.py:161
+msgid "détaché"
+msgstr "detached"
+
+#: core/orchestrator.py:202
+msgid "{n} image détectée"
+msgid_plural "{n} images détectées"
+msgstr[0] "{n} image detected"
+msgstr[1] "{n} images detected"
+
+#: core/orchestrator.py:215
+msgid "Vidéo détectée"
+msgstr "Video detected"
+
+#: core/orchestrator.py:231
+msgid "Lien externe détecté"
+msgstr "External link detected"
+
+#: core/orchestrator.py:243
+msgid "Citation : carte de lien non archivée (texte seul)"
+msgstr "Quote: link card not archived (text only)"
+
+#: core/orchestrator.py:248
+msgid "Texte seul détecté"
+msgstr "Text-only post detected"
+
+#: core/orchestrator.py:248
+msgid "Texte du post détecté"
+msgstr "Post text detected"
+
+#: core/orchestrator.py:338
+msgid "Citation non résolue"
+msgstr "Quote not resolved"
+
+#: core/orchestrator.py:343
+msgid "Le record cité n'est pas un post ({collection}) : ignoré"
+msgstr "The quoted record is not a post ({collection}): ignored"
+
+#: core/orchestrator.py:355
+msgid "Post cité {etat}"
+msgstr "Quoted post {etat}"
+
+#: core/orchestrator.py:361
+msgid "Post cité :"
+msgstr "Quoted post:"
+
+#: core/orchestrator.py:365
+msgid "Post cité supprimé"
+msgstr "Quoted post deleted"
+
+#: core/orchestrator.py:371
+msgid "Post cité inaccessible"
+msgstr "Quoted post unreachable"
+
+#: core/orchestrator.py:375
+msgid "Contenu du post cité non reconnu : ignoré"
+msgstr "Quoted post content not recognized: ignored"
+
+#: core/orchestrator.py:459
+msgid "Type détecté :"
+msgstr "Type detected:"
+
+#: core/orchestrator.py:470
+msgid "Erreur serveur (500)"
+msgstr "Server error (500)"
+
+#: core/orchestrator.py:479 core/orchestrator.py:692
+msgid "Limite de débit (429)"
+msgstr "Rate limit (429)"
+
+#: core/orchestrator.py:488
+msgid "Post supprimé ou inaccessible (400)"
+msgstr "Post deleted or unreachable (400)"
+
+#: core/orchestrator.py:496
+msgid "Type de post non reconnu"
+msgstr "Post type not recognized"
+
+#: core/orchestrator.py:498
+msgid "Debug sauvegardé : {fichier}"
+msgstr "Debug saved: {fichier}"
+
+#: core/orchestrator.py:502
+msgid "Texte"
+msgstr "Text"
+
+#: core/orchestrator.py:523
+msgid "Citation détectée, résolution du post cité..."
+msgstr "Quote detected, resolving the quoted post..."
+
+#: core/orchestrator.py:579
+msgid "Post cité supprimé ou inaccessible"
+msgstr "Quoted post deleted or unreachable"
+
+#: core/orchestrator.py:604
+msgid "{n} image"
+msgid_plural "{n} images"
+msgstr[0] "{n} image"
+msgstr[1] "{n} images"
+
+#: core/orchestrator.py:606
+msgid "{n} vidéo"
+msgid_plural "{n} vidéos"
+msgstr[0] "{n} video"
+msgstr[1] "{n} videos"
+
+#: core/orchestrator.py:608
+msgid "{n} texte"
+msgid_plural "{n} textes"
+msgstr[0] "{n} text"
+msgstr[1] "{n} texts"
+
+#: core/orchestrator.py:615
+msgid "post supprimé (400)"
+msgstr "post deleted (400)"
+
+#: core/orchestrator.py:618
+msgid "erreur serveur (500)"
+msgstr "server error (500)"
+
+#: core/orchestrator.py:621
+msgid "limite de débit (429)"
+msgstr "rate limit (429)"
+
+#: core/orchestrator.py:624
+msgid "type inconnu"
+msgstr "unknown type"
+
+#: core/orchestrator.py:627
+msgid "échec"
+msgstr "failed"
+
+#: core/orchestrator.py:640
+msgid "{n} img"
+msgstr "{n} img"
+
+#: core/orchestrator.py:642
+msgid "{n} vid"
+msgstr "{n} vid"
+
+#: core/orchestrator.py:644
+msgid "{n} txt"
+msgstr "{n} txt"
+
+#: core/orchestrator.py:647
+msgid "Progression :"
+msgstr "Progress:"
+
+#: core/orchestrator.py:657
+msgid "RAPPORT DE TÉLÉCHARGEMENT"
+msgstr "DOWNLOAD REPORT"
+
+#: core/orchestrator.py:662
+msgid "RÉSULTATS"
+msgstr "RESULTS"
+
+#: core/orchestrator.py:668
+msgid "Fiches JSON"
+msgstr "JSON sidecars"
+
+#: core/orchestrator.py:685
+msgid "PROBLÈMES"
+msgstr "PROBLEMS"
+
+#: core/orchestrator.py:688
+msgid "Posts supprimés (400)"
+msgstr "Deleted posts (400)"
+
+#: core/orchestrator.py:690
+msgid "Erreurs serveur (500)"
+msgstr "Server errors (500)"
+
+#: core/orchestrator.py:694
+msgid "Citations non archivées"
+msgstr "Quotes not archived"
+
+#: core/orchestrator.py:696
+msgid "Types inconnus"
+msgstr "Unknown types"
+
+#: core/orchestrator.py:698
+msgid "Échecs"
+msgstr "Failures"
+
+#: core/orchestrator.py:702
+msgid "MÉTRIQUES"
+msgstr "METRICS"
+
+#: core/orchestrator.py:704
+msgid "Durée totale"
+msgstr "Total duration"
+
+#: core/orchestrator.py:705
+msgid "Workers parallèles"
+msgstr "Parallel workers"
+
+#: core/orchestrator.py:706
+msgid "Poids total du dossier"
+msgstr "Total folder size"
+
+#: core/orchestrator.py:710
+msgid "Mode dev : Base de données non mise à jour"
+msgstr "Dev mode: database not updated"
+
+#: core/orchestrator.py:718
+msgid "FICHIERS GÉNÉRÉS"
+msgstr "GENERATED FILES"
+
+#: core/orchestrator.py:723
+msgid "Log détaillé : {fichier}"
+msgstr "Detailed log: {fichier}"
+
+#: core/orchestrator.py:733
+msgid "posts supprimés"
+msgstr "deleted posts"
+
+#: core/orchestrator.py:734
+msgid "citations non archivées"
+msgstr "quotes not archived"
+
+#: core/orchestrator.py:735
+msgid "erreurs 500"
+msgstr "500 errors"
+
+#: core/orchestrator.py:736
+msgid "limites de débit (429)"
+msgstr "rate limits (429)"
+
+#: core/orchestrator.py:737
+msgid "types inconnus"
+msgstr "unknown types"
+
+#: core/orchestrator.py:738
+msgid "échecs"
+msgstr "failures"
+
+#: core/orchestrator.py:835
+msgid "=== Début du téléchargement : {n} posts à traiter ({workers} workers) ==="
+msgstr "=== Download started: {n} posts to process ({workers} workers) ==="
+
+#: core/orchestrator.py:848
+msgid "{n} post à traiter"
+msgid_plural "{n} posts à traiter"
+msgstr[0] "{n} post to process"
+msgstr[1] "{n} posts to process"
+
+#: core/orchestrator.py:849
+msgid "({workers} workers parallèles)"
+msgstr "({workers} parallel workers)"
+
+#: core/orchestrator.py:891
+msgid "erreur interne ({url}), détail dans le log"
+msgstr "internal error ({url}), details in the log"
+
+#: core/ui.py:36
+msgid "Appuyez sur Entrée..."
+msgstr "Press Enter..."
+
+#: core/ui.py:46
+msgid "[O/n]"
+msgstr "[Y/n]"
+
+#: core/ui.py:46
+msgid "[o/N]"
+msgstr "[y/N]"
+
+#: downloaders/__init__.py:44
+msgid "[DL] Téléchargé ->"
+msgstr "[DL] Downloaded ->"
+
+#: downloaders/__init__.py:45
+msgid "[OK] Fichier enregistré :"
+msgstr "[OK] File saved:"
+
+#: downloaders/__init__.py:46
+msgid "[TXT]"
+msgstr "[TXT]"
+
+#: downloaders/__init__.py:47
+msgid "[SUB] Sous-titres ->"
+msgstr "[SUB] Subtitles ->"
+
+#: downloaders/__init__.py:48
+msgid "[JSON]"
+msgstr "[JSON]"
+
+#: downloaders/__init__.py:59
+msgid "[SKIP] {cid} déjà présent : {filename}"
+msgstr "[SKIP] {cid} already present: {filename}"

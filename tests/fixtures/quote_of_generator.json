@@ -1,0 +1,19 @@
+{
+  "uri": "at://did:plc:test1000000000000000000000/app.bsky.feed.post/3kquote0003",
+  "cid": "bafyreitest000000000000000000000000000000000000000000000000",
+  "value": {
+    "$type": "app.bsky.feed.post",
+    "text": "Un fil à suivre",
+    "createdAt": "2026-02-10T09:30:00.000Z",
+    "langs": [
+      "fr"
+    ],
+    "embed": {
+      "$type": "app.bsky.embed.record",
+      "record": {
+        "uri": "at://did:plc:test3000000000000000000000/app.bsky.feed.generator/aaaabbbbcccc",
+        "cid": "bafyreitest000000000000000000000000000000000000000000000000"
+      }
+    }
+  }
+}

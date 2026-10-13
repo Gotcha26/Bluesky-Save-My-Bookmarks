@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurer Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Installer les dépendances
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Lancer les tests avec couverture
+        run: >
+          python -m pytest tests/ -v --tb=short
+          --cov=core --cov=api --cov=downloaders
+          --cov-report=term-missing --cov-fail-under=70
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurer Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installer ruff
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Vérifier la syntaxe de tous les fichiers Python
+        run: python -m compileall -q -x '[/\\]\.git[/\\]' . && echo "Syntaxe OK"
+
+      - name: Analyse statique (ruff check)
+        run: ruff check .
+
+      - name: Vérifier le formatage (ruff format)
+        run: ruff format --check .

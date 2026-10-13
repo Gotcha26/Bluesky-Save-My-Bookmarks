@@ -1,0 +1,42 @@
+{
+  "uri": "at://did:plc:test000000000000000000000/app.bsky.feed.post/3ktest000030",
+  "cid": "bafyreitest000000000000000000000000000000000000000000000030",
+  "value": {
+    "text": "Citation avec une image",
+    "$type": "app.bsky.feed.post",
+    "embed": {
+      "$type": "app.bsky.embed.recordWithMedia",
+      "media": {
+        "$type": "app.bsky.embed.images",
+        "images": [
+          {
+            "alt": "Une image jointe",
+            "image": {
+              "$type": "blob",
+              "ref": {
+                "$link": "bafkreitestimage0000000000000000000000000000000000000003"
+              },
+              "mimeType": "image/jpeg",
+              "size": 51200
+            },
+            "aspectRatio": {
+              "width": 800,
+              "height": 600
+            }
+          }
+        ]
+      },
+      "record": {
+        "$type": "app.bsky.embed.record",
+        "record": {
+          "cid": "bafyreitest000000000000000000000000000000000000000000000031",
+          "uri": "at://did:plc:test111111111111111111111/app.bsky.feed.post/3ktest000031"
+        }
+      }
+    },
+    "langs": [
+      "fr"
+    ],
+    "createdAt": "2026-01-15T12:00:00.000Z"
+  }
+}

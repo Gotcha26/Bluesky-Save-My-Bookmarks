@@ -1,0 +1,97 @@
+{
+  "uri": "at://did:plc:test000000000000000000000/app.bsky.feed.post/3ktest000020",
+  "cid": "bafyreitest000000000000000000000000000000000000000000000020",
+  "value": {
+    "$type": "app.bsky.feed.post",
+    "text": "Un guide en cinq pages",
+    "createdAt": "2026-09-14T18:39:05.796Z",
+    "langs": [
+      "fr"
+    ],
+    "embed": {
+      "$type": "app.bsky.embed.gallery",
+      "items": [
+        {
+          "$type": "app.bsky.embed.gallery#image",
+          "alt": "Page 1 : introduction",
+          "aspectRatio": {
+            "width": 1384,
+            "height": 2046
+          },
+          "image": {
+            "$type": "blob",
+            "ref": {
+              "$link": "bafkreitestgallery00000000000000000000000000000000000000001"
+            },
+            "mimeType": "image/jpeg",
+            "size": 245760
+          }
+        },
+        {
+          "$type": "app.bsky.embed.gallery#image",
+          "alt": "Page 2 : matériaux",
+          "aspectRatio": {
+            "width": 1384,
+            "height": 2046
+          },
+          "image": {
+            "$type": "blob",
+            "ref": {
+              "$link": "bafkreitestgallery00000000000000000000000000000000000000002"
+            },
+            "mimeType": "image/jpeg",
+            "size": 245760
+          }
+        },
+        {
+          "$type": "app.bsky.embed.gallery#image",
+          "alt": "Page 3 : épaisseur",
+          "aspectRatio": {
+            "width": 1384,
+            "height": 2046
+          },
+          "image": {
+            "$type": "blob",
+            "ref": {
+              "$link": "bafkreitestgallery00000000000000000000000000000000000000003"
+            },
+            "mimeType": "image/jpeg",
+            "size": 245760
+          }
+        },
+        {
+          "$type": "app.bsky.embed.gallery#image",
+          "alt": "",
+          "aspectRatio": {
+            "width": 1384,
+            "height": 2046
+          },
+          "image": {
+            "$type": "blob",
+            "ref": {
+              "$link": "bafkreitestgallery00000000000000000000000000000000000000004"
+            },
+            "mimeType": "image/jpeg",
+            "size": 245760
+          }
+        },
+        {
+          "$type": "app.bsky.embed.gallery#image",
+          "alt": "Page 5 : conclusion",
+          "aspectRatio": {
+            "width": 1384,
+            "height": 2046
+          },
+          "image": {
+            "$type": "blob",
+            "ref": {
+              "$link": "bafkreitestgallery00000000000000000000000000000000000000005"
+            },
+            "mimeType": "image/jpeg",
+            "size": 245760
+          }
+        }
+      ]
+    }
+  }
+}
