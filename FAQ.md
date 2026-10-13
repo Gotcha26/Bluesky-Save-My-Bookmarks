@@ -71,6 +71,7 @@
    - Erreur temporaire de l'API Bluesky
    - Trackés pour éviter les tentatives répétées
    - Listés dans `logs/error_500_*.txt`
+   - Une limite de débit (429) persistante donne le statut `error_429` (`logs/rate_limited_*.txt`), retenté de la même façon
 
 5. **Types de médias non reconnus**
    - Format non géré (rare)
