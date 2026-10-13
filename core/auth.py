@@ -4,6 +4,8 @@ Authentification Bluesky via createSession
 Obtient un token Bearer automatiquement à partir du handle + App Password.
 """
 
+from urllib.parse import unquote, urlparse
+
 import requests
 
 from core import http as bsmb_http
@@ -14,6 +16,10 @@ ENDPOINT = "https://bsky.social/xrpc/com.atproto.server.createSession"
 
 
 DEFAULT_PDS_URL = "https://bsky.social"
+
+# Résolution handle -> DID -> PDS (comptes hébergés hors de bsky.social)
+RESOLVE_HANDLE_URL = "https://public.api.bsky.app/xrpc/com.atproto.identity.resolveHandle"
+PLC_DIRECTORY = "https://plc.directory"
 
 
 class AuthError(Exception):
@@ -41,6 +47,76 @@ def _extract_pds_url(did_doc):
     return DEFAULT_PDS_URL
 
 
+def _url_document_did(did):
+    """URL du document DID (did:plc via plc.directory, did:web via HTTPS), ou None."""
+    if did.startswith("did:plc:"):
+        return f"{PLC_DIRECTORY}/{did}"
+    if did.startswith("did:web:"):
+        segments = did[len("did:web:") :].split(":")
+        hote = unquote(segments[0])
+        if not hote:
+            return None
+        if len(segments) > 1:
+            return f"https://{hote}/{'/'.join(unquote(s) for s in segments[1:])}/did.json"
+        return f"https://{hote}/.well-known/did.json"
+    return None
+
+
+def _resolve_pds(identifier, session=None):
+    """PDS du compte (sans barre finale) d'après son handle ou son DID, ou None en cas d'échec."""
+    http = session or bsmb_http.get_session()
+    identifier = (identifier or "").strip().lstrip("@")
+    if not identifier or "@" in identifier:
+        return None  # adresse e-mail : rien à résoudre
+    try:
+        if identifier.startswith("did:"):
+            did = identifier
+        else:
+            resp = http.get(RESOLVE_HANDLE_URL, params={"handle": identifier}, timeout=10)
+            if resp.status_code != 200:
+                return None
+            did = (resp.json() or {}).get("did")
+        if not isinstance(did, str):
+            return None
+        url_doc = _url_document_did(did)
+        if url_doc is None:
+            return None
+        resp = http.get(url_doc, timeout=10)
+        if resp.status_code != 200:
+            return None
+        doc = resp.json()
+    except (requests.exceptions.RequestException, ValueError, AttributeError, TypeError):
+        return None
+    endpoint = None
+    if isinstance(doc, dict):
+        for service in doc.get("service") or []:
+            if isinstance(service, dict) and service.get("id") in ("#atproto_pds", f"{did}#atproto_pds"):
+                endpoint = service.get("serviceEndpoint")
+                break
+    if not isinstance(endpoint, str) or not endpoint.startswith("https://"):
+        return None
+    return endpoint.rstrip("/")
+
+
+def resolve_pds(handle, session=None):
+    """
+    PDS d'un compte avant createSession : `com.atproto.identity.resolveHandle` sur
+    public.api.bsky.app donne le DID, puis le document DID (`did:plc:` sur plc.directory,
+    `did:web:` sur https://<domaine>/.well-known/did.json) donne le service
+    `#atproto_pds`. Permet la connexion des comptes hébergés hors du réseau Bluesky
+    (eurosky.social, PDS auto-hébergé).
+
+    Args:
+        handle: handle (`@` initial accepté) ou DID ; une adresse e-mail n'est pas résolue
+        session: session HTTP (défaut : session partagée de core.http)
+
+    Returns:
+        str: URL du PDS sans barre finale ; https://bsky.social si une étape échoue
+            (réseau, 404, document sans PDS).
+    """
+    return _resolve_pds(handle, session) or DEFAULT_PDS_URL
+
+
 def create_session(handle, app_password, session=None):
     """
     Authentification via com.atproto.server.createSession.
@@ -50,20 +126,25 @@ def create_session(handle, app_password, session=None):
         app_password: App Password (format xxxx-xxxx-xxxx-xxxx)
         session: session HTTP (défaut : session partagée de core.http)
 
+    createSession est appelé sur le PDS du compte (resolve_pds), sinon sur bsky.social.
+
     Returns:
         dict: {
             "token": str,        # Token complet "Bearer xxx" prêt à l'emploi
             "refresh_jwt": str|None,
             "did": str|None,
-            "pds_url": str,      # PDS réel du compte (didDoc), sinon bsky.social
+            "pds_url": str,      # PDS résolu ; à défaut celui du didDoc, sinon bsky.social
         }
 
     Raises:
         AuthError: En cas d'echec d'authentification
     """
+    pds = _resolve_pds(handle, session)
+    endpoint = f"{pds}/xrpc/com.atproto.server.createSession" if pds else ENDPOINT
+    hote = urlparse(endpoint).netloc
     try:
         resp = (session or bsmb_http.get_session()).post(
-            ENDPOINT,
+            endpoint,
             json={"identifier": handle, "password": app_password},
             timeout=15,
         )
@@ -85,13 +166,13 @@ def create_session(handle, app_password, session=None):
             "token": f"Bearer {access_jwt}",
             "refresh_jwt": data.get("refreshJwt"),
             "did": data.get("did"),
-            "pds_url": _extract_pds_url(data.get("didDoc")),
+            "pds_url": pds or _extract_pds_url(data.get("didDoc")),
         }
 
     except requests.exceptions.ConnectionError as e:
-        raise NetworkError("Impossible de se connecter à bsky.social. Vérifiez votre connexion.") from e
+        raise NetworkError(f"Impossible de se connecter à {hote}. Vérifiez votre connexion.") from e
     except requests.exceptions.Timeout as e:
-        raise NetworkError("Timeout lors de la connexion à bsky.social.") from e
+        raise NetworkError(f"Timeout lors de la connexion à {hote}.") from e
     except requests.exceptions.HTTPError as e:
         status = e.response.status_code
         if status >= 500:

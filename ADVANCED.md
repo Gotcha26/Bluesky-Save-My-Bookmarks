@@ -26,6 +26,8 @@ Une fois activé, des options supplémentaires apparaissent dans les Paramètres
 
 C'est la méthode par défaut. BSMB appelle `com.atproto.server.createSession` avec votre handle et App Password pour obtenir un token Bearer automatiquement à chaque lancement.
 
+Avant la connexion, BSMB cherche le serveur (PDS) qui héberge votre compte : `com.atproto.identity.resolveHandle` (sur `public.api.bsky.app`) donne votre DID, puis le document DID (`plc.directory` pour un `did:plc:`, `https://<domaine>/.well-known/did.json` pour un `did:web:`) donne l'adresse du PDS (service `#atproto_pds`). `createSession` est envoyé à ce PDS : les comptes hébergés hors du réseau Bluesky (eurosky.social, PDS auto-hébergé) peuvent donc se connecter. Si une étape échoue (réseau, 404) ou si l'identifiant est une adresse e-mail, BSMB se connecte à `https://bsky.social`. Le PDS retenu est enregistré dans `config.json` (`pds_url`).
+
 **Avantages :**
 - Token renouvelé automatiquement
 - Pas d'expiration tant que l'App Password existe
