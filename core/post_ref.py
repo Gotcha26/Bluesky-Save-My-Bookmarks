@@ -6,7 +6,6 @@ Le handle n'est qu'un alias d'affichage, susceptible de changer ou de valoir
 `handle.invalid` quand l'AppView ne peut pas le vérifier.
 """
 from dataclasses import dataclass
-from typing import Optional
 from urllib.parse import urlparse
 
 from core import http as bsmb_http

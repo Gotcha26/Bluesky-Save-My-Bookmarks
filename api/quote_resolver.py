@@ -7,7 +7,6 @@ cite un autre record, qui peut être un post, mais aussi un feed generator, une
 liste, un starter pack… ou un post supprimé, bloqué ou détaché.
 """
 from dataclasses import dataclass
-from typing import Optional
 from urllib.parse import urlparse
 
 from core import http as bsmb_http
