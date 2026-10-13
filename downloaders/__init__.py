@@ -18,6 +18,7 @@ class DownloadResult:
     media_type: str  # "image", "video" ou "text"
     size: int        # taille en octets
     cid: str | None = None
+    skipped: bool = False  # image déjà présente (même cid) : rien n'a été écrit
 
 
 class DownloadError(Exception):
@@ -33,4 +34,10 @@ _MARQUEURS = {
 
 def lignes_console(results):
     """Lignes d'affichage historiques ([DL] / [OK] / [TXT]) pour des résultats."""
-    return [f"   {_MARQUEURS[r.media_type]}{r.filename}" for r in results]
+    lignes = []
+    for r in results:
+        if r.skipped:
+            lignes.append(f"   [SKIP] {r.cid} déjà présent : {r.filename}")
+        else:
+            lignes.append(f"   {_MARQUEURS[r.media_type]}{r.filename}")
+    return lignes

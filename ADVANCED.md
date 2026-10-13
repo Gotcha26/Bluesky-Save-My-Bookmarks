@@ -253,6 +253,8 @@ schtasks /Create /SC DAILY /TN BSMB /TR "\"C:\chemin\bsmb\.venv\Scripts\python.e
 | `min_postid_short` | Longueur min de l'ID du post dans un nom d'image tronqué | `4` |
 | `index_digits` | Nombre de chiffres de l'index d'image (`_1`, `_01`…) | `1` |
 | `max_logs` | Nombre max de logs `download_*.log` conservés | `5` |
+| `image_quality` | `"original"` : blob d'origine (`com.atproto.sync.getBlob`, repli automatique sur le CDN en cas d'échec) ; `"cdn"` : image `fullsize` du CDN Bluesky (recompressée) | `"original"` |
+| `skip_existing_cid` | Ne pas retélécharger une image dont le `cid` est déjà en base avec un fichier présent sur disque (ligne `[SKIP]`) | `true` |
 
 Les chemins relatifs (`token_file`, `urls_file`, `db_file`, `logs_dir`) sont résolus depuis le dossier d'installation de BSMB (celui de `bsmb.py`), pas depuis le dossier courant.
 
