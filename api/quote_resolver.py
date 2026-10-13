@@ -144,5 +144,6 @@ class QuoteResolver:
                 data = resp.json()
                 return data.get("handle")
         except Exception:
+            # Meilleur effort : un handle introuvable n'est pas bloquant (None renvoyé).
             pass
         return None

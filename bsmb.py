@@ -42,6 +42,7 @@ def get_folder_size(path):
             elif entry.is_dir():
                 total += get_folder_size(entry.path)
     except Exception:
+        # Meilleur effort : la taille affichée est approximative si un fichier disparaît.
         pass
     return total
 

@@ -65,13 +65,17 @@ def get_extension_for_url(url: str, http=None) -> str:
         h = http.head(url, allow_redirects=True, timeout=10)
         ext = guess_ext_from_ct(h.headers.get('content-type',''))
         if ext: return ext
-    except Exception: pass
+    except Exception:
+        # Meilleur effort : on essaie l'étape suivante, puis l'extension par défaut.
+        pass
     try:
         r = http.get(url, stream=True, timeout=10)
         ext = guess_ext_from_ct(r.headers.get('content-type',''))
         r.close()
         if ext: return ext
-    except Exception: pass
+    except Exception:
+        # Meilleur effort : on essaie l'étape suivante, puis l'extension par défaut.
+        pass
     return '.jpg'
 
 def build_filename(handle: str, date_str: str, post_id: str, index: int, ext: str,
@@ -259,6 +263,7 @@ def download_image(url, filepath, handle, post_id, post_url, post_text, created_
         exif_cmd += ["-overwrite_original", str(filepath)]
         subprocess.run(exif_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except Exception:
+        # Meilleur effort : exiftool absent ou en échec ne doit pas bloquer le téléchargement.
         pass
 
 def build_prefixed_filename(prefix: str, index: int, ext: str, max_len, index_digits) -> str:
