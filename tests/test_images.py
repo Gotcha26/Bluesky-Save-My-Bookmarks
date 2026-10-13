@@ -66,8 +66,8 @@ class TestDownloadImages:
         res = download_images(URL, tmp_path / "img", DEFAULT_CONFIG, session=session)
 
         assert [r.filename for r in res] == [
-            "user.bsky.social_20260102_3abc_1.jpg",
-            "user.bsky.social_20260102_3abc_2.png",
+            "user.bsky.social_20260102_3abc_01.jpg",
+            "user.bsky.social_20260102_3abc_02.png",
         ]
         assert all(isinstance(r, DownloadResult) and r.media_type == "image" for r in res)
         assert [r.size for r in res] == [4, 2]
@@ -79,7 +79,7 @@ class TestDownloadImages:
         session = _session(_thread(EMBED_2_IMAGES))
         res = download_images(URL, tmp_path, DEFAULT_CONFIG, session=session,
                               name_prefix="citant_20260210_3kq_quote")
-        assert [r.filename for r in res] == ["citant_20260210_3kq_quote_1.jpg", "citant_20260210_3kq_quote_2.png"]
+        assert [r.filename for r in res] == ["citant_20260210_3kq_quote_01.jpg", "citant_20260210_3kq_quote_02.png"]
         assert all((tmp_path / r.filename).exists() for r in res)
 
     def test_name_prefix_tronque_a_max_filename_len(self, tmp_path, exiftool):
@@ -154,7 +154,7 @@ class TestDownloadImages:
     def test_echec_partiel_garde_les_reussies(self, tmp_path, exiftool):
         session = _session(_thread(EMBED_2_IMAGES), echecs=(IMG1,))
         res = download_images(URL, tmp_path, DEFAULT_CONFIG, session=session)
-        assert [r.filename for r in res] == ["user.bsky.social_20260102_3abc_2.png"]
+        assert [r.filename for r in res] == ["user.bsky.social_20260102_3abc_02.png"]
 
     def test_exiftool_absent_ne_bloque_pas(self, tmp_path):
         session = _session(_thread(EMBED_2_IMAGES))

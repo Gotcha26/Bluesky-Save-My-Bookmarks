@@ -69,7 +69,7 @@ class TestGuessExtFromCT:
 class TestBuildFilename:
     def test_basic_filename(self):
         result = build_filename("user", "20260207", "abc123", 1, ".jpg")
-        assert result == "user_20260207_abc123_1.jpg"
+        assert result == "user_20260207_abc123_01.jpg"
         assert len(result) <= 64
 
     def test_respects_max_length(self):
@@ -86,7 +86,9 @@ class TestBuildFilename:
 
     def test_index_formatting(self):
         result = build_filename("user", "20260207", "abc", 1, ".jpg")
-        assert "_1.jpg" in result
+        assert "_01.jpg" in result
+        assert build_filename("user", "20260207", "abc", 1, ".jpg", index_digits=1).endswith("_1.jpg")
+        assert build_filename("user", "20260207", "abc", 12, ".jpg", index_digits=1).endswith("_12.jpg")
 
     def test_preserves_extension(self):
         for ext in [".jpg", ".png", ".webp", ".gif"]:

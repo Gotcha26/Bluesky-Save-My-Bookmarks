@@ -15,11 +15,11 @@ class DownloadResult:
     """Un fichier écrit sur le disque par un downloader."""
     filename: str
     path: Path
-    media_type: str  # "image", "video", "subtitle" ou "text"
+    media_type: str  # "image", "video", "subtitle", "text" ou "sidecar" (fiche JSON)
     size: int        # taille en octets
     cid: str | None = None
     skipped: bool = False  # image déjà présente (même cid) : rien n'a été écrit
-    alt: str | None = None  # texte alternatif (vidéo)
+    alt: str | None = None  # texte alternatif du média (None si absent)
 
 
 class DownloadError(Exception):
@@ -31,6 +31,7 @@ _MARQUEURS = {
     "video": "[OK] Fichier enregistré : ",
     "text": "[TXT] ",
     "subtitle": "[SUB] Sous-titres -> ",
+    "sidecar": "[JSON] ",
 }
 
 

@@ -68,8 +68,8 @@ class TestModeOriginal:
         session = _session(record=RECORD, blobs={BLOB1: b"png!", BLOB2: b"jpg!"})
         res = download_images(URL, tmp_path, DEFAULT_CONFIG, session=session, record=RECORD)
 
-        assert [r.filename for r in res] == ["user.bsky.social_20260102_3abc_1.png",
-                                             "user.bsky.social_20260102_3abc_2.jpg"]
+        assert [r.filename for r in res] == ["user.bsky.social_20260102_3abc_01.png",
+                                             "user.bsky.social_20260102_3abc_02.jpg"]
         assert res[0].path.read_bytes() == b"png!"
         assert [r.cid for r in res] == [CID1, CID2]
         assert BLOB1 in _urls(session) and BLOB2 in _urls(session)
@@ -148,10 +148,10 @@ class TestModeOriginal:
         assert IMG1 in _urls(session)
         # repli : extension par l'ancien chemin (HEAD sur l'URL CDN)
         session.head.assert_called_once_with(IMG1, allow_redirects=True, timeout=10)
-        assert res[0].filename.endswith("_1.jpg")
+        assert res[0].filename.endswith("_01.jpg")
         assert res[0].cid == CID1
         # la 2e image n'est pas concernée
-        assert res[1].filename.endswith("_2.jpg") and IMG2 not in _urls(session)
+        assert res[1].filename.endswith("_02.jpg") and IMG2 not in _urls(session)
 
     def test_repli_cdn_sur_exception_du_blob(self, tmp_path):
         session = _session(erreurs=(BLOB2,))
@@ -181,13 +181,13 @@ class TestModeOriginal:
                             "media": {"$type": "app.bsky.embed.images", "images": [_img(CID1, "image/webp")]}}}
         session = _session(embed=embed)
         res = download_images(URL, tmp_path, DEFAULT_CONFIG, session=session, record=record)
-        assert res[0].filename.endswith("_1.webp") and res[0].cid == CID1
+        assert res[0].filename.endswith("_01.webp") and res[0].cid == CID1
 
     def test_mime_inconnu_extension_jpg(self, tmp_path):
         record = {"embed": {"images": [_img(CID1, "application/x-inconnu")]}}
         embed = {"$type": "app.bsky.embed.images#view", "images": [{"fullsize": IMG1}]}
         res = download_images(URL, tmp_path, DEFAULT_CONFIG, session=_session(embed=embed), record=record)
-        assert res[0].filename.endswith("_1.jpg")
+        assert res[0].filename.endswith("_01.jpg")
 
     def test_images_du_post_cite_gardent_le_cdn(self, tmp_path):
         embed = {"$type": "app.bsky.embed.record#view",
