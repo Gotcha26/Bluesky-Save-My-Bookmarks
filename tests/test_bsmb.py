@@ -214,7 +214,7 @@ class TestMigrationAuDemarrage:
              patch("bsmb.clear_screen"), patch("bsmb.get_app_state", return_value={}), \
              patch("bsmb.print_header"), patch("bsmb.show_main_menu"), \
              patch("builtins.input", side_effect=["0"]):
-            bsmb.main()
+            bsmb.main([])
         assert ordre == ["load", "migrate"]
 
 

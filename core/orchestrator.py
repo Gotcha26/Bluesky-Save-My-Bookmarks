@@ -29,6 +29,7 @@ from core.config import (  # noqa: E402
 )
 from core.database import Database  # noqa: E402
 from core.colors import c  # noqa: E402
+from core import ui  # noqa: E402
 from api.post_analyzer import PostAnalyzer, PostType  # noqa: E402
 from api.quote_resolver import QuoteResolver  # noqa: E402
 from downloaders import DownloadError, lignes_console  # noqa: E402
@@ -672,15 +673,14 @@ def main(argv=None):
     config = load_config()
     stats = _run(argv[3:], config, media_dirs=media_dirs, no_db=no_db_mode)
 
-    if stats["success"] > 0:
-        print()
-        confirm = input(c.prompt("  Ouvrir le dossier de téléchargements ? [O/n]: ")).strip().lower()
-        if not confirm or confirm in ("o", "oui", "y", "yes"):
-            download_dir = config["download_dir"]
-            if sys.platform == "win32":
-                os.startfile(download_dir)
-            else:
-                subprocess.run(["xdg-open", download_dir])
+    # Option « open_folder_after_download » (défaut vrai), ignorée en non interactif
+    if (stats["success"] > 0 and config.get("open_folder_after_download", True)
+            and ui.is_interactive()):
+        download_dir = config["download_dir"]
+        if sys.platform == "win32":
+            os.startfile(download_dir)
+        else:
+            subprocess.run(["xdg-open", download_dir])
 
 
 if __name__ == "__main__":

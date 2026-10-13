@@ -107,6 +107,14 @@ Les fichiers sont enregistrés dans `~/Downloads/BSMB/` par défaut.
 
 BSMB se souvient de ce qui a déjà été traité grâce à sa base de données locale.
 
+### Ligne de commande
+
+Sans menu, par exemple pour une tâche planifiée (voir [ADVANCED.md](ADVANCED.md#planification)) :
+
+- `python bsmb.py sync` — synchronise les bookmarks ; `python bsmb.py download [--force]` — télécharge les nouveaux
+- `python bsmb.py run --yes` — synchronise puis télécharge, sans aucune question
+- `python bsmb.py status [--json]` — affiche l'état du compte et des compteurs
+
 ---
 
 ## Menu principal
