@@ -29,6 +29,7 @@ from core.config import (
     save_config,
 )
 from core.database import Database
+from core.i18n import _
 from core.secret_store import migrate_secret_to_keyring
 from core.version import __version__
 
@@ -47,11 +48,11 @@ def build_parser():
     """Construit l'analyseur d'arguments (--yes accepté avant ou après la sous-commande)."""
     parser = argparse.ArgumentParser(
         prog="bsmb",
-        description="BSMB - Bsky Save My Bookmarks. Sans sous-commande : menu interactif.",
+        description=_("BSMB - Bsky Save My Bookmarks. Sans sous-commande : menu interactif."),
     )
     parser.add_argument("--version", action="version", version=f"BSMB {__version__}")
     parser.add_argument(
-        "--yes", action="store_true", help="mode non interactif : accepte les valeurs par défaut"
+        "--yes", action="store_true", help=_("mode non interactif : accepte les valeurs par défaut")
     )
     sub = parser.add_subparsers(dest="command", metavar="{sync,download,run,status}")
 
@@ -61,16 +62,16 @@ def build_parser():
             "--yes",
             action="store_true",
             default=argparse.SUPPRESS,
-            help="mode non interactif : accepte les valeurs par défaut",
+            help=_("mode non interactif : accepte les valeurs par défaut"),
         )
         return p
 
-    ajouter("sync", "synchronise les bookmarks en ligne")
-    p_dl = ajouter("download", "télécharge les posts pas encore traités")
-    p_dl.add_argument("--force", action="store_true", help="retraite tous les posts de urls.txt")
-    ajouter("run", "synchronise puis télécharge (pour la planification)")
-    p_st = ajouter("status", "affiche l'état du compte et les compteurs")
-    p_st.add_argument("--json", action="store_true", help="sortie JSON")
+    ajouter("sync", _("synchronise les bookmarks en ligne"))
+    p_dl = ajouter("download", _("télécharge les posts pas encore traités"))
+    p_dl.add_argument("--force", action="store_true", help=_("retraite tous les posts de urls.txt"))
+    ajouter("run", _("synchronise puis télécharge (pour la planification)"))
+    p_st = ajouter("status", _("affiche l'état du compte et les compteurs"))
+    p_st.add_argument("--json", action="store_true", help=_("sortie JSON"))
     return parser
 
 
@@ -96,17 +97,17 @@ def _lire_urls(config):
 
 def cmd_sync(config, args=None):
     """Synchronise les bookmarks. Retourne un code de retour."""
-    print(c.info("Connexion à Bluesky..."))
+    print(c.info(_("Connexion à Bluesky...")))
     try:
         session = get_session(config)
     except NetworkError as e:
-        print(c.error(f"Erreur réseau pendant l'authentification : {e}"))
+        print(c.error(_("Erreur réseau pendant l'authentification : {erreur}").format(erreur=e)))
         return EXIT_NETWORK
     except AuthError as e:
-        print(c.error(f"Authentification impossible : {e}"))
+        print(c.error(_("Authentification impossible : {erreur}").format(erreur=e)))
         return EXIT_AUTH
     if not session:
-        print(c.error("Aucun moyen d'authentification : configurez un compte (menu > Mon compte)"))
+        print(c.error(_("Aucun moyen d'authentification : configurez un compte (menu > Mon compte)")))
         return EXIT_AUTH
 
     pds_url = session.get("pds_url")
@@ -118,7 +119,9 @@ def cmd_sync(config, args=None):
     try:
         result = BookmarkSync(config, db).sync(
             session["token"],
-            on_progress=lambda page, count: print(f"  Page {page}... {count} bookmarks"),
+            on_progress=lambda page, count: print(
+                "  " + _("Page {page}... {count} bookmarks").format(page=page, count=count)
+            ),
             session_info=session,
         )
     finally:
@@ -126,17 +129,17 @@ def cmd_sync(config, args=None):
 
     if result["error"]:
         if result.get("expired"):
-            print(c.error("Token expiré — reconnectez votre compte"))
+            print(c.error(_("Token expiré — reconnectez votre compte")))
             return EXIT_AUTH
-        print(c.error(f"Erreur réseau : {result['error']}"))
+        print(c.error(_("Erreur réseau : {erreur}").format(erreur=result["error"])))
         return EXIT_NETWORK
 
-    print(c.success("Synchronisation terminée"))
-    print(c.config_line("Bookmarks en ligne", str(result["online_count"])))
-    print(c.config_line("Déjà traités", str(result["local_count"])))
-    print(c.config_line("Nouveaux", str(result["new_count"])))
+    print(c.success(_("Synchronisation terminée")))
+    print(c.config_line(_("Bookmarks en ligne"), str(result["online_count"])))
+    print(c.config_line(_("Déjà traités"), str(result["local_count"])))
+    print(c.config_line(_("Nouveaux"), str(result["new_count"])))
     if result.get("cache_error"):
-        print(c.warning(f"Cache des bookmarks non écrit : {result['cache_error']}"))
+        print(c.warning(_("Cache des bookmarks non écrit : {erreur}").format(erreur=result["cache_error"])))
     return EXIT_OK
 
 
@@ -145,7 +148,7 @@ def cmd_download(config, args=None):
     force = bool(getattr(args, "force", False))
     urls = _lire_urls(config)
     if not urls:
-        print(c.warning("Aucune URL à traiter (lancez d'abord « sync »)"))
+        print(c.warning(_("Aucune URL à traiter (lancez d'abord « sync »)")))
         return EXIT_OK
 
     if force:
@@ -158,10 +161,10 @@ def cmd_download(config, args=None):
             db.close()
 
     if not a_traiter:
-        print(c.success("Tous les posts sont déjà traités"))
+        print(c.success(_("Tous les posts sont déjà traités")))
         return EXIT_OK
 
-    if not ui.confirm(f"Traiter {len(a_traiter)} posts ?", default=True):
+    if not ui.confirm(_("Traiter {n} posts ?").format(n=len(a_traiter)), default=True):
         return EXIT_OK
 
     # Vues hydratées de la dernière synchro : évitent un getRecord par post
@@ -212,17 +215,19 @@ def cmd_status(config, args=None):
         print(json.dumps(etat, ensure_ascii=False, indent=2))
         return EXIT_OK
 
-    print(c.config_line("Compte", etat["account"] or "non connecté"))
-    print(c.config_line("Dernière synchronisation", etat["last_sync"] or "jamais"))
-    print(c.config_line("Bookmarks en ligne", str(etat["online_count"])))
-    print(c.config_line("Posts traités", str(etat["local_count"])))
-    print(c.config_line("Nouveaux", str(etat["new_count"])))
-    print(c.config_line("Liens morts", str(etat["dead_count"])))
+    print(c.config_line(_("Compte"), etat["account"] or _("non connecté")))
+    print(c.config_line(_("Dernière synchronisation"), etat["last_sync"] or _("jamais")))
+    print(c.config_line(_("Bookmarks en ligne"), str(etat["online_count"])))
+    print(c.config_line(_("Posts traités"), str(etat["local_count"])))
+    print(c.config_line(_("Nouveaux"), str(etat["new_count"])))
+    print(c.config_line(_("Liens morts"), str(etat["dead_count"])))
     media = etat["media"]
     print(
-        c.config_line("Images / vidéos / textes", f"{media['images']} / {media['videos']} / {media['texts']}")
+        c.config_line(
+            _("Images / vidéos / textes"), f"{media['images']} / {media['videos']} / {media['texts']}"
+        )
     )
-    print(c.config_line("Destination", etat["download_dir"]))
+    print(c.config_line(_("Destination"), etat["download_dir"]))
     return EXIT_OK
 
 

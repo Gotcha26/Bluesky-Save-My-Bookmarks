@@ -10,6 +10,8 @@ n'imprime : l'affichage est produit par l'appelant via lignes_console().
 from dataclasses import dataclass
 from pathlib import Path
 
+from core.i18n import _
+
 
 @dataclass
 class DownloadResult:
@@ -28,21 +30,26 @@ class DownloadError(Exception):
     """Erreur technique d'un downloader (API, réseau, écriture)."""
 
 
-_MARQUEURS = {
-    "image": "[DL] Téléchargé -> ",
-    "video": "[OK] Fichier enregistré : ",
-    "text": "[TXT] ",
-    "subtitle": "[SUB] Sous-titres -> ",
-    "sidecar": "[JSON] ",
-}
+def _marqueurs():
+    """Préfixes d'affichage par type de média (traduits au moment de l'appel, pas à l'import)."""
+    return {
+        "image": _("[DL] Téléchargé ->"),
+        "video": _("[OK] Fichier enregistré :"),
+        "text": _("[TXT]"),
+        "subtitle": _("[SUB] Sous-titres ->"),
+        "sidecar": _("[JSON]"),
+    }
 
 
 def lignes_console(results):
     """Lignes d'affichage historiques ([DL] / [OK] / [TXT]) pour des résultats."""
     lignes = []
+    marqueurs = _marqueurs()
     for r in results:
         if r.skipped:
-            lignes.append(f"   [SKIP] {r.cid} déjà présent : {r.filename}")
+            lignes.append(
+                "   " + _("[SKIP] {cid} déjà présent : {filename}").format(cid=r.cid, filename=r.filename)
+            )
         else:
-            lignes.append(f"   {_MARQUEURS[r.media_type]}{r.filename}")
+            lignes.append(f"   {marqueurs[r.media_type]} {r.filename}")
     return lignes

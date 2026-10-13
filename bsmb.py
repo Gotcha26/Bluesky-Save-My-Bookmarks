@@ -15,6 +15,7 @@ from core.bookmarks_cache import post_views_from_config
 from core.colors import c
 from core.config import ensure_dirs, load_config, resolve_path, restrict_permissions, save_config
 from core.database import Database
+from core.i18n import _, _n
 from core.orchestrator import run
 from core.secret_store import (
     backend_name,
@@ -50,11 +51,11 @@ def get_folder_size(path):
 
 def format_size(size_bytes):
     """Formate une taille en octets lisible."""
-    for unit in ["o", "Ko", "Mo", "Go"]:
+    for unit in [_("o"), _("Ko"), _("Mo"), _("Go")]:
         if size_bytes < 1024.0:
             return f"{size_bytes:.1f} {unit}"
         size_bytes /= 1024.0
-    return f"{size_bytes:.1f} To"
+    return f"{size_bytes:.1f} {_('To')}"
 
 
 def format_last_sync(iso_str):
@@ -65,16 +66,16 @@ def format_last_sync(iso_str):
         dt = datetime.fromisoformat(iso_str)
         delta = datetime.now() - dt
         if delta.total_seconds() < 60:
-            return "à l'instant"
+            return _("à l'instant")
         elif delta.total_seconds() < 3600:
             mins = int(delta.total_seconds() // 60)
-            return f"il y a {mins} min"
+            return _("il y a {n} min").format(n=mins)
         elif delta.total_seconds() < 86400:
             hours = int(delta.total_seconds() // 3600)
-            return f"il y a {hours}h"
+            return _("il y a {n}h").format(n=hours)
         else:
             days = delta.days
-            return f"il y a {days} jour{'s' if days > 1 else ''}"
+            return _n("il y a {n} jour", "il y a {n} jours", days).format(n=days)
     except Exception:
         return iso_str[:16]
 
@@ -128,18 +129,20 @@ def print_header(config, state):
         handle = config.get("bsky_handle", "")
         account_status = f"{c.OK}{handle}{c.RESET}"
     else:
-        account_status = f"{c.WARNING}non connecté{c.RESET}"
+        account_status = f"{c.WARNING}{_('non connecté')}{c.RESET}"
 
     media_total = state["stats"]["images"] + state["stats"]["videos"]
-    media_status = (
-        f"{c.VALUE}{media_total}{c.RESET} fichiers" if media_total > 0 else f"{c.DIM}aucun{c.RESET}"
-    )
+    if media_total > 0:
+        media_status = _("{n} fichiers").format(n=f"{c.VALUE}{media_total}{c.RESET}")
+    else:
+        media_status = f"{c.DIM}{_('aucun')}{c.RESET}"
 
-    print(f"  Compte: {account_status} | Médias: {media_status}")
+    print("  " + _("Compte: {compte} | Médias: {medias}").format(compte=account_status, medias=media_status))
 
     last_sync_str = format_last_sync(state["last_sync"])
     if last_sync_str:
-        print(f"  Dernière synchronisation: {c.DIM}{last_sync_str}{c.RESET}")
+        date = f"{c.DIM}{last_sync_str}{c.RESET}"
+        print("  " + _("Dernière synchronisation: {date}").format(date=date))
 
     print()
 
@@ -149,24 +152,26 @@ def print_header(config, state):
 
 def show_main_menu(state):
     """Affiche le menu principal novice-first."""
-    print(c.menu_option("1", "Mon compte     - Connexion et bookmarks en ligne"))
-    print(c.menu_option("2", "Stockage local - Dossier et statistiques"))
-    print(c.menu_option("3", "Paramètres     - Configuration de l'application"))
+    print(c.menu_option("1", _("Mon compte     - Connexion et bookmarks en ligne")))
+    print(c.menu_option("2", _("Stockage local - Dossier et statistiques")))
+    print(c.menu_option("3", _("Paramètres     - Configuration de l'application")))
     print()
 
     # Option 4 : conditionnelle
     if not state["has_account"]:
-        print(f"  {c.DIM}4. Télécharger    - (connectez d'abord votre compte){c.RESET}")
+        texte = _("4. Télécharger    - (connectez d'abord votre compte)")
+        print(f"  {c.DIM}{texte}{c.RESET}")
     elif state["new_count"] > 0:
-        label = f"Télécharger {c.VALUE}{state['new_count']}{c.RESET} nouveaux bookmarks"
+        label = _("Télécharger {n} nouveaux bookmarks").format(n=f"{c.VALUE}{state['new_count']}{c.RESET}")
         print(c.menu_option("4", label))
     elif state["has_urls"]:
-        print(f"  {c.DIM}4. Tout est à jour{c.RESET}")
+        print(f"  {c.DIM}{_('4. Tout est à jour')}{c.RESET}")
     else:
-        print(f"  {c.DIM}4. Télécharger    - (synchronisez d'abord via Mon compte){c.RESET}")
+        texte = _("4. Télécharger    - (synchronisez d'abord via Mon compte)")
+        print(f"  {c.DIM}{texte}{c.RESET}")
 
     print()
-    print(c.menu_option("0", f"{c.DIM}Quitter{c.RESET}"))
+    print(c.menu_option("0", f"{c.DIM}{_('Quitter')}{c.RESET}"))
     print()
 
 
@@ -212,6 +217,16 @@ def _remember_pds_url(config, pds_url):
         save_config(config)
 
 
+def _invite_choix(suffixe=""):
+    """Invite « Votre choix » commune aux menus (suffixe : plage éventuelle, ex. « (0-9) »)."""
+    return c.prompt(f"  {_('Votre choix')}{suffixe}: ")
+
+
+def _choix_invalide(choice):
+    """Message d'erreur d'un choix de menu inconnu."""
+    return c.error(_('Choix invalide : "{choix}"').format(choix=choice))
+
+
 # ─── Mon compte ──────────────────────────────────────────────
 
 
@@ -219,21 +234,21 @@ def menu_account(config, state):
     """Menu Mon compte : connexion et synchronisation."""
     while True:
         clear_screen()
-        print(c.box_header("MON COMPTE"))
+        print(c.box_header(_("MON COMPTE")))
         print()
 
         if not state["has_account"]:
             # Pas de compte configuré → guidage
-            print(c.warning("Aucun compte Bluesky connecté"))
+            print(c.warning(_("Aucun compte Bluesky connecté")))
             print()
-            print(f"  {c.KEY}Pour sauvegarder vos bookmarks, connectez votre compte :{c.RESET}")
+            print(f"  {c.KEY}{_('Pour sauvegarder vos bookmarks, connectez votre compte :')}{c.RESET}")
             print()
-            print(c.menu_option("1", "Connecter mon compte Bluesky"))
+            print(c.menu_option("1", _("Connecter mon compte Bluesky")))
             print()
-            print(c.menu_option("0", f"{c.DIM}Retour{c.RESET}"))
+            print(c.menu_option("0", f"{c.DIM}{_('Retour')}{c.RESET}"))
             print()
 
-            choice = input(c.prompt("  Votre choix: ")).strip()
+            choice = input(_invite_choix()).strip()
             if choice == "1":
                 configure_credentials(config)
                 state = get_app_state(config)
@@ -243,37 +258,37 @@ def menu_account(config, state):
 
         # Compte configuré → affichage + sync
         handle = config.get("bsky_handle", "")
-        print(c.config_line("Compte", f"{c.OK}{handle}{c.RESET}"))
+        print(c.config_line(_("Compte"), f"{c.OK}{handle}{c.RESET}"))
 
         last_sync_str = format_last_sync(state["last_sync"])
         if last_sync_str:
-            print(c.config_line("Dernière sync", last_sync_str))
+            print(c.config_line(_("Dernière sync"), last_sync_str))
 
         # Statistiques en ligne vs local
         if state["has_urls"]:
             print()
-            print(c.config_line("Bookmarks en ligne", str(state["url_count"])))
-            print(c.config_line("Posts traités", str(state["stats"]["posts"])))
+            print(c.config_line(_("Bookmarks en ligne"), str(state["url_count"])))
+            print(c.config_line(_("Posts traités"), str(state["stats"]["posts"])))
             if state["new_count"] > 0:
-                print(c.config_line("Nouveaux", f"{c.OK}{state['new_count']}{c.RESET}"))
+                print(c.config_line(_("Nouveaux"), f"{c.OK}{state['new_count']}{c.RESET}"))
             else:
-                print(c.config_line("Nouveaux", f"{c.DIM}0 - tout est à jour{c.RESET}"))
+                print(c.config_line(_("Nouveaux"), f"{c.DIM}{_('0 - tout est à jour')}{c.RESET}"))
         else:
             print()
-            print(f"  {c.DIM}Aucune synchronisation effectuée{c.RESET}")
+            print(f"  {c.DIM}{_('Aucune synchronisation effectuée')}{c.RESET}")
 
         if state["stats"]["dead"] > 0:
-            print(c.config_line("Liens morts", f"{c.WARNING}{state['stats']['dead']}{c.RESET}"))
+            print(c.config_line(_("Liens morts"), f"{c.WARNING}{state['stats']['dead']}{c.RESET}"))
 
         print()
         print(c.separator())
         print()
-        print(c.menu_option("1", "Synchroniser les bookmarks"))
-        print(c.menu_option("D", "Déconnecter mon compte"))
-        print(c.menu_option("0", f"{c.DIM}Retour{c.RESET}"))
+        print(c.menu_option("1", _("Synchroniser les bookmarks")))
+        print(c.menu_option("D", _("Déconnecter mon compte")))
+        print(c.menu_option("0", f"{c.DIM}{_('Retour')}{c.RESET}"))
         print()
 
-        choice = input(c.prompt("  Votre choix: ")).strip()
+        choice = input(_invite_choix()).strip()
 
         if choice == "0":
             return
@@ -295,9 +310,15 @@ def disconnect_account(config):
     """
     handle = config.get("bsky_handle", "")
     print()
-    print(c.warning(f"Le compte {handle} sera déconnecté (App Password supprimé de cet ordinateur)."))
-    print(f"  {c.DIM}Vos fichiers téléchargés et la base ne sont pas touchés.{c.RESET}")
-    if not confirm("Confirmer ?", default=False):
+    print(
+        c.warning(
+            _("Le compte {handle} sera déconnecté (App Password supprimé de cet ordinateur).").format(
+                handle=handle
+            )
+        )
+    )
+    print(f"  {c.DIM}{_('Vos fichiers téléchargés et la base ne sont pas touchés.')}{c.RESET}")
+    if not confirm(_("Confirmer ?"), default=False):
         return False
 
     nettoye = delete_app_password(config, handle)
@@ -305,12 +326,14 @@ def disconnect_account(config):
     config["pds_url"] = ""
     save_config(config)
     if nettoye:
-        print(c.success("Compte déconnecté"))
+        print(c.success(_("Compte déconnecté")))
     else:
         print(
             c.warning(
-                "Compte déconnecté, mais le trousseau n'a pas pu être nettoyé : "
-                "supprimez l'entrée « bsmb » à la main."
+                _(
+                    "Compte déconnecté, mais le trousseau n'a pas pu être nettoyé : "
+                    "supprimez l'entrée « bsmb » à la main."
+                )
             )
         )
     pause()
@@ -320,20 +343,20 @@ def disconnect_account(config):
 def do_sync(config):
     """Lance la synchronisation des bookmarks."""
     print()
-    print(c.info("Connexion à Bluesky..."))
+    print(c.info(_("Connexion à Bluesky...")))
 
     session = get_session(config)
     if not session:
-        print(c.error("Impossible d'obtenir un token d'authentification"))
-        print(f"  {c.DIM}Vérifiez vos identifiants dans Paramètres{c.RESET}")
+        print(c.error(_("Impossible d'obtenir un token d'authentification")))
+        print(f"  {c.DIM}{_('Vérifiez vos identifiants dans Paramètres')}{c.RESET}")
         pause()
         return
 
     token = session["token"]
     _remember_pds_url(config, session["pds_url"])
 
-    print(c.success("Authentification réussie"))
-    print(c.info("Récupération des bookmarks..."))
+    print(c.success(_("Authentification réussie")))
+    print(c.info(_("Récupération des bookmarks...")))
 
     db = Database(resolve_path(config, "db_file"))
     from core.bookmarks import BookmarkSync
@@ -341,27 +364,30 @@ def do_sync(config):
     sync = BookmarkSync(config, db)
 
     def progress(page, count):
-        print(f"  {c.DIM}Page {page}... {count} bookmarks{c.RESET}")
+        ligne = _("Page {page}... {count} bookmarks").format(page=page, count=count)
+        print(f"  {c.DIM}{ligne}{c.RESET}")
 
     result = sync.sync(token, on_progress=progress, session_info=session)
     db.close()
 
     if result["error"]:
         if result.get("expired"):
-            print(c.error("Token expiré — reconnectez votre compte"))
+            print(c.error(_("Token expiré — reconnectez votre compte")))
         else:
-            print(c.error(f"Erreur : {result['error']}"))
+            print(c.error(_("Erreur : {erreur}").format(erreur=result["error"])))
     else:
         print()
-        print(c.success("Synchronisation terminée"))
-        print(c.config_line("Bookmarks en ligne", str(result["online_count"])))
-        print(c.config_line("Déjà traités", str(result["local_count"])))
+        print(c.success(_("Synchronisation terminée")))
+        print(c.config_line(_("Bookmarks en ligne"), str(result["online_count"])))
+        print(c.config_line(_("Déjà traités"), str(result["local_count"])))
         if result["new_count"] > 0:
-            print(c.config_line("Nouveaux", f"{c.OK}{result['new_count']}{c.RESET}"))
+            print(c.config_line(_("Nouveaux"), f"{c.OK}{result['new_count']}{c.RESET}"))
         else:
-            print(c.config_line("Nouveaux", f"{c.DIM}0 - tout est à jour{c.RESET}"))
+            print(c.config_line(_("Nouveaux"), f"{c.DIM}{_('0 - tout est à jour')}{c.RESET}"))
         if result.get("cache_error"):
-            print(c.warning(f"Cache des bookmarks non écrit : {result['cache_error']}"))
+            print(
+                c.warning(_("Cache des bookmarks non écrit : {erreur}").format(erreur=result["cache_error"]))
+            )
 
     pause()
 
@@ -373,48 +399,48 @@ def menu_local_storage(config, state):
     """Menu Stockage local : stats, dossier, nettoyage."""
     while True:
         clear_screen()
-        print(c.box_header("STOCKAGE LOCAL"))
+        print(c.box_header(_("STOCKAGE LOCAL")))
         print()
 
         stats = state["stats"]
         total_media = stats["images"] + stats["videos"]
 
-        print(c.config_line("Posts traités", str(stats["posts"])))
-        print(c.config_line("Images téléchargées", str(stats["images"])))
-        print(c.config_line("Vidéos téléchargées", str(stats["videos"])))
-        print(c.config_line("Textes sauvegardés", str(stats["texts"])))
-        print(c.config_line("Total médias", str(total_media)))
+        print(c.config_line(_("Posts traités"), str(stats["posts"])))
+        print(c.config_line(_("Images téléchargées"), str(stats["images"])))
+        print(c.config_line(_("Vidéos téléchargées"), str(stats["videos"])))
+        print(c.config_line(_("Textes sauvegardés"), str(stats["texts"])))
+        print(c.config_line(_("Total médias"), str(total_media)))
 
         # Taille du dossier
         download_dir = config["download_dir"]
         if Path(download_dir).exists():
             size = get_folder_size(download_dir)
-            print(c.config_line("Taille du dossier", format_size(size)))
+            print(c.config_line(_("Taille du dossier"), format_size(size)))
 
-        print(c.config_line("Destination", f"{c.VALUE}{download_dir}{c.RESET}"))
+        print(c.config_line(_("Destination"), f"{c.VALUE}{download_dir}{c.RESET}"))
 
         # Liens morts
         if stats["dead"] > 0:
             print()
-            print(c.warning(f"{stats['dead']} lien(s) mort(s) détecté(s)"))
+            print(c.warning(_dead_links_label(stats["dead"])))
 
         print()
         print(c.separator())
         print()
 
         options = []
-        print(c.menu_option("1", "Ouvrir le dossier de téléchargements"))
+        print(c.menu_option("1", _("Ouvrir le dossier de téléchargements")))
         options.append("1")
 
         if stats["dead"] > 0:
-            print(c.menu_option("2", f"Nettoyer les liens morts ({stats['dead']})"))
+            print(c.menu_option("2", _("Nettoyer les liens morts ({n})").format(n=stats["dead"])))
             options.append("2")
 
-        print(c.menu_option("R", f"{c.WARNING}Réinitialiser la base de données{c.RESET}"))
-        print(c.menu_option("0", f"{c.DIM}Retour{c.RESET}"))
+        print(c.menu_option("R", f"{c.WARNING}{_('Réinitialiser la base de données')}{c.RESET}"))
+        print(c.menu_option("0", f"{c.DIM}{_('Retour')}{c.RESET}"))
         print()
 
-        choice = input(c.prompt("  Votre choix: ")).strip().upper()
+        choice = input(_invite_choix()).strip().upper()
 
         if choice == "0":
             return
@@ -427,8 +453,13 @@ def menu_local_storage(config, state):
             reset_database(config)
             state = get_app_state(config)
         else:
-            print(c.error(f'Choix invalide : "{choice}"'))
+            print(_choix_invalide(choice))
             pause()
+
+
+def _dead_links_label(n):
+    """« N lien(s) mort(s) détecté(s) » accordé en nombre."""
+    return _n("{n} lien mort détecté", "{n} liens morts détectés", n).format(n=n)
 
 
 def cleanup_dead_links(config):
@@ -437,30 +468,32 @@ def cleanup_dead_links(config):
     dead_posts = db.get_dead_posts()
 
     clear_screen()
-    print(c.box_header("NETTOYAGE DES LIENS MORTS"))
+    print(c.box_header(_("NETTOYAGE DES LIENS MORTS")))
     print()
-    print(c.warning(f"{len(dead_posts)} lien(s) mort(s) détecté(s) :"))
+    nb_morts = len(dead_posts)
+    print(c.warning(_n("{n} lien mort détecté :", "{n} liens morts détectés :", nb_morts).format(n=nb_morts)))
     print()
 
     for url, status in dead_posts[:10]:
-        label = "supprimé" if status == "deleted" else status
+        label = _("supprimé") if status == "deleted" else status
         print(f"  {c.DIM}-{c.RESET} {c.DIM}{label}{c.RESET} : {url}")
 
     if len(dead_posts) > 10:
-        print(f"  {c.DIM}... et {len(dead_posts) - 10} autres{c.RESET}")
+        autres = _("... et {n} autres").format(n=len(dead_posts) - 10)
+        print(f"  {c.DIM}{autres}{c.RESET}")
 
     print()
     print(c.separator())
     print()
-    print(f"  {c.KEY}Cette action va supprimer ces entrées de la base.{c.RESET}")
-    print(f"  {c.DIM}Les fichiers déjà téléchargés ne seront pas supprimés.{c.RESET}")
+    print(f"  {c.KEY}{_('Cette action va supprimer ces entrées de la base.')}{c.RESET}")
+    print(f"  {c.DIM}{_('Les fichiers déjà téléchargés ne seront pas supprimés.')}{c.RESET}")
     print()
 
-    if confirm("Confirmer le nettoyage ?"):
+    if confirm(_("Confirmer le nettoyage ?")):
         count = db.cleanup_dead_posts()
-        print(c.success(f"{count} entrée(s) supprimée(s)"))
+        print(c.success(_n("{n} entrée supprimée", "{n} entrées supprimées", count).format(n=count)))
     else:
-        print(f"\n  {c.DIM}Nettoyage annulé{c.RESET}")
+        print(f"\n  {c.DIM}{_('Nettoyage annulé')}{c.RESET}")
 
     db.close()
     pause()
@@ -469,26 +502,30 @@ def cleanup_dead_links(config):
 def reset_database(config):
     """Réinitialisation de la base de données avec confirmation."""
     clear_screen()
-    print(c.box_header("RÉINITIALISATION"))
+    print(c.box_header(_("RÉINITIALISATION")))
     print()
-    print(c.warning("Cette action va :"))
-    print(f"    {c.DIM}-{c.RESET} Supprimer l'historique des posts traités")
-    print(f"    {c.DIM}-{c.RESET} Supprimer l'historique des médias téléchargés")
-    print(f"    {c.DIM}-{c.RESET} {c.OK}NE PAS{c.RESET} supprimer les fichiers déjà téléchargés")
+    print(c.warning(_("Cette action va :")))
+    print(f"    {c.DIM}-{c.RESET} " + _("Supprimer l'historique des posts traités"))
+    print(f"    {c.DIM}-{c.RESET} " + _("Supprimer l'historique des médias téléchargés"))
+    print(
+        "    "
+        + f"{c.DIM}-{c.RESET} "
+        + _("{ne_pas} supprimer les fichiers déjà téléchargés").format(ne_pas=f"{c.OK}{_('NE PAS')}{c.RESET}")
+    )
     print()
     print(c.separator())
     print()
 
-    saisie = input(c.prompt("  Confirmer ? (tapez 'RESET'): ")).strip()
+    saisie = input(c.prompt("  " + _("Confirmer ? (tapez 'RESET'):") + " ")).strip()
     if saisie == "RESET":
         db_file = resolve_path(config, "db_file")
         if db_file.exists():
             db_file.unlink()
-            print(c.success("Base de données réinitialisée"))
+            print(c.success(_("Base de données réinitialisée")))
         else:
-            print(c.warning("Aucune base de données à réinitialiser"))
+            print(c.warning(_("Aucune base de données à réinitialiser")))
     else:
-        print(f"\n  {c.DIM}Réinitialisation annulée{c.RESET}")
+        print(f"\n  {c.DIM}{_('Réinitialisation annulée')}{c.RESET}")
 
     pause()
 
@@ -500,44 +537,48 @@ def menu_settings(config, state):
     """Menu Paramètres : configuration de l'application."""
     while True:
         clear_screen()
-        print(c.box_header("PARAMÈTRES"))
+        print(c.box_header(_("PARAMÈTRES")))
         print()
 
         from core.auth import has_credentials
 
-        auth_status = (
-            f"{c.OK}connecté{c.RESET}" if has_credentials(config) else f"{c.DIM}non connecté{c.RESET}"
-        )
+        if has_credentials(config):
+            auth_status = f"{c.OK}{_('connecté')}{c.RESET}"
+        else:
+            auth_status = f"{c.DIM}{_('non connecté')}{c.RESET}"
         advanced = config.get("advanced_mode", False)
 
-        print(c.config_line("1. Identifiants Bluesky", auth_status))
-        print(c.config_line("2. Dossier téléchargements", config["download_dir"]))
-        print(c.config_line("3. Workers parallèles", str(config.get("max_workers", 4))))
+        print(c.config_line(_("1. Identifiants Bluesky"), auth_status))
+        print(c.config_line(_("2. Dossier téléchargements"), config["download_dir"]))
+        print(c.config_line(_("3. Workers parallèles"), str(config.get("max_workers", 4))))
 
         if advanced:
-            print(c.config_line("4. Mode avancé", f"{c.OK}activé{c.RESET}"))
+            print(c.config_line(_("4. Mode avancé"), f"{c.OK}{_('activé')}{c.RESET}"))
         else:
-            print(c.config_line("4. Mode avancé", f"{c.DIM}désactivé{c.RESET}"))
+            print(c.config_line(_("4. Mode avancé"), f"{c.DIM}{_('désactivé')}{c.RESET}"))
 
         if advanced:
             print()
-            print(c.title("  OPTIONS AVANCÉES"))
+            print(c.title("  " + _("OPTIONS AVANCÉES")))
             print(c.separator())
-            print(c.config_line("5. Fichier token (fallback)", config["token_file"]))
-            print(c.config_line("6. Fichier URLs", config["urls_file"]))
-            print(c.menu_option("7", "Supprimer les logs"))
-            print(c.menu_option("8", "Mode dev - Depuis urls.txt, sans token"))
-            print(c.menu_option("9", f"{c.WARNING}Force DL{c.RESET} - Re-télécharger tous les médias"))
+            print(c.config_line(_("5. Fichier token (fallback)"), config["token_file"]))
+            print(c.config_line(_("6. Fichier URLs"), config["urls_file"]))
+            print(c.menu_option("7", _("Supprimer les logs")))
+            print(c.menu_option("8", _("Mode dev - Depuis urls.txt, sans token")))
+            force = _("{force_dl} - Re-télécharger tous les médias").format(
+                force_dl=f"{c.WARNING}Force DL{c.RESET}"
+            )
+            print(c.menu_option("9", force))
 
         print()
         print(c.separator())
-        print(f"  {c.DIM}Entrez le numéro pour modifier, ou 0 pour revenir{c.RESET}")
+        print(f"  {c.DIM}{_('Entrez le numéro pour modifier, ou 0 pour revenir')}{c.RESET}")
         print()
-        print(c.menu_option("0", f"{c.DIM}Retour{c.RESET}"))
+        print(c.menu_option("0", f"{c.DIM}{_('Retour')}{c.RESET}"))
         print()
 
         max_choice = "9" if advanced else "4"
-        choice = input(c.prompt(f"  Votre choix (0-{max_choice}): ")).strip()
+        choice = input(_invite_choix(f" (0-{max_choice})")).strip()
 
         if choice == "0":
             break
@@ -548,7 +589,7 @@ def menu_settings(config, state):
             _edit_config_value(
                 config,
                 "download_dir",
-                "Dossier de téléchargements",
+                _("Dossier de téléchargements"),
                 after_save=lambda: ensure_dirs(config),
             )
         elif choice == "3":
@@ -556,18 +597,24 @@ def menu_settings(config, state):
         elif choice == "4":
             config["advanced_mode"] = not config.get("advanced_mode", False)
             save_config(config)
-            mode_str = "activé" if config["advanced_mode"] else "désactivé"
-            print(c.success(f"Mode avancé {mode_str}"))
+            if config["advanced_mode"]:
+                print(c.success(_("Mode avancé activé")))
+            else:
+                print(c.success(_("Mode avancé désactivé")))
             pause()
         elif choice == "5" and advanced:
-            _edit_config_value(config, "token_file", "Fichier token")
+            _edit_config_value(config, "token_file", _("Fichier token"))
         elif choice == "6" and advanced:
-            _edit_config_value(config, "urls_file", "Fichier URLs")
+            _edit_config_value(config, "urls_file", _("Fichier URLs"))
         elif choice == "7" and advanced:
             from core.config import cleanup_logs
 
             deleted = cleanup_logs(config)
-            print(c.success(f"{deleted} fichier(s) log supprimé(s)"))
+            print(
+                c.success(
+                    _n("{n} fichier log supprimé", "{n} fichiers log supprimés", deleted).format(n=deleted)
+                )
+            )
             pause()
         elif choice == "8" and advanced:
             download_media_dev(config)
@@ -576,65 +623,66 @@ def menu_settings(config, state):
             download_media(config, force=True)
             pause()
         else:
-            print(c.error(f'Choix invalide : "{choice}"'))
+            print(_choix_invalide(choice))
             pause()
 
 
 def configure_credentials(config):
     """Menu de configuration des identifiants Bluesky."""
     clear_screen()
-    print(c.box_header("IDENTIFIANTS BLUESKY"))
+    print(c.box_header(_("IDENTIFIANTS BLUESKY")))
     print()
 
     current_handle = config.get("bsky_handle", "")
     has_pwd = bool(current_handle) and bool(load_app_password(config, current_handle))
 
-    print(c.config_line("Handle actuel", current_handle or f"{c.DIM}non configuré{c.RESET}"))
-    print(
-        c.config_line(
-            "App Password", f"{c.OK}configuré{c.RESET}" if has_pwd else f"{c.DIM}non configuré{c.RESET}"
-        )
-    )
+    non_configure = f"{c.DIM}{_('non configuré')}{c.RESET}"
+    print(c.config_line(_("Handle actuel"), current_handle or non_configure))
+    print(c.config_line(_("App Password"), f"{c.OK}{_('configuré')}{c.RESET}" if has_pwd else non_configure))
     print()
     print(c.separator())
     print()
-    print(f"  {c.KEY}Pour créer un App Password :{c.RESET}")
-    print(f"    {c.DIM}1.{c.RESET} Allez sur {c.VALUE}bsky.app > Settings > App Passwords{c.RESET}")
-    print(f"    {c.DIM}2.{c.RESET} Cliquez sur {c.VALUE}Add App Password{c.RESET}")
-    print(f"    {c.DIM}3.{c.RESET} Nommez-le (ex: 'BSMB') et copiez le mot de passe généré")
+    print(f"  {c.KEY}{_('Pour créer un App Password :')}{c.RESET}")
+    chemin_bsky = f"{c.VALUE}bsky.app > Settings > App Passwords{c.RESET}"
+    print(f"    {c.DIM}1.{c.RESET} " + _("Allez sur {chemin}").format(chemin=chemin_bsky))
+    bouton = f"{c.VALUE}Add App Password{c.RESET}"
+    print(f"    {c.DIM}2.{c.RESET} " + _("Cliquez sur {bouton}").format(bouton=bouton))
+    print(f"    {c.DIM}3.{c.RESET} " + _("Nommez-le (ex: 'BSMB') et copiez le mot de passe généré"))
     print()
     if backend_name() == "keyring":
-        print(f"  {c.DIM}L'App Password sera stocké dans le trousseau du système (keyring){c.RESET}")
+        stockage = _("L'App Password sera stocké dans le trousseau du système (keyring)")
     else:
-        print(f"  {c.DIM}L'App Password sera stocké dans config.json (fichier local, hors Git){c.RESET}")
-    print(f"  {c.DIM}Conseil : créez un App Password dédié à BSMB et révoquez-le en cas de doute.{c.RESET}")
+        stockage = _("L'App Password sera stocké dans config.json (fichier local, hors Git)")
+    print(f"  {c.DIM}{stockage}{c.RESET}")
+    conseil = _("Conseil : créez un App Password dédié à BSMB et révoquez-le en cas de doute.")
+    print(f"  {c.DIM}{conseil}{c.RESET}")
     print()
     print(c.separator())
     print()
 
-    handle = input(c.prompt("  Handle Bluesky (ENTRÉE pour garder): ")).strip()
+    handle = input(c.prompt(f"  {_('Handle Bluesky (ENTRÉE pour garder):')} ")).strip()
     if not handle and not current_handle:
-        print(f"\n  {c.DIM}Configuration annulée{c.RESET}")
+        print(f"\n  {c.DIM}{_('Configuration annulée')}{c.RESET}")
         pause()
         return
     if not handle:
         handle = current_handle
 
-    app_password = input(c.prompt("  App Password (xxxx-xxxx-xxxx-xxxx): ")).strip()
+    app_password = input(c.prompt(f"  {_('App Password (xxxx-xxxx-xxxx-xxxx):')} ")).strip()
     if not app_password:
-        print(f"\n  {c.DIM}Configuration annulée{c.RESET}")
+        print(f"\n  {c.DIM}{_('Configuration annulée')}{c.RESET}")
         pause()
         return
 
     # Test immédiat
     print()
-    print(c.info("Test de connexion..."))
+    print(c.info(_("Test de connexion...")))
 
     from core.auth import AuthError, create_session
 
     try:
         session = create_session(handle, app_password)
-        print(c.success("Connexion réussie !"))
+        print(c.success(_("Connexion réussie !")))
 
         if current_handle and current_handle != handle:
             delete_app_password(config, current_handle)  # ne pas laisser l'ancien secret
@@ -642,22 +690,21 @@ def configure_credentials(config):
         config["bsky_handle"] = handle
         config["pds_url"] = session["pds_url"]
         if backend == "config.json" and not config.get("warned_plaintext_secret", False):
-            print(c.warning("AVERTISSEMENT : l'App Password est stocké en clair dans config.json."))
-            print(
-                f"  {c.DIM}Installez keyring (pip install keyring) pour le placer dans le "
-                f"trousseau du système.{c.RESET}"
+            print(c.warning(_("AVERTISSEMENT : l'App Password est stocké en clair dans config.json.")))
+            installer = _(
+                "Installez keyring (pip install keyring) pour le placer dans le trousseau du système."
             )
+            print(f"  {c.DIM}{installer}{c.RESET}")
             config["warned_plaintext_secret"] = True
         save_config(config)
-        print(
-            c.success(
-                "Identifiants sauvegardés" + (" (trousseau du système)" if backend == "keyring" else "")
-            )
-        )
+        if backend == "keyring":
+            print(c.success(_("Identifiants sauvegardés (trousseau du système)")))
+        else:
+            print(c.success(_("Identifiants sauvegardés")))
 
     except AuthError as e:
-        print(c.error(f"Échec : {e}"))
-        print(f"  {c.DIM}Identifiants non sauvegardés{c.RESET}")
+        print(c.error(_("Échec : {erreur}").format(erreur=e)))
+        print(f"  {c.DIM}{_('Identifiants non sauvegardés')}{c.RESET}")
 
     pause()
 
@@ -665,17 +712,18 @@ def configure_credentials(config):
 def _edit_config_value(config, key, label, after_save=None):
     """Édite une valeur de configuration."""
     print()
-    print(f"  {c.KEY}Actuel:{c.RESET} {c.VALUE}{config[key]}{c.RESET}")
-    new_val = input(c.prompt(f"  Nouveau {label} (ENTRÉE pour garder): ")).strip()
+    print(f"  {c.KEY}{_('Actuel:')}{c.RESET} {c.VALUE}{config[key]}{c.RESET}")
+    invite = _("Nouveau {label} (ENTRÉE pour garder):").format(label=label)
+    new_val = input(c.prompt(f"  {invite} ")).strip()
 
     if new_val:
         config[key] = new_val
         save_config(config)
         if after_save:
             after_save()
-        print(c.success("Sauvegardé"))
+        print(c.success(_("Sauvegardé")))
     else:
-        print(c.success("Valeur inchangée"))
+        print(c.success(_("Valeur inchangée")))
 
     pause()
 
@@ -684,9 +732,9 @@ def _edit_workers(config):
     """Édite le nombre de workers parallèles."""
     current = config.get("max_workers", 4)
     print()
-    print(f"  {c.KEY}Actuel:{c.RESET} {c.VALUE}{current}{c.RESET} workers")
-    print(f"  {c.DIM}Plage recommandée : 1 (séquentiel) à 8 (rapide){c.RESET}")
-    new_val = input(c.prompt("  Nombre de workers (ENTRÉE pour garder): ")).strip()
+    print(f"  {c.KEY}{_('Actuel:')}{c.RESET} " + _("{n} workers").format(n=f"{c.VALUE}{current}{c.RESET}"))
+    print(f"  {c.DIM}{_('Plage recommandée : 1 (séquentiel) à 8 (rapide)')}{c.RESET}")
+    new_val = input(c.prompt(f"  {_('Nombre de workers (ENTRÉE pour garder):')} ")).strip()
 
     if new_val:
         try:
@@ -695,14 +743,14 @@ def _edit_workers(config):
                 n = 1
             elif n > 16:
                 n = 16
-                print(c.warning(f"Limité à {n} workers maximum"))
+                print(c.warning(_("Limité à {n} workers maximum").format(n=n)))
             config["max_workers"] = n
             save_config(config)
-            print(c.success(f"Workers mis à jour : {n}"))
+            print(c.success(_("Workers mis à jour : {n}").format(n=n)))
         except ValueError:
-            print(c.error("Valeur invalide (nombre entier attendu)"))
+            print(c.error(_("Valeur invalide (nombre entier attendu)")))
     else:
-        print(c.success("Valeur inchangée"))
+        print(c.success(_("Valeur inchangée")))
 
     pause()
 
@@ -714,30 +762,30 @@ def menu_download_new(config, state):
     """Menu Télécharger : synchronise si besoin, puis télécharge les nouveaux."""
     if not state["has_account"]:
         clear_screen()
-        print(c.box_header("TÉLÉCHARGER"))
+        print(c.box_header(_("TÉLÉCHARGER")))
         print()
-        print(c.warning("Aucun compte Bluesky connecté"))
+        print(c.warning(_("Aucun compte Bluesky connecté")))
         print()
-        print(f"  {c.KEY}Connectez d'abord votre compte :{c.RESET}")
-        print(f"    {c.DIM}Menu principal > 1. Mon compte{c.RESET}")
+        print(f"  {c.KEY}" + _("Connectez d'abord votre compte :") + f"{c.RESET}")
+        print(f"    {c.DIM}{_('Menu principal > 1. Mon compte')}{c.RESET}")
         pause()
         return
 
     # Si pas de sync récente, proposer d'en faire une
     if not state["has_urls"]:
         clear_screen()
-        print(c.box_header("TÉLÉCHARGER"))
+        print(c.box_header(_("TÉLÉCHARGER")))
         print()
-        print(c.info("Aucune synchronisation effectuée"))
+        print(c.info(_("Aucune synchronisation effectuée")))
         print()
-        if not confirm("Synchroniser les bookmarks maintenant ?"):
+        if not confirm(_("Synchroniser les bookmarks maintenant ?")):
             return
         do_sync(config)
         state = get_app_state(config)
 
     if state["new_count"] == 0:
         print()
-        print(c.success("Tout est à jour — aucun nouveau bookmark à télécharger"))
+        print(c.success(_("Tout est à jour — aucun nouveau bookmark à télécharger")))
         pause()
         return
 
@@ -749,14 +797,14 @@ def download_media(config, force=False):
     """Télécharge les médias via l'orchestrateur."""
     urls_file = resolve_path(config, "urls_file")
     if not urls_file.exists():
-        print(c.error(f"Fichier {config['urls_file']} introuvable"))
+        print(c.error(_("Fichier {fichier} introuvable").format(fichier=config["urls_file"])))
         return False
 
     with open(urls_file, encoding="utf-8") as f:
         urls = [line.strip() for line in f if line.strip()]
 
     if not urls:
-        print(c.warning("Aucune URL à traiter"))
+        print(c.warning(_("Aucune URL à traiter")))
         return False
 
     db = Database(resolve_path(config, "db_file"))
@@ -764,28 +812,34 @@ def download_media(config, force=False):
     if force:
         urls_to_process = urls
         print()
-        print(c.warning(f"Mode FORCE : {len(urls)} posts seront tous traités"))
+        print(c.warning(_("Mode FORCE : {n} posts seront tous traités").format(n=len(urls))))
     else:
         urls_to_process = db.get_pending_posts(urls, config.get("retry_after_days", 7))
         new = len(urls_to_process)
         total = len(urls)
         print()
-        print(c.info(f"{total} URLs au total, {c.VALUE}{new}{c.RESET} nouvelles"))
+        print(
+            c.info(
+                _("{total} URLs au total, {new} nouvelles").format(
+                    total=total, new=f"{c.VALUE}{new}{c.RESET}"
+                )
+            )
+        )
 
     if not urls_to_process:
-        print(c.success("Tous les posts sont déjà traités"))
+        print(c.success(_("Tous les posts sont déjà traités")))
         db.close()
         return True
 
     print()
-    if not confirm(f"Traiter {len(urls_to_process)} posts ?"):
+    if not confirm(_("Traiter {n} posts ?").format(n=len(urls_to_process))):
         db.close()
         return False
 
     db.close()
 
     print()
-    print(c.info("Lancement du téléchargement..."))
+    print(c.info(_("Lancement du téléchargement...")))
     print()
 
     # Vues hydratées de la dernière synchro : évitent un getRecord par post
@@ -802,28 +856,28 @@ def download_media_dev(config):
     """Mode dev : télécharge depuis urls.txt sans token ni DB."""
     urls_file = resolve_path(config, "urls_file")
     if not urls_file.exists() or urls_file.stat().st_size == 0:
-        print(c.warning("Aucune URL disponible dans urls.txt"))
+        print(c.warning(_("Aucune URL disponible dans urls.txt")))
         return False
 
     with open(urls_file, encoding="utf-8") as f:
         urls = [line.strip() for line in f if line.strip()]
 
     if not urls:
-        print(c.warning("Aucune URL à traiter"))
+        print(c.warning(_("Aucune URL à traiter")))
         return False
 
     clear_screen()
-    print(c.box_header("MODE DÉVELOPPEMENT"))
+    print(c.box_header(_("MODE DÉVELOPPEMENT")))
     print()
-    print(c.warning("Traitement direct depuis urls.txt"))
-    print(c.config_line("Token", f"{c.DIM}non vérifié{c.RESET}"))
-    print(c.config_line("Base de données", f"{c.DIM}non mise à jour{c.RESET}"))
-    print(c.config_line("Posts à traiter", f"{c.VALUE}{len(urls)}{c.RESET}"))
+    print(c.warning(_("Traitement direct depuis urls.txt")))
+    print(c.config_line("Token", f"{c.DIM}{_('non vérifié')}{c.RESET}"))
+    print(c.config_line(_("Base de données"), f"{c.DIM}{_('non mise à jour')}{c.RESET}"))
+    print(c.config_line(_("Posts à traiter"), f"{c.VALUE}{len(urls)}{c.RESET}"))
     print()
     print(c.separator())
     print()
 
-    if not confirm(f"Traiter {len(urls)} posts en mode dev ?"):
+    if not confirm(_("Traiter {n} posts en mode dev ?").format(n=len(urls))):
         return False
 
     stats = run(urls, config, no_db=True)
@@ -835,7 +889,7 @@ def _proposer_ouverture(config, stats):
     """Propose d'ouvrir le dossier de téléchargements si au moins un post a réussi."""
     if stats["success"] > 0 and config.get("open_folder_after_download", True):
         print()
-        if confirm("Ouvrir le dossier de téléchargements ?"):
+        if confirm(_("Ouvrir le dossier de téléchargements ?")):
             open_download_folder(config)
 
 
@@ -876,7 +930,7 @@ def main(argv=None):
     try:
         run_menu(config)
     except (EOFError, KeyboardInterrupt):
-        print(f"\n  {c.DIM}Entrée interrompue — fin du programme{c.RESET}")
+        print(f"\n  {c.DIM}{_('Entrée interrompue — fin du programme')}{c.RESET}")
     return 0
 
 
@@ -888,10 +942,10 @@ def run_menu(config):
         print_header(config, state)
         show_main_menu(state)
 
-        choice = input(c.prompt("  Votre choix: ")).strip()
+        choice = input(_invite_choix()).strip()
 
         if choice == "0":
-            print(f"\n  {c.DIM}Au revoir !{c.RESET}")
+            print(f"\n  {c.DIM}{_('Au revoir !')}{c.RESET}")
             break
         elif choice == "1":
             menu_account(config, state)
@@ -902,7 +956,7 @@ def run_menu(config):
         elif choice == "4":
             menu_download_new(config, state)
         else:
-            print(c.error(f'Choix invalide : "{choice}"'))
+            print(_choix_invalide(choice))
             pause()
 
 

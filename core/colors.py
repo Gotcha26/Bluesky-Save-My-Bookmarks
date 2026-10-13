@@ -7,6 +7,8 @@ Pattern menu-generator : classe centralisée, détection auto du terminal
 import os
 import sys
 
+from core.i18n import _
+
 
 class Colors:
     """Gestion centralisée des couleurs ANSI avec détection automatique du terminal."""
@@ -116,27 +118,27 @@ class Colors:
     # --- Méthodes de formatage avec préfixe ---
 
     def success(self, text):
-        return f"  {self.GREEN}[OK]{self.RESET} {text}"
+        return f"  {self.GREEN}{_('[OK]')}{self.RESET} {text}"
 
     def error(self, text):
-        return f"  {self.RED}[ERREUR]{self.RESET} {text}"
+        return f"  {self.RED}{_('[ERREUR]')}{self.RESET} {text}"
 
     def warning(self, text):
-        return f"  {self.YELLOW}[ATTENTION]{self.RESET} {text}"
+        return f"  {self.YELLOW}{_('[ATTENTION]')}{self.RESET} {text}"
 
     def info(self, text):
-        return f"  {self.BLUE}[INFO]{self.RESET} {text}"
+        return f"  {self.BLUE}{_('[INFO]')}{self.RESET} {text}"
 
     # --- Marqueurs isolés ---
 
     def ok_marker(self):
-        return f"{self.GREEN}[OK]{self.RESET}"
+        return f"{self.GREEN}{_('[OK]')}{self.RESET}"
 
     def error_marker(self):
-        return f"{self.RED}[ERREUR]{self.RESET}"
+        return f"{self.RED}{_('[ERREUR]')}{self.RESET}"
 
     def warn_marker(self):
-        return f"{self.YELLOW}[ATTENTION]{self.RESET}"
+        return f"{self.YELLOW}{_('[ATTENTION]')}{self.RESET}"
 
     # --- Formatage inline ---
 
