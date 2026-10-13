@@ -38,6 +38,8 @@ def _session(record=None, erreur_api=None, erreur_blob=None, contenu=b"video!"):
         if erreur_blob:
             raise erreur_blob
         rep = MagicMock()
+        rep.status_code = 200
+        rep.headers = {"content-type": "video/mp4"}
         rep.iter_content.return_value = [contenu[:3], contenu[3:]]
         return rep
 
@@ -69,6 +71,11 @@ class TestFonctionsPures:
             "text": "Ma vidéo",
             "created_at": "2026-01-02T10:00:00.000Z",
             "cid": CID,
+            "did": DID,
+            "mime": "",
+            "alt": "",
+            "presentation": "",
+            "captions": [],
         }
 
     def test_extract_video_info_post_cite(self):
