@@ -151,7 +151,7 @@ class BookmarkSync:
             new_count = len(self.db.get_pending_refs(vivants, retry_after_days))
             has_cache = True
         elif urls_file.exists() and urls_file.stat().st_size > 0:
-            with open(urls_file, "r", encoding="utf-8") as f:
+            with open(urls_file, encoding="utf-8") as f:
                 urls = [line.strip() for line in f if line.strip()]
             online_count = len(urls)
             new_count = len(self.db.get_pending_posts(urls, retry_after_days))

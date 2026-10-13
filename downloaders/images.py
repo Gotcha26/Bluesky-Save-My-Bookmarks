@@ -396,7 +396,7 @@ def main(argv=None):
     url_input = argv[1] if len(argv) > 1 else input("👉 Collez une URL : ").strip()
 
     if os.path.isfile(url_input):
-        with open(url_input, "r", encoding="utf-8") as f:
+        with open(url_input, encoding="utf-8") as f:
             urls = [line.strip() for line in f if line.strip()]
     else:
         urls = [url_input] if url_input else []
