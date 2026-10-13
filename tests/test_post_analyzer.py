@@ -1,10 +1,23 @@
 """Tests pour api/post_analyzer.py"""
 
+import json
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
 
 from api.post_analyzer import PostAnalyzer, PostType
+
+FIXTURES = Path(__file__).parent / "fixtures"
+
+
+def _reponse_fixture(nom):
+    """Réponse getRecord (200) construite depuis une fixture JSON anonymisée de tests/fixtures/."""
+    resp = MagicMock()
+    resp.status_code = 200
+    resp.raise_for_status.return_value = None
+    resp.json.return_value = json.loads((FIXTURES / nom).read_text(encoding="utf-8"))
+    return resp
 
 
 class TestPostTypeEnum:
@@ -76,55 +89,25 @@ class TestAnalyzePostTypes:
         self.analyzer = PostAnalyzer()
 
     def test_detect_images(self, mock_get):
-        mock_resp = MagicMock()
-        mock_resp.status_code = 200
-        mock_resp.raise_for_status.return_value = None
-        mock_resp.json.return_value = {
-            "uri": "at://did:plc:abc/app.bsky.feed.post/123",
-            "value": {
-                "createdAt": "2026-01-15T10:00:00Z",
-                "text": "Voici mes photos",
-                "embed": {
-                    "$type": "app.bsky.embed.images",
-                    "images": [
-                        {"image": {"ref": {"$link": "bafkrei_img1"}}},
-                        {"image": {"ref": {"$link": "bafkrei_img2"}}},
-                    ],
-                },
-            },
-        }
-        mock_get.return_value = mock_resp
+        mock_get.return_value = _reponse_fixture("post_images.json")
 
-        post_type, data, _ = self.analyzer.analyze("https://bsky.app/profile/user.bsky.social/post/123")
+        post_type, data, _ = self.analyzer.analyze(
+            "https://bsky.app/profile/user.bsky.social/post/3ktest000010"
+        )
         assert post_type == PostType.IMAGES
         assert data["image_count"] == 2
         assert len(data["images"]) == 2
+        assert data["images"][0].endswith("bafkreitestimage0000000000000000000000000000000000000001@jpeg")
 
     def test_detect_video(self, mock_get):
-        mock_resp = MagicMock()
-        mock_resp.status_code = 200
-        mock_resp.raise_for_status.return_value = None
-        mock_resp.json.return_value = {
-            "uri": "at://did:plc:abc/app.bsky.feed.post/456",
-            "value": {
-                "createdAt": "2026-01-15T10:00:00Z",
-                "text": "Ma vidéo",
-                "embed": {
-                    "$type": "app.bsky.embed.video",
-                    "video": {
-                        "ref": {"$link": "bafkrei_vid1"},
-                        "mimeType": "video/mp4",
-                        "size": 1024000,
-                    },
-                },
-            },
-        }
-        mock_get.return_value = mock_resp
+        mock_get.return_value = _reponse_fixture("post_video.json")
 
-        post_type, data, _ = self.analyzer.analyze("https://bsky.app/profile/user.bsky.social/post/456")
+        post_type, data, _ = self.analyzer.analyze(
+            "https://bsky.app/profile/user.bsky.social/post/3ktest000020"
+        )
         assert post_type == PostType.VIDEO
         assert "video_url" in data
-        assert data["video_cid"] == "bafkrei_vid1"
+        assert data["video_cid"] == "bafkreitestvideo0000000000000000000000000000000000000001"
 
     def test_detect_quote(self, mock_get):
         mock_resp = MagicMock()
@@ -164,29 +147,15 @@ class TestAnalyzePostTypes:
         assert post_type == PostType.TEXT_ONLY
 
     def test_detect_record_with_media_images(self, mock_get):
-        mock_resp = MagicMock()
-        mock_resp.status_code = 200
-        mock_resp.raise_for_status.return_value = None
-        mock_resp.json.return_value = {
-            "uri": "at://did:plc:abc/app.bsky.feed.post/qp1",
-            "value": {
-                "createdAt": "2026-01-15T10:00:00Z",
-                "text": "Quote post avec image",
-                "embed": {
-                    "$type": "app.bsky.embed.recordWithMedia",
-                    "record": {"record": {"uri": "at://did:plc:other/app.bsky.feed.post/orig"}},
-                    "media": {
-                        "$type": "app.bsky.embed.images",
-                        "images": [{"image": {"ref": {"$link": "bafkrei_qp1"}}}],
-                    },
-                },
-            },
-        }
-        mock_get.return_value = mock_resp
+        mock_get.return_value = _reponse_fixture("post_record_with_media.json")
 
-        post_type, data, _ = self.analyzer.analyze("https://bsky.app/profile/user.bsky.social/post/qp1")
+        post_type, data, _ = self.analyzer.analyze(
+            "https://bsky.app/profile/user.bsky.social/post/3ktest000030"
+        )
         assert post_type == PostType.IMAGES
         assert data["image_count"] == 1
+        assert data["is_quote"] is True
+        assert data["quote_uri"].endswith("/app.bsky.feed.post/3ktest000031")
 
     def test_network_error(self, mock_get):
         import requests

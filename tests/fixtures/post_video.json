@@ -1,0 +1,27 @@
+{
+  "uri": "at://did:plc:test000000000000000000000/app.bsky.feed.post/3ktest000020",
+  "cid": "bafyreitest000000000000000000000000000000000000000000000020",
+  "value": {
+    "text": "Ma vidéo",
+    "$type": "app.bsky.feed.post",
+    "embed": {
+      "$type": "app.bsky.embed.video",
+      "video": {
+        "$type": "blob",
+        "ref": {
+          "$link": "bafkreitestvideo0000000000000000000000000000000000000001"
+        },
+        "mimeType": "video/mp4",
+        "size": 1024000
+      },
+      "aspectRatio": {
+        "width": 1920,
+        "height": 1080
+      }
+    },
+    "langs": [
+      "fr"
+    ],
+    "createdAt": "2026-01-15T11:00:00.000Z"
+  }
+}
