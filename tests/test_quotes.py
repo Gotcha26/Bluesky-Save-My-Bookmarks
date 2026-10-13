@@ -18,6 +18,12 @@ HANDLES = {D1: "citant.example.com", D2: "cite.example.com", D3: "troisieme.exam
 BASE = "citant_example_com_20260210"  # <handle>_<date> du citant (handle sans points)
 
 
+@pytest.fixture(autouse=True)
+def _dossier_courant_isole(tmp_path, monkeypatch):
+    """Le dossier texte « TXT » est relatif : write_text écrit dans un dossier temporaire."""
+    monkeypatch.chdir(tmp_path)
+
+
 def charger(nom):
     return json.loads((FIXTURES / nom).read_text(encoding="utf-8"))
 
@@ -87,14 +93,14 @@ class Downloaders:
         return [(nom, prefixe) for nom, _, prefixe in self.appels]
 
 
-def lancer(url, records, tmp_db, tmp_path, statuts=None, downloaders=None, non_resolues=None):
+def lancer(url, records, tmp_db, tmp_path, statuts=None, downloaders=None, non_resolues=None, sidecar=False):
     reseau = Reseau(records, statuts)
     downloaders = downloaders or Downloaders()
     journal = []
     with patch("requests.get", side_effect=reseau), downloaders.patch():
         resultat = process_post(
             url, "IMG", "VID", "TXT", tmp_db, PostAnalyzer(), QuoteResolver(), tmp_path,
-            lambda msg, **k: journal.append(msg), config={"max_filename_len": 120},
+            lambda msg, **k: journal.append(msg), config={"max_filename_len": 120, "save_sidecar": sidecar},
             quotes_unresolved=non_resolues,
         )
     return resultat, downloaders, journal, reseau
@@ -137,7 +143,7 @@ class TestCitationDeTexte:
         res, dl, _, _ = lancer(url, [charger("quote_text.json"), post_texte(D2, "3kcited0001", embed=images)],
                                tmp_db, tmp_path)
         assert ("download_images", f"{BASE}_3kquote0001_quote") in dl.noms()
-        assert res[1] == 1 and res[3] == 1  # une image citée, le texte du citant
+        assert res[1] == 1 and res[3] == 2  # une image citée, le texte du citant et celui du cité (write_text)
 
     def test_cite_avec_video(self, tmp_db, tmp_path):
         video = {"$type": "app.bsky.embed.video", "video": {"ref": {"$link": "bafkreitestvideo"}}}
@@ -148,6 +154,18 @@ class TestCitationDeTexte:
         assert res[2] == 1
 
 
+class TestFichesJsonDesCitations:
+    def test_le_cite_a_sa_propre_fiche_json_prefixee(self, tmp_db, tmp_path):
+        url = url_citant("quote_text.json")
+        res, _, _, _ = lancer(url, [charger("quote_text.json"), post_texte(D2, "3kcited0001")], tmp_db, tmp_path,
+                              sidecar=True)
+        fiches = [r for r in medias(tmp_db) if r.endswith(".json")]
+        assert fiches == [f"{BASE}_3kquote0001.json", f"{BASE}_3kquote0001_quote.json"]
+        cite = json.loads((tmp_path / "TXT" / f"{BASE}_3kquote0001_quote.json").read_text(encoding="utf-8"))
+        assert cite["record"]["text"] == "Le post cité"
+        assert cite["url"] == f"https://bsky.app/profile/{HANDLES[D2]}/post/3kcited0001"
+
+
 class TestCitationAvecMedia:
     def test_media_du_citant_texte_puis_cite(self, tmp_db, tmp_path):
         url = url_citant("quote_with_media.json")
@@ -156,7 +174,6 @@ class TestCitationAvecMedia:
         assert res[4] == "success"
         assert dl.noms() == [
             ("download_images", None),
-            ("save_text", None),
             ("save_text", f"{BASE}_3kquote0002_quote"),
         ]
         assert res[1] == 1 and res[3] == 2
@@ -172,8 +189,8 @@ class TestEchecDuContenuPropre:
         res, _, _, _ = lancer(url, [charger("quote_with_media.json"), post_texte(D2, "3kcited0001")],
                               tmp_db, tmp_path, downloaders=dl)
         assert res[0] is False and res[4] == "failed"
-        # ce qui a été obtenu est conservé en base
-        assert len(medias(tmp_db)) == 2
+        # ce qui a été obtenu est conservé en base (le texte du citant, écrit avec le média, attend la réussite)
+        assert len(medias(tmp_db)) == 1
         assert statut(tmp_db, url) != "deleted"
 
     def test_texte_du_citant_en_erreur_cite_archive_est_failed(self, tmp_db, tmp_path):
