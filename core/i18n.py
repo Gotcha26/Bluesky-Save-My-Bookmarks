@@ -18,9 +18,9 @@ usage. Aucun code ne s'exécute à l'import de ce module.
 """
 
 import gettext
+import importlib.util
 import locale
 import os
-import sys
 import tempfile
 import threading
 from pathlib import Path
@@ -70,23 +70,26 @@ def _normaliser(language):
 
 def _compiler(po, mo):
     """Compile `po` en `mo` avec tools/msgfmt.py. Renvoie True en cas de succès."""
-    outils = str(PROJECT_ROOT / "tools")
-    ajoute = outils not in sys.path
-    if ajoute:
-        sys.path.insert(0, outils)
+    # Contournements du msgfmt.py de CPython, laissé tel quel :
+    # - son dictionnaire MESSAGES est global : on en charge une instance neuve à chaque appel ;
+    # - il décode en latin-1 le premier msgid qui suit l'en-tête (mojibake si non ASCII) :
+    #   on glisse une entrée ASCII sans traduction (ignorée à la compilation) après l'en-tête.
     try:
-        import msgfmt
+        spec = importlib.util.spec_from_file_location("bsmb_msgfmt", PROJECT_ROOT / "tools" / "msgfmt.py")
+        msgfmt = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(msgfmt)
 
+        texte = po.read_text(encoding="utf-8")
+        entete, sep, reste = texte.partition("\n\n")
+        texte = f'{entete}{sep}msgid "bsmb-sentinelle"\nmsgstr ""\n\n{reste}'
         mo.parent.mkdir(parents=True, exist_ok=True)
-        with _lock:
-            msgfmt.MESSAGES.clear()
-            msgfmt.make(str(po), str(mo))
+        with tempfile.TemporaryDirectory() as tmp:
+            copie = Path(tmp) / "bsmb.po"
+            copie.write_text(texte, encoding="utf-8", newline="\n")
+            msgfmt.make(str(copie), str(mo))
         return True
     except (OSError, SystemExit, ImportError, SyntaxError, ValueError):
         return False
-    finally:
-        if ajoute and outils in sys.path:
-            sys.path.remove(outils)
 
 
 def _a_jour(po, mo):
