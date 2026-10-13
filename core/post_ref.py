@@ -24,9 +24,9 @@ def _is_valid_handle(handle):
 class PostRef:
     """Référence à un post. `did` vaut None si seul le handle est connu."""
 
-    did: Optional[str]
+    did: str | None
     rkey: str
-    handle: Optional[str] = None
+    handle: str | None = None
 
     @property
     def at_uri(self):

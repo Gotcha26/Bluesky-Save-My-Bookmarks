@@ -9,7 +9,7 @@ Pas d'usage manuel : l'orchestrateur et les downloaders texte / external fournis
 """
 import json
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -206,7 +206,7 @@ def write_sidecar(post_url, record, post_view, dest_dir, config, name_prefix=Non
     fiche = {
         "url": post_url,
         "at_uri": at_uri,
-        "archived_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "archived_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "bsmb_version": bsmb_version(),
         "record": record,
         "post_view": post_view,

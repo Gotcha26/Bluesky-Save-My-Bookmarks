@@ -31,10 +31,10 @@ class QuoteTarget:
     record cité n'est pas un post.
     """
 
-    url: Optional[str]
+    url: str | None
     did: str
     rkey: str
-    handle: Optional[str]
+    handle: str | None
     collection: str
     state: str
 
