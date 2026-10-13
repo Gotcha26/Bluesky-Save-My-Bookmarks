@@ -363,7 +363,7 @@ elif post_type == PostType.ERROR_400:
 
 ### Entrée
 ```bash
-python orchestrator.py <IMG_DIR> <VID_DIR> [--no-db] <URL1> <URL2> ...
+python orchestrator.py <IMG_DIR> <VID_DIR> <TEXT_DIR> [--no-db] <URL1> <URL2> ...
 ```
 
 ### Sortie

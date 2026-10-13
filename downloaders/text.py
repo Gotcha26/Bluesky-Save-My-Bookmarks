@@ -19,12 +19,16 @@ from core.config import get_default_paths
 
 default_paths = get_default_paths()
 
-TEXT_DIR = os.path.join(os.path.dirname(default_paths["img_dir"]), "texts")
+# Usage : text.py <TEXT_DIR> <url> ; avec un seul argument (URL), ancien comportement
+if len(sys.argv) > 2:
+    TEXT_DIR = sys.argv[1]
+    url = sys.argv[2]
+else:
+    TEXT_DIR = os.path.join(os.path.dirname(default_paths["img_dir"]), "texts")
+    url = sys.argv[1] if len(sys.argv) > 1 else None
 os.makedirs(TEXT_DIR, exist_ok=True)
 
-if len(sys.argv) > 1:
-    url = sys.argv[1]
-else:
+if url is None:
     url = input("👉 URL : ").strip()
 
 def fetch_post(handle, post_id):
