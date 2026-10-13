@@ -27,6 +27,23 @@ def fetch_post(handle, post_id, http=requests):
     resp.raise_for_status()
     return resp.json()
 
+def nom_base_texte(handle, post_id, created_at):
+    """Nom sans extension : <handle>_<YYYYMMDD>_<postid> (date du jour si createdAt est illisible)."""
+    date_str = datetime.now().strftime("%Y%m%d")
+    if created_at:
+        try:
+            date_str = datetime.fromisoformat(created_at.replace("Z", "")).strftime("%Y%m%d")
+        except ValueError:
+            pass
+    handle_safe = handle.replace(":", "_").replace(".", "_")[:20]
+    return f"{handle_safe}_{date_str}_{post_id}"
+
+
+def nom_fichier_texte(handle, post_id, created_at):
+    """Nom du fichier texte d'un post : <handle>_<YYYYMMDD>_<postid>.txt"""
+    return f"{nom_base_texte(handle, post_id, created_at)}.txt"
+
+
 def save_text(post_url, dest_dir, config, session=None):
     """
     Sauvegarde le texte d'un post dans dest_dir.
@@ -58,17 +75,7 @@ def save_text(post_url, dest_dir, config, session=None):
     if not text:
         return []
 
-    # Date
-    date_str = datetime.now().strftime("%Y%m%d")
-    if created_at:
-        try:
-            date_str = datetime.fromisoformat(created_at.replace("Z", "")).strftime("%Y%m%d")
-        except ValueError:
-            pass
-
-    # Nom fichier
-    handle_safe = handle.replace(":", "_").replace(".", "_")[:20]
-    filename = f"{handle_safe}_{date_str}_{post_id}.txt"
+    filename = nom_fichier_texte(handle, post_id, created_at)
     dest_dir = Path(dest_dir)
     dest_dir.mkdir(parents=True, exist_ok=True)
     filepath = dest_dir / filename

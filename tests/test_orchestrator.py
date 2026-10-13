@@ -61,6 +61,46 @@ class TestProcessPostTexte:
         assert tmp_db.get_stats()["texts"] == 0
 
 
+class TestProcessPostExternal:
+    DATA = {"handle": "user.bsky.social", "external": {"uri": "https://example.com"}}
+
+    def _lancer(self, db, tmp_path, resultats=None, erreur=None):
+        dl = MagicMock(return_value=resultats or [], side_effect=erreur)
+        with patch("core.orchestrator.download_external", dl):
+            resultat = process_post(
+                URL, "IMG", "VID", "TXT", db, _analyseur(PostType.EXTERNAL, self.DATA), MagicMock(),
+                tmp_path, lambda *a, **k: None, config={"max_filename_len": 64},
+            )
+        return resultat, dl
+
+    def test_arguments_transmis_au_downloader(self, tmp_db, tmp_path):
+        _, dl = self._lancer(tmp_db, tmp_path, [_res("t.txt", "text")])
+        dl.assert_called_once_with(
+            URL, self.DATA, {"img_dir": "IMG", "vid_dir": "VID", "text_dir": "TXT"}, {"max_filename_len": 64})
+
+    def test_comptage_par_type_et_base(self, tmp_db, tmp_path):
+        res = [_res("t.txt", "text"), _res("t_thumb.jpg", "image", "bafkrei"), _res("t_01.mp4", "video")]
+        resultat, _ = self._lancer(tmp_db, tmp_path, res)
+        assert resultat[:5] == (True, 1, 1, 1, "success")
+        assert _medias(tmp_db) == [("text", "t.txt", None), ("image", "t_thumb.jpg", "bafkrei"),
+                                   ("video", "t_01.mp4", None)]
+
+    def test_lignes_console(self, tmp_db, tmp_path):
+        res = [_res("t.txt", "text"), _res("t_thumb.jpg", "image")]
+        resultat, _ = self._lancer(tmp_db, tmp_path, res)
+        assert any("[TXT] t.txt" in ligne for ligne in resultat[5])
+        assert any("[DL] Téléchargé -> t_thumb.jpg" in ligne for ligne in resultat[5])
+
+    def test_texte_seul_suffit(self, tmp_db, tmp_path):
+        resultat, _ = self._lancer(tmp_db, tmp_path, [_res("t.txt", "text")])
+        assert resultat[:5] == (True, 0, 0, 1, "success")
+
+    def test_download_error_donne_failed(self, tmp_db, tmp_path):
+        resultat, _ = self._lancer(tmp_db, tmp_path, erreur=DownloadError("disque plein"))
+        assert resultat[:5] == (False, 0, 0, 0, "failed")
+        assert _medias(tmp_db) == []
+
+
 class TestProcessPostMedias:
     def test_images_comptees_depuis_les_resultats(self, tmp_db, tmp_path):
         res = [_res("a_1.jpg", "image"), _res("a_2.png", "image")]

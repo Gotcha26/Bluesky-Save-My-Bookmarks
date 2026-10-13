@@ -135,7 +135,8 @@ bsmb/
 │   ├── __init__.py             # DownloadResult, DownloadError
 │   ├── images.py               # download_images() : images avec EXIF
 │   ├── videos.py               # download_video() : vidéos avec ffmpeg
-│   └── text.py                 # save_text() : texte seul
+│   ├── text.py                 # save_text() : texte seul
+│   └── external.py             # download_external() : cartes de lien, GIF Tenor
 │
 ├── tests/                       # Tests unitaires (pytest)
 └── logs/                        # Fichiers de log (auto-créé)

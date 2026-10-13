@@ -12,6 +12,7 @@ class TestPostTypeEnum:
         assert PostType.IMAGES.value == "images"
         assert PostType.VIDEO.value == "video"
         assert PostType.TEXT_ONLY.value == "text_only"
+        assert PostType.EXTERNAL.value == "external"
         assert PostType.UNKNOWN.value == "unknown"
 
 

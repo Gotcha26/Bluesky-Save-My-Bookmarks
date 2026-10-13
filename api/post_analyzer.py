@@ -15,7 +15,21 @@ class PostType(Enum):
     IMAGES = "images"
     VIDEO = "video"
     TEXT_ONLY = "text_only"
+    EXTERNAL = "external"
     UNKNOWN = "unknown"
+
+
+def _external_info(embed_external):
+    """Champs utiles d'un `external` brut ({} s'il n'a pas d'URI)."""
+    uri = embed_external.get("uri")
+    if not uri:
+        return {}
+    return {
+        "uri": uri,
+        "title": embed_external.get("title", ""),
+        "description": embed_external.get("description", ""),
+        "thumb_cid": embed_external.get("thumb", {}).get("ref", {}).get("$link"),
+    }
 
 def _identity(did, rkey):
     """Champs d'identité canonique ({} tant que le DID est inconnu)."""
@@ -114,6 +128,13 @@ class PostAnalyzer:
                 result_data["image_count"] = len(images)
                 return PostType.IMAGES, result_data, debug_info
         
+        # 2 bis. Carte de lien / GIF (external)
+        if embed_type == "app.bsky.embed.external":
+            external = _external_info(embed.get("external", {}))
+            if external:
+                result_data["external"] = external
+                return PostType.EXTERNAL, result_data, debug_info
+
         # 3. Repost
         if embed_type == "app.bsky.embed.record":
             result_data["is_repost"] = True
@@ -148,6 +169,14 @@ class PostAnalyzer:
                     result_data["image_count"] = len(images)
                     return PostType.IMAGES, result_data, debug_info
         
+            if media_type == "app.bsky.embed.external":
+                external = _external_info(media.get("external", {}))
+                if external:
+                    result_data["external"] = external
+                    # Le record cité est traité à part (tâche suivante)
+                    result_data["is_quote"] = True
+                    return PostType.EXTERNAL, result_data, debug_info
+
         # 5. Texte seul
         if result_data["text"] and not embed:
             return PostType.TEXT_ONLY, result_data, debug_info

@@ -161,6 +161,9 @@ Les médias seront téléchargés normalement, mais sans métadonnées intégré
 **Puis-je utiliser la liste de bookmarks avec d'autres outils ?**
 Oui. Le fichier `urls.txt` est compatible avec `yt-dlp -a urls.txt`, `wget -i urls.txt`, etc.
 
+**Que devient un post qui partage un lien (article, YouTube, x.com…) ?**
+BSMB archive le texte du post, le lien, son titre, sa description et la vignette de la carte. Le contenu du site lié n'est pas téléchargé (sauf un GIF Tenor ou un fichier `.gif` / `.mp4` / `.webp` direct) : `yt-dlp -a urls.txt` reste utilisable pour ces cas.
+
 ---
 
 ## Sécurité et confidentialité
