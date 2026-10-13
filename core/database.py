@@ -236,6 +236,16 @@ class Database:
             ''', (post_url, media_type, filename, now, cid))
             self.conn.commit()
 
+    def find_media_by_cid(self, cid):
+        """Nom du fichier déjà enregistré pour ce CID de blob, ou None (thread-safe)."""
+        if not cid:
+            return None
+        with self._lock:
+            row = self.conn.execute(
+                "SELECT filename FROM media WHERE cid = ? ORDER BY id LIMIT 1", (cid,)
+            ).fetchone()
+        return row[0] if row else None
+
     def update_last_check(self, url):
         """Met à jour la date de dernière vérification d'un post (thread-safe)."""
         with self._lock:

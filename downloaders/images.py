@@ -32,6 +32,7 @@ from core.config import DEFAULT_CONFIG, get_default_paths, load_config  # noqa: 
 from downloaders import DownloadError, DownloadResult, lignes_console  # noqa: E402
 
 SPACER = " - "
+GET_RECORD_URL = "https://bsky.social/xrpc/com.atproto.repo.getRecord"
 
 
 def safe_part(s: str) -> str:
@@ -107,10 +108,13 @@ def fetch_post_json(handle: str, post_id: str, http=requests):
     resp.raise_for_status()
     return resp.json()
 
-def extract_images_from_bsky(post_url: str, http=requests):
+def extract_images_from_bsky(post_url: str, http=requests, details: dict | None = None):
     """
     Lit le post via getPostThread et extrait les URLs des images.
     Lève DownloadError si l'API échoue.
+
+    details : dict (optionnel) complété avec « did » (auteur) et « propres » (nombre
+    d'images du post lui-même, placées en tête de liste ; les suivantes viennent du post cité).
     """
     parsed = urlparse(post_url)
     parts = parsed.path.strip("/").split("/")
@@ -148,6 +152,8 @@ def extract_images_from_bsky(post_url: str, http=requests):
 
     images = []
     is_repost = False
+    if details is not None:
+        details["did"] = author.get("did") or (handle_from_url if handle_from_url.startswith("did:") else None)
 
     # ORDRE : 1. Images directes, 2. RecordWithMedia, 3. Repost
 
@@ -179,7 +185,43 @@ def extract_images_from_bsky(post_url: str, http=requests):
                     if full_url:
                         images.append(full_url)
 
+    if details is not None:
+        details["propres"] = 0 if is_repost else len(images)
     return handle, date_str, post_id, images, post_text, created_at, is_repost
+
+
+def images_du_record(record: dict | None) -> list[dict]:
+    """Images du record brut d'un post : [{"cid", "mime", "alt"}], dans l'ordre du post."""
+    embed = (record or {}).get("embed") or {}
+    liste = embed.get("images") or (embed.get("media") or {}).get("images") or []
+    resultat = []
+    for img in liste:
+        blob = img.get("image") or {}
+        cid = (blob.get("ref") or {}).get("$link")
+        resultat.append({"cid": cid, "mime": blob.get("mimeType") or "", "alt": img.get("alt", "")})
+    return resultat
+
+
+def fetch_record(handle_or_did: str, post_id: str, http=requests):
+    """Record brut (`value`) du post via getRecord, ou None si indisponible."""
+    try:
+        resp = http.get(GET_RECORD_URL, params={"repo": handle_or_did, "collection": "app.bsky.feed.post",
+                                                "rkey": post_id}, timeout=15)
+        resp.raise_for_status()
+        return (resp.json() or {}).get("value")
+    except Exception:
+        return None
+
+
+MIME_EXT = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp", "image/gif": ".gif"}
+
+
+def ext_from_mime(mime: str) -> str:
+    """Extension d'un mimeType d'image ; '' si le mimeType est inconnu (vide)."""
+    if not mime:
+        return ""
+    mime = mime.split(";", 1)[0].strip().lower()
+    return MIME_EXT.get(mime) or mimetypes.guess_extension(mime) or ".jpg"
 
 # -------------------- Téléchargement --------------------
 def download_image(url, filepath, handle, post_id, post_url, post_text, created_at, http=requests):
@@ -212,23 +254,53 @@ def build_prefixed_filename(prefix: str, index: int, ext: str, max_len, index_di
     return prefix[:max(1, max_len - len(suffix))] + suffix
 
 
-def download_images(post_url, dest_dir, config, session=None, name_prefix=None):
+def _existant_sur_disque(existing_cid, cid):
+    """Chemin du fichier déjà enregistré pour ce cid s'il existe sur disque, sinon None."""
+    if not (existing_cid and cid):
+        return None
+    chemin = existing_cid(cid)
+    if chemin and Path(chemin).is_file():
+        return Path(chemin)
+    return None
+
+
+def download_images(post_url, dest_dir, config, session=None, name_prefix=None,
+                    record=None, existing_cid=None):
     """
     Télécharge les images d'un post dans dest_dir.
 
     name_prefix : si fourni, remplace la base <handle>_<date>_<postid> du nom
     (images d'un post cité : <prefix>_<n>.<ext>).
+    record : record brut du post (`value` de getRecord) d'où lire cid et mimeType des
+    images ; absent, un getRecord est fait. Sans cid, seul le CDN est utilisable.
+    existing_cid : callback cid -> chemin d'un fichier déjà enregistré (ou None) ; avec
+    config["skip_existing_cid"], une image dont le fichier existe est sautée.
+
+    Mode config["image_quality"] : « original » (défaut) télécharge le blob d'origine
+    (com.atproto.sync.getBlob) avec repli sur le CDN ; « cdn » l'image fullsize du CDN.
 
     Returns:
-        list[DownloadResult] : une entrée par image écrite ; liste vide si le
-        post ne contient aucune image.
+        list[DownloadResult] : une entrée par image écrite ; les images sautées ont
+        skipped=True. Liste vide si le post ne contient aucune image.
     Raises:
         DownloadError : API inaccessible, ou aucune image n'a pu être téléchargée.
     """
     http = session or requests
-    handle, date_str, post_id, image_urls, post_text, created_at, _ = extract_images_from_bsky(post_url, http)
+    details = {}
+    handle, date_str, post_id, image_urls, post_text, created_at, _ = extract_images_from_bsky(
+        post_url, http, details)
     if not image_urls:
         return []
+
+    # Métadonnées des blobs (cid, mimeType) : seules les images du post lui-même en ont
+    propres = details.get("propres", 0)
+    if record is None and propres:
+        record = fetch_record(urlparse(post_url).path.strip("/").split("/")[1], post_id, http)
+    blobs = images_du_record(record)[:propres]
+    did = details.get("did")
+    original = config.get("image_quality", DEFAULT_CONFIG["image_quality"]) != "cdn"
+    pds = (config.get("pds_url") or "https://bsky.social").rstrip("/")
+    sauter = config.get("skip_existing_cid", DEFAULT_CONFIG["skip_existing_cid"])
 
     dest_dir = Path(dest_dir)
     dest_dir.mkdir(parents=True, exist_ok=True)
@@ -239,19 +311,46 @@ def download_images(post_url, dest_dir, config, session=None, name_prefix=None):
     results = []
     erreurs = []
     for idx, img_url in enumerate(image_urls, start=1):
-        ext = get_extension_for_url(img_url, http) or ".jpg"
-        if name_prefix:
-            filename = build_prefixed_filename(name_prefix, idx, ext, max_len, index_digits)
-        else:
-            filename = build_filename(handle, date_str, post_id, idx, ext,
-                                      max_len=max_len, min_postid=min_postid, index_digits=index_digits)
-        filepath = dest_dir / filename
-        try:
-            download_image(img_url, filepath, handle, post_id, post_url, post_text, created_at, http)
-        except Exception as e:
-            erreurs.append(f"Impossible de télécharger {img_url} : {e}")
+        blob = blobs[idx - 1] if idx - 1 < len(blobs) else {}
+        cid, mime = blob.get("cid"), blob.get("mime", "")
+
+        if sauter:
+            existant = _existant_sur_disque(existing_cid, cid)
+            if existant:
+                results.append(DownloadResult(existant.name, existant, "image", existant.stat().st_size,
+                                              cid, skipped=True))
+                continue
+
+        def chemin_pour(ext, idx=idx):
+            if name_prefix:
+                nom = build_prefixed_filename(name_prefix, idx, ext, max_len, index_digits)
+            else:
+                nom = build_filename(handle, date_str, post_id, idx, ext,
+                                     max_len=max_len, min_postid=min_postid, index_digits=index_digits)
+            return nom, dest_dir / nom
+
+        # Candidats dans l'ordre : (url, extension connue ou None -> deviner par l'URL)
+        candidats = []
+        if original and cid and did:
+            candidats.append((f"{pds}/xrpc/com.atproto.sync.getBlob?did={did}&cid={cid}",
+                              ext_from_mime(mime) or ".jpg"))
+        candidats.append((img_url, ext_from_mime(mime) if not original else None))
+
+        ecrit = None
+        echecs = []
+        for url_dl, ext in candidats:
+            filename, filepath = chemin_pour(ext or get_extension_for_url(url_dl, http) or ".jpg")
+            try:
+                download_image(url_dl, filepath, handle, post_id, post_url, post_text, created_at, http)
+            except Exception as e:
+                echecs.append(f"Impossible de télécharger {url_dl} : {e}")
+                continue
+            ecrit = (filename, filepath)
+            break
+        if ecrit is None:
+            erreurs.extend(echecs)
             continue
-        results.append(DownloadResult(filename, filepath, "image", filepath.stat().st_size))
+        results.append(DownloadResult(ecrit[0], ecrit[1], "image", ecrit[1].stat().st_size, cid))
 
     if erreurs and not results:
         raise DownloadError(" ; ".join(erreurs))
@@ -284,7 +383,7 @@ def main(argv=None):
         if not results:
             print("   [!] Aucune image trouvée")
             continue
-        print(f"   [OK] {len(results)} image(s) téléchargée(s)")
+        print(f"   [OK] {sum(not r.skipped for r in results)} image(s) téléchargée(s)")
         for ligne in lignes_console(results):
             print(ligne)
         code = 0

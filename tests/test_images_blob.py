@@ -1,0 +1,231 @@
+"""Tests du blob original des images (issue #18) : getBlob, repli CDN, saut par cid."""
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
+import pytest
+import requests
+
+from core.config import DEFAULT_CONFIG
+from downloaders import DownloadResult, lignes_console
+from downloaders.images import download_images
+from tests.test_images import IMG1, IMG2, URL, _reponse, _thread
+
+DID = "did:plc:x"
+CID1, CID2 = "bafkreicid1", "bafkreicid2"
+BLOB1 = f"https://bsky.social/xrpc/com.atproto.sync.getBlob?did={DID}&cid={CID1}"
+BLOB2 = f"https://bsky.social/xrpc/com.atproto.sync.getBlob?did={DID}&cid={CID2}"
+GET_RECORD = "https://bsky.social/xrpc/com.atproto.repo.getRecord"
+
+
+def _img(cid, mime="image/png", alt=""):
+    return {"alt": alt, "image": {"$type": "blob", "ref": {"$link": cid}, "mimeType": mime, "size": 1}}
+
+
+RECORD = {"embed": {"$type": "app.bsky.embed.images",
+                    "images": [_img(CID1, "image/png"), _img(CID2, "image/jpeg")]}}
+EMBED = {"$type": "app.bsky.embed.images#view", "images": [{"fullsize": IMG1}, {"fullsize": IMG2}]}
+
+
+def _thread_did(embed):
+    t = _thread(embed)
+    t["thread"]["post"]["author"]["did"] = DID
+    return t
+
+
+def _session(embed=EMBED, blobs=None, indisponibles=(), erreurs=(), record=None):
+    """Session mockée. blobs : url -> contenu ; indisponibles : urls en 404 ; erreurs : urls en exception."""
+    blobs = blobs or {}
+    session = MagicMock()
+
+    def get(url, **kwargs):
+        if "getPostThread" in url:
+            return _reponse(_thread_did(embed))
+        if url == GET_RECORD:
+            return _reponse({"value": record}) if record is not None else _reponse(status=400)
+        if url in erreurs:
+            raise requests.ConnectionError("connexion refusée")
+        if url in indisponibles:
+            return _reponse(status=404)
+        return _reponse(content=blobs.get(url, b"img"))
+
+    session.get.side_effect = get
+    session.head.return_value = _reponse(headers={"content-type": "image/jpeg"})
+    return session
+
+
+def _urls(session):
+    return [c.args[0] for c in session.get.call_args_list]
+
+
+@pytest.fixture(autouse=True)
+def _exiftool():
+    with patch("downloaders.images.subprocess.run") as run:
+        yield run
+
+
+class TestModeOriginal:
+    def test_getblob_extension_mime_sans_head(self, tmp_path):
+        session = _session(record=RECORD, blobs={BLOB1: b"png!", BLOB2: b"jpg!"})
+        res = download_images(URL, tmp_path, DEFAULT_CONFIG, session=session, record=RECORD)
+
+        assert [r.filename for r in res] == ["user.bsky.social_20260102_3abc_1.png",
+                                             "user.bsky.social_20260102_3abc_2.jpg"]
+        assert res[0].path.read_bytes() == b"png!"
+        assert [r.cid for r in res] == [CID1, CID2]
+        assert BLOB1 in _urls(session) and BLOB2 in _urls(session)
+        assert IMG1 not in _urls(session)
+        session.head.assert_not_called()
+
+    def test_record_fourni_pas_de_getrecord(self, tmp_path):
+        session = _session()
+        download_images(URL, tmp_path, DEFAULT_CONFIG, session=session, record=RECORD)
+        assert GET_RECORD not in _urls(session)
+
+    def test_pds_url_de_la_config(self, tmp_path):
+        session = _session()
+        config = {**DEFAULT_CONFIG, "pds_url": "https://morel.us-east.host.bsky.network"}
+        download_images(URL, tmp_path, config, session=session, record=RECORD)
+        assert (f"https://morel.us-east.host.bsky.network/xrpc/com.atproto.sync.getBlob"
+                f"?did={DID}&cid={CID1}") in _urls(session)
+
+    def test_repli_cdn_sur_404_du_blob(self, tmp_path):
+        session = _session(indisponibles=(BLOB1,))
+        res = download_images(URL, tmp_path, DEFAULT_CONFIG, session=session, record=RECORD)
+
+        assert IMG1 in _urls(session)
+        # repli : extension par l'ancien chemin (HEAD sur l'URL CDN)
+        session.head.assert_called_once_with(IMG1, allow_redirects=True, timeout=10)
+        assert res[0].filename.endswith("_1.jpg")
+        assert res[0].cid == CID1
+        # la 2e image n'est pas concernée
+        assert res[1].filename.endswith("_2.jpg") and IMG2 not in _urls(session)
+
+    def test_repli_cdn_sur_exception_du_blob(self, tmp_path):
+        session = _session(erreurs=(BLOB2,))
+        res = download_images(URL, tmp_path, DEFAULT_CONFIG, session=session, record=RECORD)
+        assert len(res) == 2 and IMG2 in _urls(session)
+
+    def test_record_absent_appelle_getrecord(self, tmp_path):
+        session = _session(record=RECORD)
+        res = download_images(URL, tmp_path, DEFAULT_CONFIG, session=session)
+
+        appel = next(c for c in session.get.call_args_list if c.args[0] == GET_RECORD)
+        assert appel.kwargs["params"] == {"repo": "user.bsky.social", "collection": "app.bsky.feed.post",
+                                          "rkey": "3abc"}
+        assert [r.cid for r in res] == [CID1, CID2]
+        assert BLOB1 in _urls(session)
+
+    def test_getrecord_en_echec_repli_cdn_sans_cid(self, tmp_path):
+        session = _session(record=None)
+        res = download_images(URL, tmp_path, DEFAULT_CONFIG, session=session)
+        assert [r.cid for r in res] == [None, None]
+        assert IMG1 in _urls(session)
+
+    def test_record_with_media(self, tmp_path):
+        embed = {"$type": "app.bsky.embed.recordWithMedia#view",
+                 "media": {"$type": "app.bsky.embed.images#view", "images": [{"fullsize": IMG1}]}}
+        record = {"embed": {"$type": "app.bsky.embed.recordWithMedia",
+                            "media": {"$type": "app.bsky.embed.images", "images": [_img(CID1, "image/webp")]}}}
+        session = _session(embed=embed)
+        res = download_images(URL, tmp_path, DEFAULT_CONFIG, session=session, record=record)
+        assert res[0].filename.endswith("_1.webp") and res[0].cid == CID1
+
+    def test_mime_inconnu_extension_jpg(self, tmp_path):
+        record = {"embed": {"images": [_img(CID1, "application/x-inconnu")]}}
+        embed = {"$type": "app.bsky.embed.images#view", "images": [{"fullsize": IMG1}]}
+        res = download_images(URL, tmp_path, DEFAULT_CONFIG, session=_session(embed=embed), record=record)
+        assert res[0].filename.endswith("_1.jpg")
+
+    def test_images_du_post_cite_gardent_le_cdn(self, tmp_path):
+        embed = {"$type": "app.bsky.embed.record#view",
+                 "record": {"embeds": [{"$type": "app.bsky.embed.images#view", "images": [{"fullsize": IMG2}]}]}}
+        session = _session(embed=embed)
+        res = download_images(URL, tmp_path, DEFAULT_CONFIG, session=session,
+                              record={"embed": {"$type": "app.bsky.embed.record"}})
+        assert len(res) == 1 and res[0].cid is None
+        assert IMG2 in _urls(session)
+        assert not any("getBlob" in u for u in _urls(session))
+
+
+class TestModeCdn:
+    CONFIG = {**DEFAULT_CONFIG, "image_quality": "cdn"}
+
+    def test_cdn_extension_depuis_le_mime_sans_head(self, tmp_path):
+        session = _session()
+        res = download_images(URL, tmp_path, self.CONFIG, session=session, record=RECORD)
+        assert not any("getBlob" in u for u in _urls(session))
+        assert IMG1 in _urls(session)
+        assert [r.filename[-4:] for r in res] == [".png", ".jpg"]
+        assert [r.cid for r in res] == [CID1, CID2]
+        session.head.assert_not_called()
+
+    def test_cdn_mime_inconnu_garde_le_head(self, tmp_path):
+        session = _session()
+        res = download_images(URL, tmp_path, self.CONFIG, session=session, record=None)
+        assert res[0].cid is None
+        session.head.assert_called()
+
+
+class TestSautParCid:
+    def _existant(self, tmp_path):
+        fichier = tmp_path / "ancien.png"
+        fichier.write_bytes(b"12345")
+        return fichier
+
+    def test_cid_deja_present_est_saute(self, tmp_path):
+        fichier = self._existant(tmp_path)
+        session = _session()
+        appels = []
+
+        def existing(cid):
+            appels.append(cid)
+            return str(fichier) if cid == CID1 else None
+
+        res = download_images(URL, tmp_path, DEFAULT_CONFIG, session=session, record=RECORD, existing_cid=existing)
+
+        assert appels == [CID1, CID2]
+        assert res[0].skipped is True
+        assert (res[0].filename, res[0].path, res[0].size, res[0].cid) == ("ancien.png", fichier, 5, CID1)
+        assert res[1].skipped is False and res[1].cid == CID2
+        assert BLOB1 not in _urls(session) and BLOB2 in _urls(session)
+        assert fichier.read_bytes() == b"12345"
+
+    def test_fichier_disparu_est_retelecharge(self, tmp_path):
+        session = _session()
+        res = download_images(URL, tmp_path, DEFAULT_CONFIG, session=session, record=RECORD,
+                              existing_cid=lambda cid: str(tmp_path / "disparu.png"))
+        assert not any(r.skipped for r in res)
+        assert BLOB1 in _urls(session)
+
+    def test_skip_existing_cid_desactive(self, tmp_path):
+        fichier = self._existant(tmp_path)
+        existing = MagicMock(return_value=str(fichier))
+        config = {**DEFAULT_CONFIG, "skip_existing_cid": False}
+        res = download_images(URL, tmp_path, config, session=_session(), record=RECORD, existing_cid=existing)
+        existing.assert_not_called()
+        assert not any(r.skipped for r in res)
+
+    def test_toutes_sautees_pas_d_erreur(self, tmp_path):
+        fichier = self._existant(tmp_path)
+        session = _session()
+        res = download_images(URL, tmp_path, DEFAULT_CONFIG, session=session, record=RECORD,
+                              existing_cid=lambda cid: str(fichier))
+        assert [r.skipped for r in res] == [True, True]
+
+    def test_ligne_console_skip(self, tmp_path):
+        res = [DownloadResult("a.png", Path("a.png"), "image", 1, cid="bafy", skipped=True)]
+        assert lignes_console(res) == ["   [SKIP] bafy déjà présent : a.png"]
+
+
+class TestFindMediaByCid:
+    def test_retrouve_le_fichier(self, tmp_db):
+        tmp_db.add_post(URL, "3abc", "user.bsky.social")
+        tmp_db.add_media(URL, "image", "a.png", cid=CID1)
+        assert tmp_db.find_media_by_cid(CID1) == "a.png"
+
+    def test_cid_inconnu_ou_vide(self, tmp_db):
+        tmp_db.add_post(URL, "3abc", "user.bsky.social")
+        tmp_db.add_media(URL, "image", "a.png")
+        assert tmp_db.find_media_by_cid("inconnu") is None
+        assert tmp_db.find_media_by_cid("") is None
+        assert tmp_db.find_media_by_cid(None) is None

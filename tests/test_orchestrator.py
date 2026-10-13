@@ -18,13 +18,14 @@ def _res(nom, media_type, cid=None):
     return DownloadResult(nom, Path(nom), media_type, 10, cid)
 
 
-def _analyseur(post_type, data=None):
+def _analyseur(post_type, data=None, debug_info=None):
     analyzer = MagicMock()
-    analyzer.analyze.return_value = (post_type, data or {"handle": "user.bsky.social"}, {})
+    analyzer.analyze.return_value = (post_type, data or {"handle": "user.bsky.social"}, debug_info or {})
     return analyzer
 
 
-def _lancer(db, tmp_path, post_type, data=None, *, images=None, video=None, texte=None, erreur=None):
+def _lancer(db, tmp_path, post_type, data=None, *, images=None, video=None, texte=None, erreur=None,
+            debug_info=None):
     """process_post() avec les trois downloaders mockés ; renvoie (résultat, mocks)."""
     mocks = {
         "download_images": MagicMock(return_value=images or [], side_effect=erreur),
@@ -33,7 +34,7 @@ def _lancer(db, tmp_path, post_type, data=None, *, images=None, video=None, text
     }
     with patch.multiple("core.orchestrator", **mocks):
         resultat = process_post(
-            URL, "IMG", "VID", "TXT", db, _analyseur(post_type, data), MagicMock(),
+            URL, "IMG", "VID", "TXT", db, _analyseur(post_type, data, debug_info), MagicMock(),
             tmp_path, lambda *a, **k: None, config={"max_filename_len": 64},
         )
     return resultat, mocks
@@ -105,9 +106,45 @@ class TestProcessPostMedias:
     def test_images_comptees_depuis_les_resultats(self, tmp_db, tmp_path):
         res = [_res("a_1.jpg", "image"), _res("a_2.png", "image")]
         resultat, mocks = _lancer(tmp_db, tmp_path, PostType.IMAGES, {"image_count": 2}, images=res)
-        mocks["download_images"].assert_called_once_with(URL, "IMG", {"max_filename_len": 64})
+        mocks["download_images"].assert_called_once_with(
+            URL, "IMG", {"max_filename_len": 64}, record=None, existing_cid=mocks["download_images"].call_args.kwargs["existing_cid"])
         assert resultat[:5] == (True, 2, 0, 0, "success")
         assert _medias(tmp_db) == [("image", "a_1.jpg", None), ("image", "a_2.png", None)]
+
+    def test_record_brut_et_cid_transmis_a_download_images(self, tmp_db, tmp_path):
+        record = {"embed": {"images": []}}
+        res = [_res("a_1.png", "image", "bafy1")]
+        _, mocks = _lancer(tmp_db, tmp_path, PostType.IMAGES, {"image_count": 1}, images=res,
+                           debug_info={"full_data": {"uri": "at://x", "value": record}})
+        kwargs = mocks["download_images"].call_args.kwargs
+        assert kwargs["record"] is record
+        assert _medias(tmp_db) == [("image", "a_1.png", "bafy1")]
+
+    def test_callback_existing_cid_resout_le_chemin_via_la_base(self, tmp_db, tmp_path):
+        tmp_db.add_post(URL, "3k1", "user.bsky.social")
+        tmp_db.add_media(URL, "image", "deja.png", cid="bafy1")
+        _, mocks = _lancer(tmp_db, tmp_path, PostType.IMAGES, {"image_count": 1}, images=[_res("a.jpg", "image")])
+        existing = mocks["download_images"].call_args.kwargs["existing_cid"]
+        assert existing("bafy1") == str(Path("IMG") / "deja.png")
+        assert existing("inconnu") is None
+
+    def test_image_sautee_affichee_mais_ni_comptee_ni_enregistree(self, tmp_db, tmp_path):
+        res = [DownloadResult("deja.png", Path("deja.png"), "image", 5, "bafy1", skipped=True),
+               _res("b_2.jpg", "image", "bafy2")]
+        resultat, _ = _lancer(tmp_db, tmp_path, PostType.IMAGES, {"image_count": 2}, images=res)
+        assert resultat[:5] == (True, 1, 0, 0, "success")
+        assert _medias(tmp_db) == [("image", "b_2.jpg", "bafy2")]
+        assert any("[SKIP] bafy1 déjà présent : deja.png" in ligne for ligne in resultat[5])
+
+    def test_toutes_images_sautees_reste_un_succes(self, tmp_db, tmp_path):
+        res = [DownloadResult("deja.png", Path("deja.png"), "image", 5, "bafy1", skipped=True)]
+        resultat, _ = _lancer(tmp_db, tmp_path, PostType.IMAGES, {"image_count": 1}, images=res)
+        assert resultat[:5] == (True, 0, 0, 0, "success")
+        assert _medias(tmp_db) == []
+
+    def test_sans_base_pas_de_callback(self, tmp_path):
+        _, mocks = _lancer(None, tmp_path, PostType.IMAGES, {"image_count": 1}, images=[_res("a.jpg", "image")])
+        assert mocks["download_images"].call_args.kwargs["existing_cid"] is None
 
     def test_lignes_console_produites_par_l_orchestrateur(self, tmp_db, tmp_path):
         res = [_res("a_1.jpg", "image")]

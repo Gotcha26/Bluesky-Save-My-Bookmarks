@@ -126,18 +126,31 @@ class _Contexte:
     resolver: object
     buf_print: object
     log_func: object
+    db: object = None
 
 
 # Libellés des états d'un record cité qui n'est plus lisible
 _ETATS_CITE_ABSENT = {"not_found": "supprimé", "blocked": "bloqué", "detached": "détaché"}
 
 
-def _contenu_propre(post_type, data, url, ctx, name_prefix=None, erreurs=None):
+def _chemin_par_cid(ctx):
+    """Callback cid -> chemin du fichier image déjà enregistré en base (None sans base ou si inconnu)."""
+    if not ctx.db:
+        return None
+
+    def chemin(cid):
+        nom = ctx.db.find_media_by_cid(cid)
+        return str(Path(ctx.dirs["img_dir"]) / nom) if nom else None
+    return chemin
+
+
+def _contenu_propre(post_type, data, url, ctx, name_prefix=None, erreurs=None, debug_info=None):
     """
     Télécharge le contenu propre d'un post selon son type (sans suivre sa citation).
 
     name_prefix : base de nom des fichiers d'un post cité (None pour le post bookmarké).
     erreurs : liste complétée avec les erreurs de téléchargement rencontrées.
+    debug_info : informations de l'analyseur ; son record brut donne les CID des images.
     Returns: la liste de DownloadResult.
     """
     cite = name_prefix is not None
@@ -148,7 +161,9 @@ def _contenu_propre(post_type, data, url, ctx, name_prefix=None, erreurs=None):
 
     if post_type == PostType.IMAGES:
         ctx.buf_print(c.info(f"{data.get('image_count', 1)} image(s) détectée(s)"))
-        results = _telecharger(download_images, url, dirs["img_dir"], *args, erreurs=erreurs, **options)
+        record = ((debug_info or {}).get("full_data") or {}).get("value")
+        results = _telecharger(download_images, url, dirs["img_dir"], *args, erreurs=erreurs,
+                               record=record, existing_cid=_chemin_par_cid(ctx), **options)
     elif post_type == PostType.VIDEO:
         ctx.buf_print(c.info("Vidéo détectée"))
         results = _telecharger(download_video, url, dirs["vid_dir"], *args, erreurs=erreurs, **options)
@@ -230,7 +245,8 @@ def _archiver_citation(url, quote_uri, depth, base, ctx):
 
     suffixe = "quote" if profondeur == 1 else f"quote{profondeur}"
     erreurs = []
-    results = _contenu_propre(post_type, data, cible.url, ctx, name_prefix=f"{base}_{suffixe}", erreurs=erreurs)
+    results = _contenu_propre(post_type, data, cible.url, ctx, name_prefix=f"{base}_{suffixe}", erreurs=erreurs,
+                              debug_info=debug_info)
     problemes = []
     if erreurs:
         ctx.log_func(f"   CITATION NON ARCHIVÉE: {cible.url}", to_console=False)
@@ -312,7 +328,7 @@ def process_post(url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_d
 
     ctx = _Contexte(
         dirs={"img_dir": IMG_DIR, "vid_dir": VID_DIR, "text_dir": TEXT_DIR},
-        config=config, analyzer=analyzer, resolver=resolver, buf_print=buf_print, log_func=log_func,
+        config=config, analyzer=analyzer, resolver=resolver, buf_print=buf_print, log_func=log_func, db=db,
     )
     est_citation = post_type == PostType.QUOTE or bool(data.get("is_quote"))
 
@@ -320,7 +336,7 @@ def process_post(url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_d
     if est_citation:
         buf_print(c.info("Citation détectée, résolution du post cité..."))
     erreurs = []
-    results = _contenu_propre(post_type, data, url, ctx, erreurs=erreurs)
+    results = _contenu_propre(post_type, data, url, ctx, erreurs=erreurs, debug_info=debug_info)
 
     # 2. Le post qu'il cite (profondeur max PROFONDEUR_MAX)
     problemes = []
@@ -328,9 +344,11 @@ def process_post(url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_d
         cites, problemes = _archiver_citation(url, data.get("quote_uri"), depth, _base_de_nom(url, data), ctx)
         results = results + cites
 
-    img_count = sum(r.media_type == "image" for r in results)
-    vid_count = sum(r.media_type == "video" for r in results)
-    text_count = sum(r.media_type == "text" for r in results)
+    # Une image sautée (cid déjà archivé) est affichée mais ni comptée ni enregistrée
+    a_enregistrer = [r for r in results if not r.skipped]
+    img_count = sum(r.media_type == "image" for r in a_enregistrer)
+    vid_count = sum(r.media_type == "video" for r in a_enregistrer)
+    text_count = sum(r.media_type == "text" for r in a_enregistrer)
     echec_citation = any(genre == "failed" for genre, _ in problemes)
 
     # Bilan
@@ -338,7 +356,7 @@ def process_post(url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_d
         # Le contenu propre du post n'est pas complet : on garde ce qui a été obtenu,
         # mais le post reste retentable (comme un post simple en échec)
         if db and results:
-            for r in results:
+            for r in a_enregistrer:
                 db.add_media(url, r.media_type, r.filename, cid=r.cid)
             db.update_last_check(url)
         log_func(f"   ÉCHEC: {url}", to_console=False)
@@ -346,7 +364,7 @@ def process_post(url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_d
 
     if results:
         if db:
-            for r in results:
+            for r in a_enregistrer:
                 db.add_media(url, r.media_type, r.filename, cid=r.cid)
             db.update_last_check(url)
             # Un post retenté avec succès ne doit plus rester en erreur
