@@ -147,7 +147,7 @@ class PostAnalyzer:
             "has_embed": bool(embed),
             "full_data": full_data
         }
-        
+
         # 1. Vidéo
         if embed_type == "app.bsky.embed.video":
             video_blob = embed.get("video", {})
@@ -160,7 +160,7 @@ class PostAnalyzer:
                     result_data["video_mime"] = video_blob.get("mimeType", "video/mp4")
                     result_data["video_size"] = video_blob.get("size", 0)
                     return PostType.VIDEO, result_data, debug_info
-        
+
         # 2. Images directes
         if embed_type == "app.bsky.embed.images":
             images_list = embed.get("images", [])
@@ -169,12 +169,12 @@ class PostAnalyzer:
                 img_ref = img.get("image", {}).get("ref", {}).get("$link")
                 if img_ref:
                     images.append(f"https://cdn.bsky.app/img/feed_fullsize/plain/{img_ref}@jpeg")
-            
+
             if images:
                 result_data["images"] = images
                 result_data["image_count"] = len(images)
                 return PostType.IMAGES, result_data, debug_info
-        
+
         # 2 bis. Carte de lien / GIF (external)
         if embed_type == "app.bsky.embed.external":
             external = _external_info(embed.get("external", {}))
@@ -194,7 +194,7 @@ class PostAnalyzer:
             result_data["is_quote"] = True
             result_data["quote_uri"] = embed.get("record", {}).get("record", {}).get("uri", "")
             media_type = media.get("$type", "")
-            
+
             if media_type == "app.bsky.embed.video":
                 video_blob = media.get("video", {})
                 cid = video_blob.get("ref", {}).get("$link")
@@ -204,7 +204,7 @@ class PostAnalyzer:
                         result_data["video_url"] = f"https://bsky.social/xrpc/com.atproto.sync.getBlob?did={did}&cid={cid}"
                         result_data["video_cid"] = cid
                         return PostType.VIDEO, result_data, debug_info
-            
+
             if media_type == "app.bsky.embed.images":
                 images_list = media.get("images", [])
                 images = []
@@ -212,12 +212,12 @@ class PostAnalyzer:
                     img_ref = img.get("image", {}).get("ref", {}).get("$link")
                     if img_ref:
                         images.append(f"https://cdn.bsky.app/img/feed_fullsize/plain/{img_ref}@jpeg")
-                
+
                 if images:
                     result_data["images"] = images
                     result_data["image_count"] = len(images)
                     return PostType.IMAGES, result_data, debug_info
-        
+
             if media_type == "app.bsky.embed.external":
                 external = _external_info(media.get("external", {}))
                 if external:
@@ -230,6 +230,6 @@ class PostAnalyzer:
         # 5. Texte seul
         if result_data["text"] and not embed:
             return PostType.TEXT_ONLY, result_data, debug_info
-        
+
         # 6. Inconnu
         return PostType.UNKNOWN, result_data, debug_info
