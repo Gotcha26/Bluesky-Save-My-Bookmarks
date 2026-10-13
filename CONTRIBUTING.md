@@ -166,6 +166,16 @@ pytest tests/test_auth.py # Un fichier spécifique
 pytest -k "create_session"# Tests matching
 ```
 
+### Qualité
+La CI (job `lint` puis `test`) refuse tout ce qui ne passe pas ces commandes ; lance-les avant de pousser :
+```bash
+pip install -r requirements-dev.txt   # pytest, pytest-cov, ruff
+ruff check .                          # analyse statique (E, F, W, I, B, UP ; 110 colonnes)
+ruff format .                         # formatage (ruff format --check . en CI)
+pytest --cov=core --cov=api --cov=downloaders --cov-report=term-missing --cov-fail-under=70
+```
+La CI teste Python 3.11 à 3.14 sur Ubuntu et Windows. Dependabot propose chaque semaine les mises à jour de `pip` et de `github-actions`.
+
 ---
 
 ## 🏗️ Architecture à connaître
