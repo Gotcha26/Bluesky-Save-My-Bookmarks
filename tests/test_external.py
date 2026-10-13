@@ -51,6 +51,18 @@ def _session(reponses=None, erreur=None):
     return session
 
 
+class TestNomDuTexteExternal:
+    def test_meme_base_que_la_fiche_json_et_auteur_du_data(self, dirs):
+        """Le .txt prend sa base de l'URL, comme write_sidecar ; « Auteur: » reste le handle de data."""
+        from downloaders.archive import write_sidecar
+        url_did = "https://bsky.app/profile/did:plc:abcdefghijklmnopqrstuvwx/post/3ktest000001"
+        res = download_external(url_did, _data(thumb_cid=None), dirs, DEFAULT_CONFIG, session=_session())
+        fiche = write_sidecar(url_did, {"createdAt": "2026-01-05T17:24:26.493Z"}, None, dirs["text_dir"],
+                              DEFAULT_CONFIG)[0]
+        assert res[0].path.stem == fiche.path.stem
+        assert "Auteur: auteur.test\n" in res[0].path.read_text(encoding="utf-8")
+
+
 class TestTexteDuRecord:
     def test_le_record_fourni_prime_sur_data(self, dirs):
         record = {"text": "Voir ici", "createdAt": "2026-01-05T17:24:26.493Z", "langs": ["fr"],

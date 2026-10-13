@@ -120,7 +120,8 @@ def download_external(post_url, data, dirs, config, session=None):
     resultats = []
 
     # write_text lève DownloadError si l'écriture est impossible
-    resultats += write_text(post_url, _record_de(data, external), dirs["text_dir"], config, name_prefix=base)
+    resultats += write_text(post_url, _record_de(data, external), dirs["text_dir"], config,
+                            auteur=data.get("handle") or None)
 
     # Vignette : blob Bluesky servi par le CDN
     cid, did = external.get("thumb_cid"), data.get("did")

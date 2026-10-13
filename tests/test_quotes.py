@@ -166,6 +166,30 @@ class TestFichesJsonDesCitations:
         assert cite["url"] == f"https://bsky.app/profile/{HANDLES[D2]}/post/3kcited0001"
 
 
+class TestCitantSansTextePropre:
+    """Citation dont save_text ne renvoie rien : le citant a quand même son .txt (Cite:) et sa fiche JSON."""
+    IMAGES = {"$type": "app.bsky.embed.images", "images": [{"image": {"ref": {"$link": "bafkreitestimage"}}}]}
+
+    def test_txt_et_json_du_citant_ecrits_et_enregistres(self, tmp_db, tmp_path):
+        url = url_citant("quote_text.json")
+        res, _, _, _ = lancer(url, [charger("quote_text.json"), post_texte(D2, "3kcited0001", embed=self.IMAGES)],
+                              tmp_db, tmp_path, downloaders=Downloaders(texte_vide=True), sidecar=True)
+        assert res[0] is True and res[4] == "success"
+        base = f"{BASE}_3kquote0001"
+        txt = tmp_path / "TXT" / f"{base}.txt"
+        assert txt.is_file() and (tmp_path / "TXT" / f"{base}.json").is_file()
+        assert "\nCite: at://" in txt.read_text(encoding="utf-8")
+        noms = medias(tmp_db)
+        assert f"{base}.txt" in noms and f"{base}.json" in noms
+
+    def test_cite_non_archive_pas_de_fichiers_du_citant(self, tmp_db, tmp_path):
+        url = url_citant("quote_text.json")
+        res, _, _, _ = lancer(url, [charger("quote_text.json")], tmp_db, tmp_path,
+                              downloaders=Downloaders(texte_vide=True), sidecar=True)
+        assert res[0] is False
+        assert not (tmp_path / "TXT").exists()
+
+
 class TestCitationAvecMedia:
     def test_media_du_citant_texte_puis_cite(self, tmp_db, tmp_path):
         url = url_citant("quote_with_media.json")

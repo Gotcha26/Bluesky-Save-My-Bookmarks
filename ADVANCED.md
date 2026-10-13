@@ -136,7 +136,7 @@ Cite: at://did:plc:…/app.bsky.feed.post/3kcite
 Réponse à: at://did:plc:…/app.bsky.feed.post/3kparent
 ```
 
-Les lignes `Langue`, `[Image N : …]` / `[Vidéo : …]` (seulement si le texte alternatif n'est pas vide), `Lien/Titre/Description`, `Cite` et `Réponse à` n'apparaissent que lorsqu'elles s'appliquent. Un fichier déjà présent au même contenu n'est pas réécrit. Le texte alternatif des images est aussi écrit dans le champ EXIF `ImageDescription` (si `exiftool` est installé).
+Les lignes `Langue`, `[Image N : …]` / `[Vidéo : …]` (seulement si le texte alternatif n'est pas vide), `Lien/Titre/Description`, `Cite` et `Réponse à` n'apparaissent que lorsqu'elles s'appliquent. Un fichier déjà présent au même contenu n'est pas réécrit. Si tous les médias propres d'un post échouent, son texte n'est pas archivé tant que le post n'est pas retenté avec succès. Le texte alternatif des images est aussi écrit dans le champ EXIF `ImageDescription` (si `exiftool` est installé).
 
 **`<base>.json`** : la fiche (« sidecar »), archive fidèle du post, désactivable avec `save_sidecar: false` :
 
