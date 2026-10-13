@@ -173,27 +173,6 @@ def show_main_menu(state):
 # ─── Token ───────────────────────────────────────────────────
 
 
-def get_token_from_clipboard():
-    """Récupère le token depuis le presse-papier."""
-    try:
-        import win32clipboard  # type: ignore
-
-        win32clipboard.OpenClipboard()
-        token = win32clipboard.GetClipboardData(win32clipboard.CF_UNICODETEXT)
-        win32clipboard.CloseClipboard()
-        return token.strip() if token else None
-    except Exception:
-        try:
-            result = subprocess.run(
-                ["powershell", "-command", "Get-Clipboard"],
-                capture_output=True,
-                text=True,
-            )
-            return result.stdout.strip() if result.returncode == 0 else None
-        except Exception:
-            return None
-
-
 def get_session(config):
     """
     Obtient une session Bluesky valide silencieusement.

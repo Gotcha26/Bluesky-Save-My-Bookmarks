@@ -52,7 +52,6 @@ Points qui ne se voient pas en lisant un seul fichier :
 - **Deux modes « avancés »** dans `bsmb.py` : `download_media_dev()` appelle `run(…, no_db=True)` (traite `urls.txt` sans écrire en base) ; `download_media(force=True)` retraite toutes les URLs de `urls.txt`.
 - **Console Windows** : `bsmb.py` (et `core/orchestrator.py` en usage CLI) ré-encapsule stdout en UTF-8 uniquement sous `__name__ == "__main__"` (sinon conflit avec la capture pytest). `core/colors.py` expose l'instance globale `c` (détection ANSI, `NO_COLOR` / `FORCE_COLOR`).
 - **Logs** : `cleanup_old_logs()` supprime les logs de plus de 10 jours et ne garde que `max_logs` fichiers `download_*.log`.
-- `core/logger.py` est vide, `lang/` est vide, `tools/debug_post.py` est un vestige : ne pas s'y appuyer.
 
 ## Conventions
 
