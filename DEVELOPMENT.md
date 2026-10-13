@@ -90,7 +90,7 @@ Il renvoie un dict : `total`, `success`, `images`, `videos`, `texts`, `sidecars`
 Règles :
 - Une exception est isolée au post (journalisée, statut `failed`) : un post en échec n'arrête jamais le lot.
 - Les compteurs sont mis à jour par le seul thread principal (`as_completed`).
-- Un échec technique (`DownloadError`) donne `failed`. Un post en échec est pour l'instant déjà enregistré dans la base : il n'est pas retenté automatiquement (voir la roadmap du [CHANGELOG](CHANGELOG.md)).
+- Un échec technique (`DownloadError`) donne `failed`. Le post reçoit le statut `failed` en base et est retenté automatiquement après `retry_after_days` jours ; les fichiers déjà obtenus (échec partiel, `DownloadError.partial`) sont enregistrés.
 
 ---
 
@@ -106,7 +106,7 @@ save_text(post_url, dest_dir, config, session=None, name_prefix=None)           
 
 `download_external(post_url, data, dirs, config, session=None)` (`external.py`) reçoit en plus le dict `data` de l'analyseur et les trois dossiers médias.
 
-Chacune renvoie une `list[DownloadResult]` (`filename`, `path`, `media_type`, `size`, `cid`, `skipped`, `alt`) ; liste vide = aucun média ; `DownloadError` = erreur technique. Les téléchargeurs **n'impriment rien** : les lignes `[DL]` / `[OK]` / `[TXT]` viennent de `lignes_console()`. Chaque module reste utilisable seul pour déboguer un post :
+Chacune renvoie une `list[DownloadResult]` (`filename`, `path`, `media_type`, `size`, `cid`, `skipped`, `alt`) ; liste vide = aucun média ; `DownloadError` = erreur technique (son attribut `partial` porte les résultats déjà écrits en cas d'échec partiel, par exemple 2 images sur 3). Les téléchargeurs **n'impriment rien** : les lignes `[DL]` / `[OK]` / `[TXT]` viennent de `lignes_console()`. Chaque module reste utilisable seul pour déboguer un post :
 
 ```bash
 python downloaders/images.py <dossier> <url_post>

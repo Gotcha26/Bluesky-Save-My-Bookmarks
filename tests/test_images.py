@@ -168,8 +168,9 @@ class TestDownloadImages:
 
     def test_echec_partiel_garde_les_reussies(self, tmp_path, exiftool):
         session = _session(_thread(EMBED_2_IMAGES), echecs=(IMG1,))
-        res = download_images(URL, tmp_path, DEFAULT_CONFIG, session=session)
-        assert [r.filename for r in res] == ["user.bsky.social_20260102_3abc_02.png"]
+        with pytest.raises(DownloadError) as exc:
+            download_images(URL, tmp_path, DEFAULT_CONFIG, session=session)
+        assert [r.filename for r in exc.value.partial] == ["user.bsky.social_20260102_3abc_02.png"]
 
     def test_exiftool_absent_ne_bloque_pas(self, tmp_path):
         session = _session(_thread(EMBED_2_IMAGES))
