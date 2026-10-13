@@ -205,6 +205,17 @@ def _record_brut(debug_info):
     return record if isinstance(record, dict) and record else None
 
 
+def _archiver_citant_sans_contenu(propres, cites, url, data, debug_info, ctx, post_view, name_prefix, erreurs):
+    """
+    Un citant sans contenu propre (save_text n'a rien renvoyé) dont le cité est archivé garde
+    quand même son .txt (avec « Cite: ») et sa fiche JSON.
+    Returns: la liste des DownloadResult ajoutés (vide si le citant a un contenu propre).
+    """
+    if propres or not cites or (erreurs is not None and erreurs):
+        return []
+    return _archiver_post([], url, data, ctx, _record_brut(debug_info), post_view, name_prefix, erreurs)
+
+
 def _archiver_post(results, url, data, ctx, record, post_view, name_prefix, erreurs):
     """
     Écrit le .txt lisible (sauf si `results` en contient déjà un) puis, avec
@@ -297,7 +308,8 @@ def _archiver_citation(url, quote_uri, depth, base, ctx, post_view=None):
     est_citation = post_type == PostType.QUOTE or data.get("is_quote")
     if est_citation and profondeur < PROFONDEUR_MAX:
         suite, suite_problemes = _archiver_citation(cible.url, data.get("quote_uri"), profondeur, base, ctx)
-        results += suite
+        results = (_archiver_citant_sans_contenu(results, suite, cible.url, data, debug_info, ctx, None,
+                                                 f"{base}_{suffixe}", erreurs) + results + suite)
         problemes += suite_problemes
     return results, problemes
 
@@ -394,7 +406,8 @@ def process_post(url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_d
     if est_citation and depth < PROFONDEUR_MAX:
         cites, problemes = _archiver_citation(url, data.get("quote_uri"), depth, _base_de_nom(url, data), ctx,
                                               post_view=post_view)
-        results = results + cites
+        results = (_archiver_citant_sans_contenu(results, cites, url, data, debug_info, ctx, post_view, None,
+                                                 erreurs) + results + cites)
 
     # Une image sautée (cid déjà archivé) est affichée mais ni comptée ni enregistrée
     a_enregistrer = [r for r in results if not r.skipped]

@@ -44,7 +44,8 @@ def resolve_facets(text, facets):
 
     Les index `byteStart` / `byteEnd` des facets sont des octets UTF-8. Les mentions
     (déjà écrites « @handle ») et les tags (« #tag ») restent tels quels. Une facet
-    hors bornes, chevauchante, coupant un caractère ou malformée est ignorée.
+    hors bornes, chevauchante (la première par `byteStart` est gardée ; à début égal, la plus courte),
+    coupant un caractère ou malformée est ignorée.
     """
     if not text or not facets or not isinstance(facets, list):
         return text or ""
@@ -134,9 +135,9 @@ def _nom_base(post_url, record, name_prefix):
     return nom_base_texte(handle, rkey, (record or {}).get("createdAt", ""))
 
 
-def _contenu_texte(post_url, record, alts):
+def _contenu_texte(post_url, record, alts, auteur=None):
     handle, _ = _identite(post_url)
-    lignes = [f"Post: {post_url}", f"Date: {record.get('createdAt', '')}", f"Auteur: {handle}"]
+    lignes = [f"Post: {post_url}", f"Date: {record.get('createdAt', '')}", f"Auteur: {auteur or handle}"]
     langs = [la for la in record.get("langs") or [] if isinstance(la, str)]
     if langs:
         lignes.append(f"Langue: {', '.join(langs)}")
@@ -166,19 +167,20 @@ def _resultat(chemin, media_type):
     return DownloadResult(chemin.name, chemin, media_type, chemin.stat().st_size)
 
 
-def write_text(post_url, record, dest_dir, config, name_prefix=None, alts=None):
+def write_text(post_url, record, dest_dir, config, name_prefix=None, alts=None, auteur=None):
     """
     Écrit <base>.txt : en-tête (Post, Date, Auteur, Langue), texte avec facets résolues,
     alt des médias, carte de lien, citation (Cite:) et parent d'une réponse (Réponse à:).
 
     record : record brut du post. alts : alt des médias dans l'ordre, qui remplacent ceux
-    du record. Un fichier déjà présent au même nom et au même contenu n'est pas réécrit.
+    du record. auteur : handle affiché dans « Auteur: » (défaut : celui de l'URL ; le nom du fichier
+    vient toujours de l'URL). Un fichier déjà présent au même nom et au même contenu n'est pas réécrit.
 
     Returns: [DownloadResult(media_type="text")]
     Raises: DownloadError (URL invalide, écriture impossible).
     """
     base = _nom_base(post_url, record, name_prefix)
-    contenu = _contenu_texte(post_url, record or {}, alts)
+    contenu = _contenu_texte(post_url, record or {}, alts, auteur)
     try:
         dest_dir = Path(dest_dir)
         dest_dir.mkdir(parents=True, exist_ok=True)
