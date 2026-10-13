@@ -143,7 +143,7 @@ python -m pytest tests/test_auth.py -k "expired"  # un motif
 
 ### Qualité
 
-La CI (`.github/workflows/ci.yml`, job `lint` puis `test`) refuse tout ce qui ne passe pas ces commandes ; lancez-les avant de pousser :
+La CI (`.github/workflows/ci.yml`, jobs `lint` et `test`) refuse tout ce qui ne passe pas ces commandes ; lancez-les avant de pousser :
 
 ```bash
 ruff check .                          # analyse statique

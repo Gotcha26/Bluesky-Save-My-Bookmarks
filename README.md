@@ -17,6 +17,8 @@ Tout est automatique. Aucun copier-coller de token, aucun fichier à éditer man
 
 ## Installation
 
+BSMB demande **Python 3.11 ou plus récent**. `ffmpeg` et `exiftool` sont facultatifs : sans eux, les médias sont téléchargés mais sans métadonnées intégrées.
+
 ### Windows
 
 1. Téléchargez le projet (bouton vert **Code** > **Download ZIP**)
@@ -42,7 +44,11 @@ pipx install .
 bsmb
 ```
 
-BSMB lit et écrit `config.json`, `bsmb.db` et `logs/` dans son dossier d'installation (celui de `bsmb.py`), quel que soit le dossier courant. **Avec pipx, ce dossier est interne à l'environnement pipx : ces fichiers (identifiants, historique, logs) sont perdus à `pipx upgrade` ou `pipx reinstall`.** Sauvegardez-les avant, ou préférez l'installation par `git clone` ci-dessus.
+BSMB lit et écrit `config.json`, `bsmb.db`, `bookmarks.json` et `logs/` dans son dossier d'installation (celui de `bsmb.py`), quel que soit le dossier courant. **Avec pipx, ce dossier est interne à l'environnement pipx : ces fichiers (identifiants, historique, logs) sont perdus à `pipx upgrade` ou `pipx reinstall`.** Sauvegardez-les avant, ou préférez l'installation par `git clone` ci-dessus.
+
+### Trousseau du système (facultatif)
+
+Pour que l'App Password soit rangé dans le trousseau du système (Credential Manager, Keychain, Secret Service) plutôt que dans `config.json` : `pip install -r requirements-optional.txt` (ou `pipx install ".[keyring]"`).
 
 ---
 
@@ -52,19 +58,20 @@ Au lancement, BSMB affiche un menu simple :
 
 ```
 ======================================================================
-=                    BSMB - BSKY SAVE MY BOOKMARKS                   =
+=                BSMB v3.1.0 - BSKY SAVE MY BOOKMARKS                =
 ======================================================================
   Compte: non connecté | Médias: aucun
 
   1. Mon compte     - Connexion et bookmarks en ligne
   2. Stockage local - Dossier et statistiques
   3. Paramètres     - Configuration de l'application
+
   4. Télécharger    - (connectez d'abord votre compte)
 
   0. Quitter
 ```
 
-### Étape 1 — Connecter votre compte
+### Étape 1 : connecter votre compte
 
 Choisissez **1. Mon compte** puis **1. Connecter mon compte Bluesky**.
 
@@ -79,22 +86,23 @@ Vous aurez besoin de :
 
 BSMB teste immédiatement la connexion. Si ça marche, vos identifiants sont sauvegardés localement.
 
-### Étape 2 — Synchroniser
+### Étape 2 : synchroniser
 
 Toujours dans **Mon compte**, choisissez **1. Synchroniser les bookmarks**.
 
 BSMB récupère la liste complète de vos bookmarks depuis Bluesky et vous indique combien sont nouveaux.
 
-### Étape 3 — Télécharger
+### Étape 3 : télécharger
 
 Revenez au menu principal et choisissez **4. Télécharger X nouveaux bookmarks**.
 
-BSMB analyse chaque post et télécharge automatiquement :
-- Les **images** (avec métadonnées EXIF : auteur, date, lien)
-- Les **vidéos** (avec métadonnées ffmpeg)
-- Les **textes** seuls
+BSMB analyse chaque post et enregistre automatiquement :
+- les **images**, en qualité d'origine, avec métadonnées EXIF (auteur, date, lien, texte alternatif) ;
+- les **vidéos** (jusqu'à 10 minutes), les GIF et leurs sous-titres, avec métadonnées ffmpeg ;
+- le **texte** de chaque post dans un fichier `.txt` lisible, accompagné d'une fiche `.json` (le post tel que Bluesky le fournit) ;
+- les **cartes de lien** (titre, description, vignette) et, pour les citations, le post cité.
 
-Les fichiers sont enregistrés dans `~/Downloads/BSMB/` par défaut.
+Les fichiers sont enregistrés dans `~/Downloads/BSMB/` par défaut, dans les sous-dossiers `images/`, `videos/` et `texts/`.
 
 ---
 
@@ -102,18 +110,19 @@ Les fichiers sont enregistrés dans `~/Downloads/BSMB/` par défaut.
 
 À chaque lancement :
 
-1. **Mon compte** > **Synchroniser** — récupère les nouveaux bookmarks
-2. **Télécharger X nouveaux bookmarks** — télécharge uniquement ce qui est nouveau
+1. **Mon compte** > **Synchroniser** : récupère les nouveaux bookmarks
+2. **Télécharger X nouveaux bookmarks** : télécharge uniquement ce qui est nouveau
 
 BSMB se souvient de ce qui a déjà été traité grâce à sa base de données locale.
 
 ### Ligne de commande
 
-Sans menu, par exemple pour une tâche planifiée (voir [ADVANCED.md](ADVANCED.md#planification)) :
+Sans menu, par exemple pour une tâche planifiée (voir [ADVANCED.md](ADVANCED.md#planification)) ; un compte doit déjà être configuré par le menu. Avec l'installation par `git clone`, remplacez `bsmb` par `python bsmb.py` :
 
-- `python bsmb.py sync` — synchronise les bookmarks ; `python bsmb.py download [--force]` — télécharge les nouveaux
-- `python bsmb.py run --yes` — synchronise puis télécharge, sans aucune question
-- `python bsmb.py status [--json]` — affiche l'état du compte et des compteurs
+- `bsmb sync` : synchronise les bookmarks ; `bsmb download [--force]` : télécharge les nouveaux
+- `bsmb run --yes` : synchronise puis télécharge, sans aucune question
+- `bsmb status [--json]` : affiche l'état du compte et des compteurs
+- `bsmb --version` : affiche la version
 
 ---
 
@@ -121,8 +130,8 @@ Sans menu, par exemple pour une tâche planifiée (voir [ADVANCED.md](ADVANCED.m
 
 | Option | Description |
 |--------|-------------|
-| **1. Mon compte** | Connexion Bluesky, synchronisation, compteurs en ligne vs local |
-| **2. Stockage local** | Statistiques, taille du dossier, nettoyage des liens morts |
+| **1. Mon compte** | Connexion Bluesky, synchronisation, déconnexion, compteurs en ligne et en local |
+| **2. Stockage local** | Statistiques, taille du dossier, ouverture du dossier, nettoyage des liens morts, réinitialisation de la base |
 | **3. Paramètres** | Identifiants, dossier de destination, workers parallèles, mode avancé |
 | **4. Télécharger** | Lance le téléchargement des nouveaux bookmarks |
 
@@ -130,22 +139,25 @@ Sans menu, par exemple pour une tâche planifiée (voir [ADVANCED.md](ADVANCED.m
 
 ## Fonctionnalités
 
-- **Téléchargement incrémental** — seuls les nouveaux bookmarks sont traités
-- **Citations (quote posts)** — le texte et les médias du post bookmarké sont archivés, puis ceux du post qu'il cite (fichiers `…_quote…`, deux niveaux au plus)
-- **Métadonnées** — chaque fichier contient l'auteur, la date et le lien vers le post original
-- **Détection des liens morts** — les posts supprimés (erreur 400/500) sont identifiés et nettoyables
-- **Téléchargement parallèle** — configurable de 1 à 16 workers (défaut : 4)
-- **Multi-plateforme** — Windows, macOS, Linux
+- **Téléchargement incrémental** : seuls les nouveaux bookmarks sont traités
+- **Archive fidèle** : chaque post donne un `.txt` lisible et une fiche `.json` (désactivable)
+- **Citations (quote posts)** : le texte et les médias du post bookmarké sont archivés, puis ceux du post qu'il cite (fichiers `…_quote…`, deux niveaux au plus)
+- **Images en qualité d'origine**, vidéos jusqu'à 10 minutes et 300 Mo, GIF, sous-titres, cartes de lien
+- **Métadonnées** : chaque image et vidéo contient l'auteur, la date et le lien vers le post original (avec ffmpeg et exiftool)
+- **Détection des liens morts** : les posts supprimés ou bloqués sont identifiés et nettoyables
+- **Téléchargement parallèle** : configurable de 1 à 16 workers (défaut : 4)
+- **Utilisable sans menu** : sous-commandes et codes de retour pour les tâches planifiées
+- **Multi-plateforme** : Windows, macOS, Linux
 
 ---
 
 ## Nommage des fichiers
 
-Format : `handle_YYYYMMDD_postid_N.ext`
+Format : `handle_YYYYMMDD_postid_NN.ext`
 
 Exemple : `artiste_20260110_3abc123xyz_01.jpg`
 
-Chaque fichier est traçable vers son post d'origine sur Bluesky.
+Chaque fichier est traçable vers son post d'origine sur Bluesky. Les textes et fiches portent le même nom de base sans index (`artiste_20260110_3abc123xyz.txt` et `.json`, dans `texts/`), les sous-titres ajoutent leur langue (`…_01.fr.vtt`) et les fichiers d'un post cité contiennent `_quote`.
 
 ---
 
@@ -183,7 +195,7 @@ C'est normal : un post est enregistré dès qu'il a été traité, même sans m�
 Souvent une erreur réseau ou serveur temporaire (Bluesky). Une erreur 500 ou une limite de débit (429) du serveur est retentée automatiquement après 7 jours. Un échec de téléchargement (liste dans `logs/failed_downloads_*.txt`) n'est en revanche pas retenté tout seul : le post reste marqué comme traité. Pour le retenter, utilisez **Force DL** (ou `python bsmb.py download --force`).
 
 **Que devient un post qui partage un lien (article, YouTube, x.com…) ?**
-BSMB archive le texte du post, le lien, son titre, sa description et la vignette de la carte. Le contenu du site lié n'est pas téléchargé (sauf un GIF Tenor ou un fichier `.gif` / `.mp4` / `.webp` direct) ; pour ces cas, un outil externe comme `yt-dlp -a urls.txt` reste utilisable.
+BSMB archive le texte du post, le lien, son titre, sa description et la vignette de la carte. Le contenu du site lié n'est pas téléchargé (sauf un GIF Tenor ou un fichier `.gif` / `.mp4` / `.webp` direct).
 
 **Puis-je utiliser la liste de bookmarks avec d'autres outils ?**
 Oui. Le fichier `urls.txt` contient une URL par ligne : il est compatible avec `wget -i urls.txt` ou `yt-dlp -a urls.txt` (outils externes, facultatifs). `bookmarks.json` garde la réponse complète de Bluesky.
@@ -228,29 +240,32 @@ Le menu s'adapte à votre situation : **4. Télécharger** n'est actif qu'une fo
 
 - Vos données restent **100% locales** (aucun upload, aucun tracking)
 - L'App Password est stocké dans le trousseau du système si `keyring` est installé (`pip install -r requirements-optional.txt`), sinon dans `config.json` (fichier local, ignoré par Git). Créez un App Password **dédié** à BSMB et révoquez-le en cas de doute ; « Mon compte > D » le supprime de cet ordinateur.
-- Seules des requêtes HTTPS vers l'API Bluesky sont effectuées
+- `bookmarks.json` (la dernière réponse de Bluesky) contient le texte complet de vos posts en favori : il est ignoré par Git, ne le publiez pas.
+- Seules des requêtes HTTPS sont effectuées : vers Bluesky (API, serveur de votre compte et CDN) et, pour un post qui partage un GIF, vers l'hôte de ce GIF
 - Ne partagez jamais votre App Password
 
 ---
 
 ## Utilisateurs avancés
 
-Si vous souhaitez utiliser le mode développeur, le token Bearer manuel, ou comprendre l'architecture technique, consultez le [guide avancé](ADVANCED.md).
+Pour le mode développeur, le token Bearer manuel, la planification, la configuration détaillée ou l'architecture technique, consultez le [guide avancé](ADVANCED.md). Pour contribuer : [CONTRIBUTING.md](CONTRIBUTING.md) et [DEVELOPMENT.md](DEVELOPMENT.md). L'historique des versions est dans le [CHANGELOG](CHANGELOG.md).
 
 ---
 
 ## Signaler un bug
 
-Trouvez un problème ? Signalez-le sur [GitHub Issues](https://github.com/Gotcha26/Bluesky-Save-My-Bookmarks/issues)
+Trouvez un problème ? Signalez-le sur [GitHub Issues](https://github.com/Gotcha26/Bluesky-Save-My-Bookmarks/issues).
 
 Incluez :
-- Votre plateforme (Windows/Mac/Linux)
-- L'erreur exacte (message, logs si disponibles)
+- La sortie de `bsmb --version` (ou `python bsmb.py --version`)
+- La sortie de `bsmb status --json` (ou `python bsmb.py status --json`) : état du compte et compteurs, sans appel réseau. Relisez-la avant de la publier.
+- Votre plateforme (Windows/Mac/Linux) et votre version de Python
+- L'erreur exacte (message, extraits de `logs/` si disponibles)
 - Les étapes pour reproduire le problème
 
 ---
 
 ## Licence
 
-Projet personnel — Utilisation libre.
+Projet personnel : utilisation libre.
 Respectez les droits des créateurs de contenu.

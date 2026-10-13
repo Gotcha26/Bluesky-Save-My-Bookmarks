@@ -18,15 +18,15 @@ echo "   Initialisation des prérequis"
 echo "============================================================"
 echo
 
-# --- [1/4] Python 3.10+ ---------------------------------------
+# --- [1/4] Python 3.11+ ---------------------------------------
 if ! command -v python3 >/dev/null 2>&1; then
     echo "[ERREUR] python3 est introuvable."
     echo "         Debian/Ubuntu : sudo apt install python3 python3-venv python3-pip"
     echo "         macOS         : brew install python"
     exit 1
 fi
-if ! python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)'; then
-    echo "[ERREUR] Python trop ancien : BSMB demande Python 3.10 ou plus récent."
+if ! python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)'; then
+    echo "[ERREUR] Python trop ancien : BSMB demande Python 3.11 ou plus récent."
     python3 -c 'import sys; print("         Version détectée :", sys.version.split()[0])'
     exit 1
 fi

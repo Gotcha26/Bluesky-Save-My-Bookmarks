@@ -11,7 +11,7 @@ echo    Initialisation des prérequis
 echo ============================================================
 echo.
 echo BSMB utilise :
-echo    - Python 3.10 ou plus récent  ^(obligatoire^)
+echo    - Python 3.11 ou plus récent  ^(obligatoire^)
 echo    - le paquet Python requests   ^(obligatoire, installé dans .venv^)
 echo    - ffmpeg et exiftool          ^(facultatifs : métadonnées vidéo et images^)
 echo.
@@ -38,7 +38,7 @@ if not errorlevel 1 (
         choco install python -y --no-progress
     ) else (
         echo [ERREUR] Ni winget ni Chocolatey ne sont disponibles.
-        echo          Installez Python 3.10+ depuis https://www.python.org/downloads/
+        echo          Installez Python 3.11+ depuis https://www.python.org/downloads/
         echo          en cochant "Add python.exe to PATH", puis relancez Start.bat.
         pause
         exit /b 1
@@ -62,9 +62,9 @@ if not defined PYEXE (
 )
 
 :python_ok
-%PYEXE% -c "import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)" >nul 2>nul
+%PYEXE% -c "import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)" >nul 2>nul
 if errorlevel 1 (
-    echo [ERREUR] Python trop ancien : BSMB demande Python 3.10 ou plus récent.
+    echo [ERREUR] Python trop ancien : BSMB demande Python 3.11 ou plus récent.
     %PYEXE% -c "import sys; print('         Version détectée :', sys.version.split()[0])"
     echo          Installez une version récente : winget install --id Python.Python.3.13
     pause

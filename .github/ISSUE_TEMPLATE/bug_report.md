@@ -30,7 +30,8 @@ Décrire ce qui se passe réellement (erreur, comportement inattendu).
 - **OS** : Windows 10 / Windows 11 / macOS / Linux
 - **Terminal** : CMD / PowerShell / Windows Terminal / Bash / Zsh
 - **Python** : `python --version` ?
-- **BSMB Version** : 2.1 (du README.md ou bsmb.py)
+- **BSMB Version** : sortie de `bsmb --version` (ou `python bsmb.py --version`)
+- **État** : sortie de `bsmb status --json` (ou `python bsmb.py status --json`), après relecture
 - **Dépendances** : ffmpeg / exiftool installés? Oui/Non
 
 ## 📝 Message d'erreur complète
