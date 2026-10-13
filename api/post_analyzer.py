@@ -36,6 +36,21 @@ def _external_info(embed_external):
     }
 
 
+CDN_FULLSIZE = "https://cdn.bsky.app/img/feed_fullsize/plain/"
+
+
+def _gallery_info(media):
+    """Images d'une galerie brute (`app.bsky.embed.gallery`, jusqu'à 20 items) :
+    (urls CDN, alts), dans l'ordre. Un item sans blob est ignoré, alt compris."""
+    images, alts = [], []
+    for item in media.get("items") or []:
+        ref = ((item.get("image") or {}).get("ref") or {}).get("$link")
+        if ref:
+            images.append(f"{CDN_FULLSIZE}{ref}@jpeg")
+            alts.append(item.get("alt") or "")
+    return images, alts
+
+
 def _identity(did, rkey):
     """Champs d'identité canonique ({} tant que le DID est inconnu)."""
     if not did:
@@ -187,6 +202,13 @@ class PostAnalyzer:
                 result_data["image_count"] = len(images)
                 return PostType.IMAGES, result_data, debug_info
 
+        # 2 ter. Galerie (nouveau format Bluesky, plus de 4 images)
+        if embed_type == "app.bsky.embed.gallery":
+            images, alts = _gallery_info(embed)
+            if images:
+                result_data.update(images=images, image_count=len(images), alts=alts, gallery=True)
+                return PostType.IMAGES, result_data, debug_info
+
         # 2 bis. Carte de lien / GIF (external)
         if embed_type == "app.bsky.embed.external":
             external = _external_info(embed.get("external") or {})
@@ -230,6 +252,12 @@ class PostAnalyzer:
                 if images:
                     result_data["images"] = images
                     result_data["image_count"] = len(images)
+                    return PostType.IMAGES, result_data, debug_info
+
+            if media_type == "app.bsky.embed.gallery":
+                images, alts = _gallery_info(media)
+                if images:
+                    result_data.update(images=images, image_count=len(images), alts=alts, gallery=True)
                     return PostType.IMAGES, result_data, debug_info
 
             if media_type == "app.bsky.embed.external":

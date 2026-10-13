@@ -128,7 +128,7 @@ Le nettoyage :
 
 ## Archive d'un post (fichiers texte et fiche JSON)
 
-Chaque post archivé avec succès (images, vidéo, texte, lien externe, citation, et le post cité d'une citation) donne, dans le dossier `texts/`, deux fichiers de même nom de base (`<handle>_<AAAAMMJJ>_<postid>`, ou `<base>_quote` pour un post cité) :
+Chaque post archivé avec succès (images, galeries jusqu'à 20 images, vidéo, texte, lien externe, citation, et le post cité d'une citation) donne, dans le dossier `texts/`, deux fichiers de même nom de base (`<handle>_<AAAAMMJJ>_<postid>`, ou `<base>_quote` pour un post cité) :
 
 **`<base>.txt`** : version lisible. Les liens du texte affichent leur URL réelle (`libellé (https://url)`, au lieu du libellé tronqué par Bluesky), les mentions restent en `@handle` et les tags en `#tag` :
 
