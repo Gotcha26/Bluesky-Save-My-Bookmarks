@@ -1,4 +1,5 @@
-"""Archivage des citations (quote posts, issue #5) : analyseur et résolveur réels, réseau et downloaders mockés."""
+"""Archivage des citations (quote posts, issue #5) : analyseur et résolveur réels,
+réseau et downloaders mockés."""
 
 import json
 from pathlib import Path
@@ -268,7 +269,8 @@ class TestEchecDuContenuPropre:
             downloaders=dl,
         )
         assert res[0] is False and res[4] == "failed"
-        # ce qui a été obtenu est conservé en base (le texte du citant, écrit avec le média, attend la réussite)
+        # ce qui a été obtenu est conservé en base (le texte du citant, écrit avec le média,
+        # attend la réussite)
         assert len(medias(tmp_db)) == 1
         assert statut(tmp_db, url) != "deleted"
 

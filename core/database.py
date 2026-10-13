@@ -412,7 +412,8 @@ class Database:
                 now = datetime.now().isoformat()
                 rkey = ref.get("rkey") or url.rstrip("/").rsplit("/", 1)[-1]
                 cursor.execute(
-                    "INSERT INTO posts (url, post_id, handle, added_at, last_check, status, at_uri, did, rkey) "
+                    "INSERT INTO posts "
+                    "(url, post_id, handle, added_at, last_check, status, at_uri, did, rkey) "
                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     (
                         url,

@@ -581,7 +581,10 @@ def _format_job_summary(idx, total, url, status, img_count, vid_count, text_coun
         if text_count:
             details.append(f"{text_count} texte{'s' if text_count > 1 else ''}")
         detail_str = ", ".join(details) if details else "OK"
-        return f"  {c.DIM}{counter}{c.RESET} {c.GREEN}OK{c.RESET} {c.VALUE}{handle}/{post_id}{c.RESET} {c.DIM}{detail_str}{c.RESET}"
+        return (
+            f"  {c.DIM}{counter}{c.RESET} {c.GREEN}OK{c.RESET} "
+            f"{c.VALUE}{handle}/{post_id}{c.RESET} {c.DIM}{detail_str}{c.RESET}"
+        )
     elif status == "error_400":
         return f"  {c.DIM}{counter}{c.RESET} {c.RED}--{c.RESET} {c.DIM}post supprimé (400){c.RESET}"
     elif status == "error_500":
@@ -800,7 +803,8 @@ def _run(urls, config, media_dirs, no_db=False, on_progress=None, quiet=False, p
         print()
         print(f"  {c.HEADER}{'─' * 78}{c.RESET}")
         print(
-            f"  {c.BOLD}{total_jobs} posts à traiter{c.RESET} {c.DIM}({max_workers} workers parallèles){c.RESET}"
+            f"  {c.BOLD}{total_jobs} posts à traiter{c.RESET} "
+            f"{c.DIM}({max_workers} workers parallèles){c.RESET}"
         )
         print(f"  {c.HEADER}{'─' * 78}{c.RESET}")
         print()
