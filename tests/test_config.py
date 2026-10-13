@@ -307,3 +307,10 @@ class TestPermissionsFichier:
         monkeypatch.setattr("core.config.CONFIG_FILE", tmp_path / "config.json")
         monkeypatch.setattr("core.config.os", types.SimpleNamespace(name="posix", chmod=boom))
         save_config({"a": 1})
+
+
+class TestDefautsArchive:
+    def test_index_a_deux_chiffres_et_fiche_json_activee(self):
+        from core.config import DEFAULT_CONFIG
+        assert DEFAULT_CONFIG["index_digits"] == 2
+        assert DEFAULT_CONFIG["save_sidecar"] is True

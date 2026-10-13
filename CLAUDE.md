@@ -38,6 +38,8 @@ Le flux est en deux temps, piloté par le menu de `bsmb.py` :
 
 Points qui ne se voient pas en lisant un seul fichier :
 
+- **Archive fidèle** (`downloaders/archive.py`) : `write_text(post_url, record, dest_dir, config, name_prefix=None, alts=None)` écrit le `.txt` lisible de **tout** post (facets résolues via `resolve_facets`, index en octets UTF-8 ; alt, carte de lien, `Cite:`, `Réponse à:`) et `write_sidecar(...)` la fiche `.json` (record brut + `postView` ou null ; désactivable par `save_sidecar`). `save_text` et `download_external` y délèguent ; l'orchestrateur (`_archiver_post`, depuis le record de `debug_info["full_data"]`) les appelle pour les autres types. Résultats `media_type` `text` / `sidecar`.
+
 - **Chemins ancrés sur `PROJECT_ROOT`** (`core/paths.py`, dossier de `bsmb.py`) : `CONFIG_FILE` y est fixé, et `resolve_path(config, key)` résout `db_file`, `urls_file`, `logs_dir`, `token_file` quand ils sont relatifs. Toujours passer par `resolve_path`, jamais `Path(config["…"])`. `config.json` garde les valeurs relatives. Les dossiers médias viennent de `get_media_dirs(config)` (`download_dir`).
 - **Aucun code au niveau module** dans les downloaders et l'orchestrateur : `tests/test_imports.py` importe chaque module dans un interpréteur neuf et échoue sur toute sortie, `input()` ou fichier créé. Le `sys.path.insert` des scripts n'a lieu qu'en exécution directe (`__package__` vide). Seuls `exiftool` et `ffmpeg` sont lancés en sous-processus.
 - **Le token ne sert qu'à `getBookmarks`**. Il est passé à `export_bookmarks.py` par la variable d'environnement `BSMB_TOKEN`. Tous les autres appels (`getRecord`, `getPostThread`, `getBlob`, `getProfile`) sont publics, sans authentification.
