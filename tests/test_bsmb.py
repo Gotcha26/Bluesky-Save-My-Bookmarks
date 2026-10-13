@@ -235,3 +235,27 @@ class TestDisconnectKeyringEnEchec:
         sortie = capsys.readouterr().out
         assert "Compte déconnecté" in sortie
         assert "pas pu être nettoyé" not in sortie
+
+
+class TestDownloadMediaCache:
+    def test_post_views_du_cache_passes_a_run(self, tmp_config):
+        from core.bookmarks_cache import save_cache
+        at_uri = "at://did:plc:test/app.bsky.feed.post/3k2"
+        vue = {"uri": at_uri, "record": {"text": "x"}}
+        save_cache(tmp_config["bookmarks_cache"], [
+            {"at_uri": at_uri, "url": URL2, "item_type": "postView", "post_view": vue},
+            {"at_uri": "at://did:plc:test/app.bsky.feed.post/3k9", "url": "u9",
+             "item_type": "notFoundPost", "post_view": None},
+        ])
+        _urls(tmp_config, URL2)
+        with patch("bsmb.run", return_value=_stats()) as run, \
+             patch("builtins.input", side_effect=["", "n"]):
+            bsmb.download_media(tmp_config)
+        assert run.call_args.kwargs["post_views"] == {at_uri: vue, URL2: vue}
+
+    def test_sans_cache_run_inchange(self, tmp_config):
+        _urls(tmp_config, URL2)
+        with patch("bsmb.run", return_value=_stats()) as run, \
+             patch("builtins.input", side_effect=["", "n"]):
+            bsmb.download_media(tmp_config)
+        run.assert_called_once_with([URL2], tmp_config)

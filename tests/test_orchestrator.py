@@ -332,3 +332,37 @@ class TestMainCli:
             orchestrator.main(["I", "V"])
         assert exc.value.code == 1
         assert "Usage" in capsys.readouterr().out
+
+
+class TestPostViews:
+    """run(..., post_views=...) transmet la vue hydratée à l'analyseur et au résolveur (issue #3)."""
+
+    def test_run_transmet_le_post_view_a_analyze(self, env_run):
+        config, analyzer, _ = env_run
+        vue = {"uri": "at://did:plc:test/app.bsky.feed.post/3k1", "record": {}}
+        analyzer.analyze.side_effect = None
+        analyzer.analyze.return_value = (PostType.TEXT_ONLY, {"handle": "user.bsky.social"}, {})
+
+        run([URL, URL2], config, quiet=True, post_views={URL: vue})
+
+        appels = {c.args[0]: c.kwargs for c in analyzer.analyze.call_args_list}
+        assert appels[URL] == {"post_view": vue}
+        assert appels[URL2] == {}  # pas de vue : appel inchangé (getRecord)
+
+    def test_run_sans_post_views_appel_inchange(self, env_run):
+        config, analyzer, _ = env_run
+        _types(analyzer, {URL: PostType.TEXT_ONLY})
+        run([URL], config, quiet=True)
+        analyzer.analyze.assert_called_once_with(URL)
+
+    def test_resolveur_recoit_le_post_view_du_citant(self, tmp_db, tmp_path):
+        vue = {"uri": "at://did:plc:test/app.bsky.feed.post/3k1", "record": {}}
+        resolveur = MagicMock()
+        resolveur.resolve.return_value = None
+        analyseur = _analyseur(PostType.QUOTE, {"handle": "user.bsky.social", "is_quote": True,
+                                                "quote_uri": "at://did:plc:x/app.bsky.feed.post/3kc"})
+        with patch.multiple("core.orchestrator", save_text=MagicMock(return_value=[_res("t.txt", "text")])):
+            process_post(URL, "IMG", "VID", "TXT", tmp_db, analyseur, resolveur,
+                         tmp_path, lambda *a, **k: None, config={"max_filename_len": 64}, post_view=vue)
+        analyseur.analyze.assert_called_once_with(URL, post_view=vue)
+        resolveur.resolve.assert_called_once_with(URL, post_view=vue)

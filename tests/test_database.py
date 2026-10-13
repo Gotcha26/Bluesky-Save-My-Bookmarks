@@ -243,3 +243,41 @@ class TestMigration:
         cursor = tmp_db.conn.cursor()
         columns = [row[1] for row in cursor.execute('PRAGMA table_info(posts)').fetchall()]
         assert 'status' in columns
+
+
+class TestStatutBlocked:
+    def test_cleanup_supprime_aussi_les_blocked(self, tmp_db):
+        tmp_db.add_post("https://bsky.app/profile/u/post/1")
+        tmp_db.add_post("https://bsky.app/profile/u/post/2")
+        tmp_db.add_post("https://bsky.app/profile/u/post/3")
+        tmp_db.mark_post_status("https://bsky.app/profile/u/post/1", "deleted")
+        tmp_db.mark_post_status("https://bsky.app/profile/u/post/2", "blocked")
+        tmp_db.mark_post_status("https://bsky.app/profile/u/post/3", "error_500")
+        assert tmp_db.cleanup_dead_posts() == 2
+        assert tmp_db.get_stats()["posts"] == 1
+
+    def test_blocked_n_est_pas_retente(self, tmp_db):
+        url = "https://bsky.app/profile/u/post/2"
+        tmp_db.add_post(url)
+        tmp_db.mark_post_status(url, "blocked")
+        tmp_db.conn.execute("UPDATE posts SET last_check = '2000-01-01T00:00:00'")
+        tmp_db.conn.commit()
+        assert tmp_db.get_pending_posts([url], 7) == []
+
+    def test_mark_unavailable_cree_et_marque(self, tmp_db):
+        ref = {"url": "https://bsky.app/profile/u/post/2", "at_uri": "at://did:plc:t/app.bsky.feed.post/2",
+               "did": "did:plc:t", "rkey": "2", "handle": "u"}
+        assert tmp_db.mark_unavailable(ref, "blocked") is True
+        ligne = tmp_db.conn.execute("SELECT status, at_uri, did, rkey, handle FROM posts").fetchone()
+        assert tuple(ligne) == ("blocked", ref["at_uri"], "did:plc:t", "2", "u")
+
+    def test_mark_unavailable_sans_at_uri(self, tmp_db):
+        url = "https://bsky.app/profile/u/post/2"
+        assert tmp_db.mark_unavailable({"url": url}, "deleted") is True
+        assert tmp_db.conn.execute("SELECT status FROM posts WHERE url = ?", (url,)).fetchone()[0] == "deleted"
+
+    def test_mark_unavailable_respecte_un_post_archive(self, tmp_db):
+        url = "https://bsky.app/profile/u/post/2"
+        tmp_db.add_post(url)
+        assert tmp_db.mark_unavailable({"url": url}, "deleted") is False
+        assert tmp_db.conn.execute("SELECT status FROM posts").fetchone()[0] == "ok"

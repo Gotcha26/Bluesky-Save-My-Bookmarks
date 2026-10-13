@@ -4,6 +4,7 @@
 config.json
 Token-Bearer.txt
 bsmb.db
+bookmarks.json
 urls.*
 ToDo.md
 .claude

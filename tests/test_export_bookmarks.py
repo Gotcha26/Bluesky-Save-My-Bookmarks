@@ -221,3 +221,50 @@ class TestFetchBookmarksErrors:
         result = fetch_bookmarks("Bearer test")
         assert result["error"] is not None
         assert result["expired"] is False
+
+
+class TestFetchBookmarksItemTypes:
+    """Les trois formes de `item` (issue #3) : postView, notFoundPost, blockedPost."""
+
+    @patch("api.export_bookmarks.requests.Session")
+    def test_item_type_post_view_et_created_at(self, mock_session_cls):
+        import json
+        from pathlib import Path
+        page = json.loads((Path(__file__).parent / "fixtures" / "bookmarks_page.json").read_text(encoding="utf-8"))
+        session = MagicMock()
+        mock_session_cls.return_value = session
+        response = MagicMock(status_code=200)
+        response.json.return_value = page
+        session.get.return_value = response
+
+        result = fetch_bookmarks("Bearer test")
+
+        assert result["error"] is None
+        assert result["count"] == 3
+        par_type = {p["item_type"]: p for p in result["posts"]}
+        assert set(par_type) == {"postView", "notFoundPost", "blockedPost"}
+        vue = par_type["postView"]
+        assert vue["post_view"] == page["bookmarks"][0]["item"]
+        assert vue["created_at"] == "2026-03-01T10:00:00.000Z"
+        assert vue["handle"] == "alice.example.com"
+        assert vue["url"] == "https://bsky.app/profile/alice.example.com/post/3kpost00001"
+        assert par_type["notFoundPost"]["post_view"] is None
+        assert par_type["blockedPost"]["post_view"] is None
+        # Sans handle connu, l'URL retombe sur le DID ; les trois restent dans `urls`
+        assert par_type["notFoundPost"]["url"].startswith("https://bsky.app/profile/did:plc:test2")
+        assert len(result["urls"]) == 3
+
+    @patch("api.export_bookmarks.requests.Session")
+    def test_item_sans_type_reste_post_view_si_record(self, mock_session_cls):
+        session = MagicMock()
+        mock_session_cls.return_value = session
+        response = MagicMock(status_code=200)
+        response.json.return_value = {"bookmarks": [{"item": {
+            "uri": "at://did:plc:abc/app.bsky.feed.post/123",
+            "author": {"handle": "u.example.com"}, "record": {"text": "x"}}}], "cursor": None}
+        session.get.return_value = response
+
+        post = fetch_bookmarks("Bearer test")["posts"][0]
+        assert post["item_type"] == "postView"
+        assert post["post_view"]["record"] == {"text": "x"}
+        assert post["created_at"] is None

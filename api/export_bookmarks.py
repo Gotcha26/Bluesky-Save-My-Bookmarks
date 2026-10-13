@@ -16,6 +16,18 @@ from core.post_ref import PostRef  # noqa: E402
 DEFAULT_PDS_URL = "https://bsky.social"
 
 
+def _item_type(item):
+    """
+    Forme de l'`item` d'un bookmarkView : "postView", "notFoundPost" ou "blockedPost"
+    (suffixe de `$type` après `#`). Sans `$type`, un item portant un `record` est un
+    postView ; sinon la forme est "unknown" (traitée comme un post ordinaire).
+    """
+    suffixe = str(item.get("$type", "")).rpartition("#")[2]
+    if suffixe:
+        return suffixe
+    return "postView" if item.get("record") else "unknown"
+
+
 def fetch_bookmarks(token, on_progress=None, pds_url=DEFAULT_PDS_URL):
     """
     Récupère tous les bookmarks depuis l'API Bluesky.
@@ -28,7 +40,9 @@ def fetch_bookmarks(token, on_progress=None, pds_url=DEFAULT_PDS_URL):
     Returns:
         dict: {
             "urls": list[str],   # URLs de bookmarks (handle valide, sinon DID)
-            "posts": list[dict], # {"at_uri", "did", "rkey", "handle", "url"} par bookmark
+            "posts": list[dict], # par bookmark : {"at_uri", "did", "rkey", "handle", "url",
+                                 #   "item_type" ("postView"/"notFoundPost"/"blockedPost"),
+                                 #   "post_view" (dict brut, None si pas postView), "created_at"}
             "count": int,        # Nombre total de bookmarks
             "pages": int,        # Nombre de pages parcourues
             "error": str|None,   # Message d'erreur si échec
@@ -123,6 +137,7 @@ def fetch_bookmarks(token, on_progress=None, pds_url=DEFAULT_PDS_URL):
                 except ValueError:
                     continue
 
+                item_type = _item_type(item)
                 urls.append(ref.web_url)
                 posts.append({
                     "at_uri": ref.at_uri,
@@ -130,6 +145,9 @@ def fetch_bookmarks(token, on_progress=None, pds_url=DEFAULT_PDS_URL):
                     "rkey": ref.rkey,
                     "handle": handle,
                     "url": ref.web_url,
+                    "item_type": item_type,
+                    "post_view": item if item_type == "postView" else None,
+                    "created_at": bm.get("createdAt"),
                 })
 
             if on_progress:
