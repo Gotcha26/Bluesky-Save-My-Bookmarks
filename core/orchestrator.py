@@ -222,7 +222,7 @@ def _contenu_propre(
             erreurs=erreurs,
             record=full.get("value") or full.get("record"),
             did=data.get("did"),
-            view_embed=data.get("view_embed"),
+            view_embed=_vue_video(data.get("view_embed")),
             **_session(ctx),
             **options,
         )
@@ -255,6 +255,13 @@ def _contenu_propre(
     if results and not (erreurs is not None and len(erreurs) > nb_erreurs):
         results = results + _archiver_post(results, url, data, ctx, record, post_view, name_prefix, erreurs)
     return results
+
+
+def _vue_video(view_embed):
+    """Embed #view de la vidéo : le `media` d'une citation avec média (recordWithMedia#view)."""
+    if isinstance(view_embed, dict) and view_embed.get("$type") == "app.bsky.embed.recordWithMedia#view":
+        return view_embed.get("media")
+    return view_embed
 
 
 def _record_brut(debug_info):
