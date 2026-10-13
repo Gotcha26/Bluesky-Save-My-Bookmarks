@@ -1,7 +1,7 @@
 """Tests pour core/config.py"""
 import json
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from core.config import (
     DEFAULT_CONFIG,
@@ -12,7 +12,38 @@ from core.config import (
     get_media_dirs,
     cleanup_logs,
     cleanup_old_logs,
+    resolve_path,
+    CONFIG_FILE,
 )
+from core.paths import PROJECT_ROOT
+
+
+class TestCheminsAncres:
+    def test_project_root_est_la_racine_du_depot(self):
+        assert (PROJECT_ROOT / "bsmb.py").is_file()
+        assert (PROJECT_ROOT / "core" / "paths.py").is_file()
+
+    def test_config_file_ancre_sur_project_root(self):
+        assert CONFIG_FILE == PROJECT_ROOT / "config.json"
+
+    def test_resolve_path_relatif_ancre_sur_project_root(self):
+        assert resolve_path({"db_file": "bsmb.db"}, "db_file") == PROJECT_ROOT / "bsmb.db"
+
+    def test_resolve_path_absolu_inchange(self, tmp_path):
+        chemin = tmp_path / "base.db"
+        assert resolve_path({"db_file": str(chemin)}, "db_file") == chemin
+
+    def test_resolve_path_independant_du_dossier_courant(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        assert resolve_path({"logs_dir": "logs"}, "logs_dir") == PROJECT_ROOT / "logs"
+
+    def test_load_config_ne_modifie_pas_les_chemins_relatifs(self, tmp_path, monkeypatch):
+        config_file = tmp_path / "config.json"
+        config_file.write_text(json.dumps({"db_file": "autre.db"}), encoding="utf-8")
+        monkeypatch.setattr("core.config.CONFIG_FILE", config_file)
+        config = load_config()
+        assert config["db_file"] == "autre.db"
+        assert config["logs_dir"] == "logs"
 
 
 class TestDefaultConfig:
@@ -143,3 +174,84 @@ class TestCleanupOldLogs:
 
         assert not old_file.exists()
         assert new_file.exists()
+
+    @staticmethod
+    def _logs_dates(logs_dir, noms):
+        """Crée les fichiers dans l'ordre donné, du plus ancien au plus récent."""
+        import os
+        import time
+
+        maintenant = time.time()
+        for i, nom in enumerate(noms):
+            fichier = logs_dir / nom
+            fichier.write_text("x")
+            horodatage = maintenant - (len(noms) - i) * 60
+            os.utime(fichier, (horodatage, horodatage))
+
+    def test_garde_au_plus_max_logs_logs_de_telechargement(self, tmp_path):
+        logs_dir = tmp_path / "logs"
+        logs_dir.mkdir()
+        noms = [f"download_2026010{i}_000000.log" for i in range(1, 8)]
+        self._logs_dates(logs_dir, noms)
+
+        cleanup_old_logs({"logs_dir": str(logs_dir), "max_logs": 3})
+
+        restants = sorted(p.name for p in logs_dir.iterdir())
+        assert restants == noms[-3:]
+
+    def test_max_logs_ne_touche_pas_aux_autres_fichiers(self, tmp_path):
+        logs_dir = tmp_path / "logs"
+        logs_dir.mkdir()
+        self._logs_dates(logs_dir, ["failed_downloads_1.txt", "debug_x.json",
+                                    "download_1.log", "download_2.log"])
+
+        cleanup_old_logs({"logs_dir": str(logs_dir), "max_logs": 1})
+
+        restants = sorted(p.name for p in logs_dir.iterdir())
+        assert restants == ["debug_x.json", "download_2.log", "failed_downloads_1.txt"]
+
+    def test_max_logs_par_defaut(self, tmp_path):
+        logs_dir = tmp_path / "logs"
+        logs_dir.mkdir()
+        self._logs_dates(logs_dir, [f"download_{i}.log" for i in range(8)])
+
+        cleanup_old_logs({"logs_dir": str(logs_dir)})
+
+        assert len(list(logs_dir.iterdir())) == DEFAULT_CONFIG["max_logs"]
+
+
+class TestConsommateursAncres:
+    """Les chemins relatifs de la config sont résolus depuis PROJECT_ROOT, pas depuis le cwd."""
+
+    def test_ensure_dirs_logs_relatif(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("core.config.PROJECT_ROOT", tmp_path / "racine")
+        monkeypatch.chdir(tmp_path)
+        ensure_dirs({"download_dir": str(tmp_path / "dl"), "logs_dir": "logs"})
+        assert (tmp_path / "racine" / "logs").is_dir()
+        assert not (tmp_path / "logs").exists()
+
+    def test_cleanup_logs_relatif(self, tmp_path, monkeypatch):
+        racine = tmp_path / "racine"
+        (racine / "logs").mkdir(parents=True)
+        (racine / "logs" / "a.log").write_text("x")
+        monkeypatch.setattr("core.config.PROJECT_ROOT", racine)
+        monkeypatch.chdir(tmp_path)
+        assert cleanup_logs({"logs_dir": "logs"}) == 1
+
+    def test_token_file_relatif(self, tmp_path, monkeypatch):
+        from core.auth import get_session
+
+        (tmp_path / "Token-Bearer.txt").write_text("Bearer abc", encoding="utf-8")
+        monkeypatch.setattr("core.config.PROJECT_ROOT", tmp_path)
+        monkeypatch.chdir(tmp_path.parent)
+        session = get_session({"token_file": "Token-Bearer.txt"})
+        assert session["token"] == "Bearer abc"
+
+    def test_urls_file_relatif(self, tmp_path, monkeypatch):
+        from core.bookmarks import BookmarkSync
+
+        (tmp_path / "urls.txt").write_text("https://bsky.app/profile/a/post/1", encoding="utf-8")
+        monkeypatch.setattr("core.config.PROJECT_ROOT", tmp_path)
+        monkeypatch.chdir(tmp_path.parent)
+        etat = BookmarkSync({"urls_file": "urls.txt"}, MagicMock()).get_cached_state()
+        assert etat["online_count"] == 1

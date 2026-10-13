@@ -4,10 +4,9 @@ Synchronisation des bookmarks Bluesky.
 Pont entre l'API (export_bookmarks) et la base de données locale.
 """
 from datetime import datetime
-from pathlib import Path
 
 from api.export_bookmarks import fetch_bookmarks, DEFAULT_PDS_URL
-from core.config import save_config
+from core.config import resolve_path, save_config
 
 
 class BookmarkSync:
@@ -56,7 +55,7 @@ class BookmarkSync:
         new_urls = [p["url"] for p in self.db.get_pending_refs(result["posts"], retry_after_days)]
 
         # Sauvegarder dans urls.txt (rétrocompatibilité)
-        urls_file = Path(self.config["urls_file"])
+        urls_file = resolve_path(self.config, "urls_file")
         urls_file.write_text("\n".join(result["urls"]), encoding="utf-8")
 
         # Mettre à jour last_sync
@@ -92,7 +91,7 @@ class BookmarkSync:
         """
         stats = self.db.get_stats()
 
-        urls_file = Path(self.config["urls_file"])
+        urls_file = resolve_path(self.config, "urls_file")
         online_count = 0
         new_count = 0
         has_cache = False
