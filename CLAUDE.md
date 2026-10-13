@@ -24,7 +24,7 @@ Scripts utilisables seuls pour déboguer un post :
 ```bash
 python downloaders/images.py <dossier> <url_post>
 python downloaders/videos.py <dossier> <url_post>
-python core/orchestrator.py <img_dir> <vid_dir> [--no-db] <url1> [url2...]
+python core/orchestrator.py <img_dir> <vid_dir> <text_dir> [--no-db] <url1> [url2...]
 python api/export_bookmarks.py           # lit BSMB_TOKEN ou Token-Bearer.txt, écrit urls.txt
 ```
 

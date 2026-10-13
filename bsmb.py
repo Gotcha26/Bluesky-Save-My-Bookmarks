@@ -702,7 +702,7 @@ def download_media(config, force=False):
     print()
 
     result = subprocess.run(
-        ["python", "core/orchestrator.py", media_dirs["img_dir"], media_dirs["vid_dir"]] + urls_to_process,
+        ["python", "core/orchestrator.py", media_dirs["img_dir"], media_dirs["vid_dir"], media_dirs["text_dir"]] + urls_to_process,
         encoding="utf-8",
         errors="replace",
     )
@@ -743,7 +743,7 @@ def download_media_dev(config):
         return False
 
     result = subprocess.run(
-        ["python", "core/orchestrator.py", media_dirs["img_dir"], media_dirs["vid_dir"], "--no-db"] + urls
+        ["python", "core/orchestrator.py", media_dirs["img_dir"], media_dirs["vid_dir"], media_dirs["text_dir"], "--no-db"] + urls
     )
     return result.returncode == 0
 

@@ -74,7 +74,7 @@ def save_debug_info(post_id, debug_info, logs_dir):
     return debug_file
 
 
-def process_post(url, IMG_DIR, VID_DIR, db, analyzer, resolver, logs_dir, log_func):
+def process_post(url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_dir, log_func):
     """
     Traite un post unique et retourne les stats.
     Returns: (has_success, img_count, vid_count, text_count, status, output_lines)
@@ -131,7 +131,7 @@ def process_post(url, IMG_DIR, VID_DIR, db, analyzer, resolver, logs_dir, log_fu
             buf_print(f"  {c.DIM}{original_url}{c.RESET}")
 
             # Traiter récursivement le post original
-            return process_post(original_url, IMG_DIR, VID_DIR, db, analyzer, resolver, logs_dir, log_func)
+            return process_post(original_url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_dir, log_func)
         else:
             buf_print(c.warning("Impossible de résoudre le repost"))
             log_func(f"   REPOST NON RÉSOLU: {url}", to_console=False)
@@ -188,7 +188,7 @@ def process_post(url, IMG_DIR, VID_DIR, db, analyzer, resolver, logs_dir, log_fu
         buf_print(c.info("Texte seul détecté"))
 
         text_proc = subprocess.run(
-            ["python", "downloaders/text.py", url],
+            ["python", "downloaders/text.py", TEXT_DIR, url],
             capture_output=True,
             text=True
         )
@@ -201,6 +201,13 @@ def process_post(url, IMG_DIR, VID_DIR, db, analyzer, resolver, logs_dir, log_fu
             for line in text_proc.stdout.strip().split("\n"):
                 if line:
                     buf_print(f"    {line}")
+
+        if db and text_proc.returncode == 0:
+            for line in text_proc.stdout.splitlines():
+                if "[TXT]" in line:
+                    filename = line.split("[TXT]", 1)[1].strip()
+                    if filename:
+                        db.add_media(url, 'text', filename)
 
     # Cas inconnu - MODE DEBUG
     elif post_type == PostType.UNKNOWN:
@@ -364,20 +371,21 @@ def _save_and_report_logs(stats, logs_dir, log_file):
 
 
 def main():
-    if len(sys.argv) < 4:
-        print("Usage: python orchestrator.py <IMG_DIR> <VID_DIR> [--no-db] <URL1> [URL2] ...")
+    if len(sys.argv) < 5:
+        print("Usage: python orchestrator.py <IMG_DIR> <VID_DIR> <TEXT_DIR> [--no-db] <URL1> [URL2] ...")
         sys.exit(1)
 
     start_time = time.time()
 
     IMG_DIR = sys.argv[1]
     VID_DIR = sys.argv[2]
+    TEXT_DIR = sys.argv[3]
 
     no_db_mode = "--no-db" in sys.argv
     if no_db_mode:
         sys.argv.remove("--no-db")
 
-    urls = sys.argv[3:]
+    urls = sys.argv[4:]
 
     config = load_config()
     cleanup_old_logs(config)
@@ -432,7 +440,7 @@ def main():
         """Worker qui traite un post et retourne le résultat."""
         log(f"Job {idx}/{total_jobs}: {url}", to_console=False)
         has_success, imgs, vids, texts, status, output_lines = process_post(
-            url, IMG_DIR, VID_DIR, db, analyzer, resolver, logs_dir, log
+            url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_dir, log
         )
         return idx, url, has_success, imgs, vids, texts, status, output_lines
 
