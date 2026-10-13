@@ -140,6 +140,41 @@ class TestFetchBookmarksSuccess:
         assert "did:plc:xyz" in result["urls"][0]
 
 
+class TestFetchBookmarksPdsUrl:
+    def _setup(self, mock_session_cls):
+        session = MagicMock()
+        mock_session_cls.return_value = session
+        response = MagicMock()
+        response.status_code = 200
+        response.json.return_value = {"bookmarks": [], "cursor": None}
+        response.raise_for_status = MagicMock()
+        session.get.return_value = response
+        return session
+
+    @patch("api.export_bookmarks.requests.Session")
+    def test_uses_provided_pds_url(self, mock_session_cls):
+        session = self._setup(mock_session_cls)
+        fetch_bookmarks("Bearer t", pds_url="https://morel.us-east.host.bsky.network/")
+        assert session.get.call_args[0][0] == (
+            "https://morel.us-east.host.bsky.network/xrpc/app.bsky.bookmark.getBookmarks"
+        )
+
+    @patch("api.export_bookmarks.requests.Session")
+    def test_default_pds_url_is_bsky_social(self, mock_session_cls):
+        session = self._setup(mock_session_cls)
+        fetch_bookmarks("Bearer t")
+        assert session.get.call_args[0][0] == (
+            "https://bsky.social/xrpc/app.bsky.bookmark.getBookmarks"
+        )
+
+    @patch("api.export_bookmarks.requests.Session")
+    def test_keeps_appview_proxy_header(self, mock_session_cls):
+        session = self._setup(mock_session_cls)
+        fetch_bookmarks("Bearer t", pds_url="https://eurosky.social")
+        headers = session.headers.update.call_args[0][0]
+        assert headers["atproto-proxy"] == "did:web:api.bsky.app#bsky_appview"
+
+
 class TestFetchBookmarksErrors:
     @patch("api.export_bookmarks.requests.Session")
     def test_expired_token(self, mock_session_cls):

@@ -173,18 +173,18 @@ def get_token_from_clipboard():
             return None
 
 
-def get_token(config):
+def get_session(config):
     """
-    Obtient un token Bearer valide silencieusement.
-    Returns: str (token) ou None si échec.
+    Obtient une session Bluesky valide silencieusement.
+    Returns: dict {"token", "refresh_jwt", "did", "pds_url"} ou None si échec.
     """
-    from core.auth import get_token as auth_get_token, has_credentials, AuthError
+    from core.auth import get_session as auth_get_session, has_credentials, AuthError
 
     if has_credentials(config):
         try:
-            token = auth_get_token(config)
-            if token:
-                return token
+            session = auth_get_session(config)
+            if session:
+                return session
         except AuthError:
             return None
 
@@ -193,9 +193,21 @@ def get_token(config):
     if token_file.exists():
         content = token_file.read_text(encoding="utf-8").strip()
         if content.startswith("Bearer "):
-            return content
+            return {
+                "token": content,
+                "refresh_jwt": None,
+                "did": None,
+                "pds_url": config.get("pds_url") or "https://bsky.social",
+            }
 
     return None
+
+
+def _remember_pds_url(config, pds_url):
+    """Sauvegarde le PDS du compte dans la config s'il a changé."""
+    if pds_url and config.get("pds_url") != pds_url:
+        config["pds_url"] = pds_url
+        save_config(config)
 
 
 # ─── Mon compte ──────────────────────────────────────────────
@@ -271,12 +283,15 @@ def do_sync(config):
     print()
     print(c.info("Connexion à Bluesky..."))
 
-    token = get_token(config)
-    if not token:
+    session = get_session(config)
+    if not session:
         print(c.error("Impossible d'obtenir un token d'authentification"))
         print(f"  {c.DIM}Vérifiez vos identifiants dans Paramètres{c.RESET}")
         input(f"\n{c.DIM}  Appuyez sur Entrée...{c.RESET}")
         return
+
+    token = session["token"]
+    _remember_pds_url(config, session["pds_url"])
 
     print(c.success("Authentification réussie"))
     print(c.info("Récupération des bookmarks..."))
@@ -560,11 +575,12 @@ def configure_credentials(config):
 
     from core.auth import create_session, AuthError
     try:
-        create_session(handle, app_password)
+        session = create_session(handle, app_password)
         print(c.success("Connexion réussie !"))
 
         config["bsky_handle"] = handle
         config["bsky_app_password"] = app_password
+        config["pds_url"] = session["pds_url"]
         save_config(config)
         print(c.success("Identifiants sauvegardés"))
 

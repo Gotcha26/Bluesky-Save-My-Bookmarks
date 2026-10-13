@@ -154,6 +154,32 @@ class TestBookmarkSyncSync:
         db.close()
 
 
+class TestBookmarkSyncPdsUrl:
+    @patch("core.bookmarks.fetch_bookmarks")
+    @patch("core.bookmarks.save_config")
+    def test_sync_passes_configured_pds_url(self, mock_save, mock_fetch, tmp_config, tmp_path):
+        db = Database(str(tmp_path / "test.db"))
+        tmp_config["pds_url"] = "https://eurosky.social"
+        mock_fetch.return_value = {
+            "urls": [], "count": 0, "pages": 1, "error": None, "expired": False,
+        }
+        BookmarkSync(tmp_config, db).sync("Bearer test")
+        assert mock_fetch.call_args[1]["pds_url"] == "https://eurosky.social"
+        db.close()
+
+    @patch("core.bookmarks.fetch_bookmarks")
+    @patch("core.bookmarks.save_config")
+    def test_sync_defaults_when_pds_url_unknown(self, mock_save, mock_fetch, tmp_config, tmp_path):
+        db = Database(str(tmp_path / "test.db"))
+        tmp_config["pds_url"] = ""
+        mock_fetch.return_value = {
+            "urls": [], "count": 0, "pages": 1, "error": None, "expired": False,
+        }
+        BookmarkSync(tmp_config, db).sync("Bearer test")
+        assert mock_fetch.call_args[1]["pds_url"] == "https://bsky.social"
+        db.close()
+
+
 class TestBookmarkSyncGetCachedState:
     def test_no_cache(self, tmp_config, tmp_path):
         db = Database(str(tmp_path / "test.db"))

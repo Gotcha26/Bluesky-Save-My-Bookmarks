@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Export des bookmarks Bluesky — module importable et script standalone."""
+import json
 import os
 import requests
 import time
@@ -7,16 +8,17 @@ import sys
 import traceback
 from pathlib import Path
 
-API = "https://shiitake.us-east.host.bsky.network/xrpc/app.bsky.bookmark.getBookmarks"
+DEFAULT_PDS_URL = "https://bsky.social"
 
 
-def fetch_bookmarks(token, on_progress=None):
+def fetch_bookmarks(token, on_progress=None, pds_url=DEFAULT_PDS_URL):
     """
     Récupère tous les bookmarks depuis l'API Bluesky.
 
     Args:
         token: Token complet "Bearer xxx"
         on_progress: callback(page, count) optionnel pour suivre la progression
+        pds_url: PDS du compte (le token n'est valable que sur celui-ci)
 
     Returns:
         dict: {
@@ -36,6 +38,7 @@ def fetch_bookmarks(token, on_progress=None):
             "expired": False,
         }
 
+    api_url = f"{(pds_url or DEFAULT_PDS_URL).rstrip('/')}/xrpc/app.bsky.bookmark.getBookmarks"
     cursor = None
     urls = []
     page = 0
@@ -56,7 +59,7 @@ def fetch_bookmarks(token, on_progress=None):
                 params["cursor"] = cursor
 
             try:
-                r = session.get(API, params=params, timeout=20)
+                r = session.get(api_url, params=params, timeout=20)
 
                 if r.status_code == 400:
                     error_data = r.json()
@@ -163,10 +166,19 @@ if __name__ == "__main__":
         print("[ERREUR] Le token doit commencer par 'Bearer '")
         sys.exit(1)
 
+    # --- PDS : BSMB_PDS_URL, sinon config.json (pds_url), sinon bsky.social ---
+    PDS_URL = os.environ.get("BSMB_PDS_URL", "").strip()
+    if not PDS_URL and Path("config.json").exists():
+        try:
+            PDS_URL = str(json.loads(Path("config.json").read_text(encoding="utf-8")).get("pds_url") or "").strip()
+        except (OSError, ValueError):
+            PDS_URL = ""
+    PDS_URL = PDS_URL or DEFAULT_PDS_URL
+
     def progress_callback(page, count):
         print(f"\n→ Page {page}... ({count} bookmarks récupérés)")
 
-    result = fetch_bookmarks(TOKEN, on_progress=progress_callback)
+    result = fetch_bookmarks(TOKEN, on_progress=progress_callback, pds_url=PDS_URL)
 
     if result["error"]:
         if result["expired"]:

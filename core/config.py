@@ -19,6 +19,7 @@ DEFAULT_CONFIG = {
     "index_digits": 1,
     "bsky_handle": "",
     "bsky_app_password": "",
+    "pds_url": "",  # PDS du compte ("" = inconnu, bsky.social utilisé)
     "max_workers": 4,
     "last_sync": "",
     "advanced_mode": False
