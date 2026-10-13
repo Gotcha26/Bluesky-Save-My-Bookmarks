@@ -21,7 +21,7 @@ import traceback
 
 from core import i18n, orchestrator, ui
 from core.auth import AuthError, NetworkError, get_session, has_credentials
-from core.bookmarks import BookmarkSync
+from core.bookmarks import BookmarkSync, pending_downloads, read_urls, run_sync
 from core.bookmarks_cache import post_views_from_config
 from core.colors import c
 from core.config import (
@@ -29,7 +29,6 @@ from core.config import (
     ensure_dirs,
     load_config,
     resolve_path,
-    save_config,
 )
 from core.database import Database
 from core.i18n import _
@@ -117,14 +116,6 @@ def _preparer_config(lang=None):
     return config
 
 
-def _lire_urls(config):
-    urls_file = resolve_path(config, "urls_file")
-    if not urls_file.exists():
-        return []
-    with open(urls_file, encoding="utf-8") as f:
-        return [line.strip() for line in f if line.strip()]
-
-
 # ─── Sous-commandes ──────────────────────────────────────────
 
 
@@ -143,19 +134,15 @@ def cmd_sync(config, args=None):
         print(c.error(_("Aucun moyen d'authentification : configurez un compte (menu > Mon compte)")))
         return EXIT_AUTH
 
-    pds_url = session.get("pds_url")
-    if pds_url and config.get("pds_url") != pds_url:
-        config["pds_url"] = pds_url
-        save_config(config)
-
     db = Database(resolve_path(config, "db_file"))
     try:
-        result = BookmarkSync(config, db).sync(
-            session["token"],
+        result = run_sync(
+            config,
+            db,
+            session,
             on_progress=lambda page, count: print(
                 "  " + _("Page {page}... {count} bookmarks").format(page=page, count=count)
             ),
-            session_info=session,
         )
     finally:
         db.close()
@@ -179,17 +166,19 @@ def cmd_sync(config, args=None):
 def cmd_download(config, args=None):
     """Télécharge les posts en attente (ou tous avec --force). Retourne un code de retour."""
     force = bool(getattr(args, "force", False))
-    urls = _lire_urls(config)
+    urls = read_urls(config)
     if not urls:
         print(c.warning(_("Aucune URL à traiter (lancez d'abord « sync »)")))
         return EXIT_OK
 
     if force:
         a_traiter = urls
+        post_views = post_views_from_config(config)
     else:
+        # Comparaison par AT-URI quand le cache existe (un changement de handle ne retélécharge rien)
         db = Database(resolve_path(config, "db_file"))
         try:
-            a_traiter = db.get_pending_posts(urls, config.get("retry_after_days", 7))
+            a_traiter, post_views = pending_downloads(config, db)
         finally:
             db.close()
 
@@ -201,7 +190,6 @@ def cmd_download(config, args=None):
         return EXIT_OK
 
     # Vues hydratées de la dernière synchro : évitent un getRecord par post
-    post_views = post_views_from_config(config)
     if post_views:
         stats = orchestrator.run(a_traiter, config, post_views=post_views)
     else:

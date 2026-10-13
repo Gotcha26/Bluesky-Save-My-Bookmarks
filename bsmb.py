@@ -11,6 +11,7 @@ from datetime import datetime
 from pathlib import Path
 
 from core import cli, i18n
+from core.bookmarks import pending_downloads, read_urls, run_sync
 from core.bookmarks_cache import post_views_from_config
 from core.colors import c
 from core.config import ensure_dirs, load_config, resolve_path, restrict_permissions, save_config
@@ -90,15 +91,9 @@ def get_app_state(config):
 
     urls_file = resolve_path(config, "urls_file")
     has_urls = urls_file.exists() and urls_file.stat().st_size > 0
-    url_count = 0
-    new_count = 0
-
-    if has_urls:
-        with open(urls_file, encoding="utf-8") as f:
-            urls = [line.strip() for line in f if line.strip()]
-        url_count = len(urls)
-        new_urls = db.get_pending_posts(urls, config.get("retry_after_days", 7))
-        new_count = len(new_urls)
+    url_count = len(read_urls(config)) if has_urls else 0
+    # Même calcul que le téléchargement et « status » (AT-URI quand le cache existe)
+    new_count = len(pending_downloads(config, db)[0])
 
     from core.auth import has_credentials
 
@@ -208,13 +203,6 @@ def get_session(config):
             }
 
     return None
-
-
-def _remember_pds_url(config, pds_url):
-    """Sauvegarde le PDS du compte dans la config s'il a changé."""
-    if pds_url and config.get("pds_url") != pds_url:
-        config["pds_url"] = pds_url
-        save_config(config)
 
 
 def _invite_choix(suffixe=""):
@@ -352,23 +340,18 @@ def do_sync(config):
         pause()
         return
 
-    token = session["token"]
-    _remember_pds_url(config, session["pds_url"])
-
     print(c.success(_("Authentification réussie")))
     print(c.info(_("Récupération des bookmarks...")))
-
-    db = Database(resolve_path(config, "db_file"))
-    from core.bookmarks import BookmarkSync
-
-    sync = BookmarkSync(config, db)
 
     def progress(page, count):
         ligne = _("Page {page}... {count} bookmarks").format(page=page, count=count)
         print(f"  {c.DIM}{ligne}{c.RESET}")
 
-    result = sync.sync(token, on_progress=progress, session_info=session)
-    db.close()
+    db = Database(resolve_path(config, "db_file"))
+    try:
+        result = run_sync(config, db, session, on_progress=progress)
+    finally:
+        db.close()
 
     if result["error"]:
         if result.get("expired"):
@@ -838,8 +821,7 @@ def download_media(config, force=False):
         print(c.error(_("Fichier {fichier} introuvable").format(fichier=config["urls_file"])))
         return False
 
-    with open(urls_file, encoding="utf-8") as f:
-        urls = [line.strip() for line in f if line.strip()]
+    urls = read_urls(config)
 
     if not urls:
         print(c.warning(_("Aucune URL à traiter")))
@@ -849,10 +831,12 @@ def download_media(config, force=False):
 
     if force:
         urls_to_process = urls
+        post_views = post_views_from_config(config)
         print()
         print(c.warning(_("Mode FORCE : {n} posts seront tous traités").format(n=len(urls))))
     else:
-        urls_to_process = db.get_pending_posts(urls, config.get("retry_after_days", 7))
+        # Comparaison par AT-URI quand le cache existe (un changement de handle ne retélécharge rien)
+        urls_to_process, post_views = pending_downloads(config, db)
         new = len(urls_to_process)
         total = len(urls)
         print()
@@ -881,7 +865,6 @@ def download_media(config, force=False):
     print()
 
     # Vues hydratées de la dernière synchro : évitent un getRecord par post
-    post_views = post_views_from_config(config)
     if post_views:
         stats = run(urls_to_process, config, post_views=post_views)
     else:
