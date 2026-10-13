@@ -111,6 +111,50 @@ Le nettoyage :
 
 ---
 
+## Archive d'un post (fichiers texte et fiche JSON)
+
+Chaque post archivé avec succès (images, vidéo, texte, lien externe, citation, et le post cité d'une citation) donne, dans le dossier `texts/`, deux fichiers de même nom de base (`<handle>_<AAAAMMJJ>_<postid>`, ou `<base>_quote` pour un post cité) :
+
+**`<base>.txt`** : version lisible. Les liens du texte affichent leur URL réelle (`libellé (https://url)`, au lieu du libellé tronqué par Bluesky), les mentions restent en `@handle` et les tags en `#tag` :
+
+```
+Post: https://bsky.app/profile/auteur.example.com/post/3kabc
+Date: 2026-02-03T09:08:07.123Z
+Auteur: auteur.example.com
+Langue: fr, en
+
+Voir libidex.example/article-tres-lo... (https://libidex.example/article-tres-long-titre) avec @alice.example.com
+
+[Image 1 : texte alternatif de la première image]
+[Image 2 : …]
+
+Lien: https://exemple.org/page        (carte de lien, si le post en a une)
+Titre: …
+Description: …
+
+Cite: at://did:plc:…/app.bsky.feed.post/3kcite
+Réponse à: at://did:plc:…/app.bsky.feed.post/3kparent
+```
+
+Les lignes `Langue`, `[Image N : …]` / `[Vidéo : …]` (seulement si le texte alternatif n'est pas vide), `Lien/Titre/Description`, `Cite` et `Réponse à` n'apparaissent que lorsqu'elles s'appliquent. Un fichier déjà présent au même contenu n'est pas réécrit. Le texte alternatif des images est aussi écrit dans le champ EXIF `ImageDescription` (si `exiftool` est installé).
+
+**`<base>.json`** : la fiche (« sidecar »), archive fidèle du post, désactivable avec `save_sidecar: false` :
+
+```json
+{
+  "url": "https://bsky.app/profile/auteur.example.com/post/3kabc",
+  "at_uri": "at://did:plc:…/app.bsky.feed.post/3kabc",
+  "archived_at": "2026-10-13T20:15:00+00:00",
+  "bsmb_version": "3.1.0",
+  "record": { "…": "record brut du post : text, facets, langs, embed, reply, createdAt…" },
+  "post_view": { "…": "postView hydraté (auteur, labels, embed) ou null" }
+}
+```
+
+`post_view` n'est renseigné que lorsque la vue vient du cache `bookmarks.json` (synchronisation récente) ; en mode dev il vaut `null`. La fiche est réécrite à chaque retraitement. Elle est enregistrée en base avec le type `sidecar` et comptée à part (ligne « Fiches JSON » du rapport). Les index `byteStart` / `byteEnd` des facets sont des octets UTF-8, pas des caractères.
+
+---
+
 ## Architecture technique
 
 ```
@@ -139,6 +183,7 @@ bsmb/
 │   ├── images.py               # download_images() : images avec EXIF
 │   ├── videos.py               # download_video() : vidéos avec ffmpeg
 │   ├── text.py                 # save_text() : texte seul
+│   ├── archive.py              # write_text() / write_sidecar() : .txt lisible et fiche JSON
 │   └── external.py             # download_external() : cartes de lien, GIF Tenor
 │
 ├── tests/                       # Tests unitaires (pytest)
@@ -229,7 +274,8 @@ schtasks /Create /SC DAILY /TN BSMB /TR "\"C:\chemin\bsmb\.venv\Scripts\python.e
   "max_logs": 5,
   "max_filename_len": 64,
   "min_postid_short": 4,
-  "index_digits": 1,
+  "index_digits": 2,
+  "save_sidecar": true,
   "bsky_handle": "monpseudo.bsky.social",
   "bsky_app_password": "xxxx-xxxx-xxxx-xxxx",
   "pds_url": "https://morel.us-east.host.bsky.network",
@@ -255,7 +301,8 @@ schtasks /Create /SC DAILY /TN BSMB /TR "\"C:\chemin\bsmb\.venv\Scripts\python.e
 | `open_folder_after_download` | Propose d'ouvrir le dossier après un téléchargement (ignoré en non interactif) | `true` |
 | `max_filename_len` | Longueur max des noms de fichiers | `64` |
 | `min_postid_short` | Longueur min de l'ID du post dans un nom d'image tronqué | `4` |
-| `index_digits` | Nombre de chiffres de l'index d'image (`_1`, `_01`…) | `1` |
+| `index_digits` | Nombre de chiffres de l'index d'image (`_1`, `_01`…). Les fichiers déjà téléchargés ne sont pas renommés | `2` |
+| `save_sidecar` | Écrit `texts/<nom>.json` (fiche JSON, voir « Archive d'un post ») pour chaque post archivé | `true` |
 | `max_logs` | Nombre max de logs `download_*.log` conservés | `5` |
 | `image_quality` | `"original"` : blob d'origine (`com.atproto.sync.getBlob` via `https://bsky.social`, qui redirige vers le PDS de l'auteur ; repli automatique sur le CDN en cas d'échec) ; `"cdn"` : image `fullsize` du CDN Bluesky (recompressée) | `"original"` |
 | `skip_existing_cid` | Ne pas retélécharger une image dont le `cid` est déjà en base avec un fichier présent sur disque (ligne `[SKIP]`) | `true` |
@@ -288,7 +335,7 @@ Les chemins relatifs (`token_file`, `urls_file`, `db_file`, `logs_dir`) sont ré
 |---------|------|-------------|
 | `id` | INTEGER (PK) | Auto-incrémenté |
 | `post_url` | TEXT (FK) | Référence vers posts.url (`ON DELETE CASCADE`) |
-| `media_type` | TEXT | `image`, `video`, `subtitle`, `text` |
+| `media_type` | TEXT | `image`, `video`, `subtitle`, `text`, `sidecar` (fiche JSON) |
 | `filename` | TEXT | Nom réel du fichier téléchargé (unique par post) |
 | `downloaded_at` | TEXT | Date de téléchargement (ISO) |
 | `cid` | TEXT | CID du blob AT Protocol (NULL si inconnu) |
@@ -314,6 +361,7 @@ Au lancement, BSMB applique les migrations numérotées manquantes aux bases exi
 | `Artist` | Handle de l'auteur |
 | `DateTimeOriginal` | Date de création du post |
 | `Copyright` | URL complète du post |
+| `ImageDescription` | Texte alternatif de l'image (si le post en fournit un) |
 
 ### Vidéos (ffmpeg)
 
