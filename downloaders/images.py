@@ -272,8 +272,15 @@ def download_image(url, filepath, handle, post_id, post_url, post_text, created_
         raise ValueError("réponse vide")
     if type_contenu and not type_contenu.startswith("image/"):
         raise ValueError(f"contenu inattendu ({type_contenu})")
-    with open(filepath, "wb") as f:
-        f.write(r.content)
+    # .part renommé à la fin (comme les vidéos) : un échec d'écriture ne laisse ni fichier
+    # tronqué ni image déjà archivée écrasée
+    part = Path(filepath).with_name(Path(filepath).name + ".part")
+    try:
+        with open(part, "wb") as f:
+            f.write(r.content)
+        os.replace(part, filepath)
+    finally:
+        part.unlink(missing_ok=True)
     # --- Ajout des métadonnées EXIF ---
     try:
         full_comment = f"{post_text}\n\nLien du post : {post_url}"

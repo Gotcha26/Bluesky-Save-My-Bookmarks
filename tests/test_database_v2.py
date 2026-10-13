@@ -217,6 +217,15 @@ class TestMigrations:
     def test_base_neuve_en_version_2(self, tmp_db):
         assert self._version(tmp_db) == "2"
 
+    def test_message_de_migration_sur_stderr(self, tmp_path, capsys):
+        """Revue finale M4 : stdout reste propre (status --json)."""
+        chemin = str(tmp_path / "v0.db")
+        self._base_v0(chemin)
+        Database(chemin).close()
+        sortie = capsys.readouterr()
+        assert sortie.out == ""
+        assert "orphelin" in sortie.err
+
     def test_migration_depuis_v0(self, tmp_path):
         chemin = str(tmp_path / "v0.db")
         self._base_v0(chemin)

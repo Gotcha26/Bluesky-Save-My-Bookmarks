@@ -4,6 +4,7 @@ Gestion de la base de données SQLite pour BSMB
 """
 
 import sqlite3
+import sys
 import threading
 from datetime import datetime, timedelta
 
@@ -145,7 +146,11 @@ class Database:
                     "OR post_url NOT IN (SELECT url FROM posts)"
                 ).fetchone()[0]
                 if orphelins:
-                    print(f"Migration v2 : {orphelins} média(s) orphelin(s) écarté(s) (post absent).")
+                    # stderr : stdout reste exploitable (status --json)
+                    print(
+                        f"Migration v2 : {orphelins} média(s) orphelin(s) écarté(s) (post absent).",
+                        file=sys.stderr,
+                    )
                 cursor.execute("""
                     INSERT OR IGNORE INTO media_v2 (post_url, media_type, filename, downloaded_at)
                     SELECT post_url, media_type, filename, downloaded_at FROM media
