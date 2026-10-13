@@ -418,7 +418,7 @@ Au lancement, BSMB applique les migrations numérotées manquantes aux bases exi
 **Vidéos : limites et comportements.** Bluesky accepte désormais des vidéos de 10 minutes et 300 Mo : le téléchargement utilise un délai de connexion de 10 s et de lecture de 300 s, et écrit dans un fichier `.part` renommé seulement une fois la réponse complète et valide (jamais de `.mp4` tronqué). L'extension suit le `mimeType` du blob (`.mp4`, `.webm`, `.mov`).
 
 - **Sous-titres** : chaque fichier de `captions` est enregistré à côté de la vidéo en `<nom_video>.<lang>.vtt` (ex. `..._01.fr.vtt`). Un sous-titre en échec est journalisé sans faire échouer la vidéo. Ils ne sont pas incrustés dans le MP4.
-- **Repli HLS** : si `getBlob` échoue (blob purgé, PDS indisponible) et que la playlist HLS est connue (vue hydratée du post, cache `bookmarks.json`), la vidéo est reconstruite avec `ffmpeg -i <playlist> -c copy` (résultat en `.mp4`). Sans ffmpeg ou sans playlist, le téléchargement échoue.
+- **Repli HLS** : si `getBlob` échoue (blob purgé, PDS indisponible) et que la playlist HLS est connue (vue hydratée du post, cache `bookmarks.json`), la vidéo est reconstruite avec `ffmpeg -i <playlist> -c copy` (résultat en `.mp4`, écrit dans un `.part` renommé seulement après succès : un échec ne touche pas une vidéo déjà archivée). Sans ffmpeg ou sans playlist, le téléchargement échoue.
 
 ---
 
