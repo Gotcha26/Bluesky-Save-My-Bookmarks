@@ -14,10 +14,12 @@ python bsmb.py                           # lance le menu (depuis la racine du d�
 python -m pytest tests/ -q               # suite complète (aucun accès réseau)
 python -m pytest tests/test_database.py -v
 python -m pytest tests/test_auth.py -k "expired"   # un test / un motif
-python -m compileall -q -x '[/\\]\.git[/\\]' .     # « lint » de la CI (.github/workflows/ci.yml)
+python -m compileall -q -x '[/\\]\.git[/\\]' .     # syntaxe (job `lint` de la CI, .github/workflows/ci.yml)
+ruff check . && ruff format --check .    # lint + formatage (job `lint` ; `ruff format .` pour corriger)
+python -m pytest tests/ --cov=core --cov=api --cov=downloaders --cov-report=term-missing --cov-fail-under=70  # couverture (CI)
 ```
 
-`pytest` n'est pas dans `requirements.txt` : `pip install pytest` au préalable. Sur ce poste, `python` est la 3.14 ; la CI tourne sur 3.10 / 3.12 / 3.13 (Ubuntu + Windows).
+`pytest` et `ruff` sont dans `requirements-dev.txt` : `pip install -r requirements-dev.txt` au préalable. Sur ce poste, `python` est la 3.14 ; la CI tourne sur 3.11 à 3.14 (Ubuntu + Windows).
 
 Scripts utilisables seuls pour déboguer un post :
 
