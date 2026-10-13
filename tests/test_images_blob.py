@@ -270,6 +270,38 @@ class TestSautParCid:
         assert lignes_console(res) == ["   [SKIP] bafy déjà présent : a.png"]
 
 
+class TestAlt:
+    """Le texte alternatif du record va dans EXIF ImageDescription et dans DownloadResult.alt (issue #7)."""
+    RECORD_ALT = {"embed": {"$type": "app.bsky.embed.images",
+                            "images": [_img(CID1, "image/png", alt="Un chat noir"), _img(CID2, "image/jpeg")]}}
+
+    def test_alt_dans_la_commande_exiftool_et_le_resultat(self, tmp_path, _exiftool):
+        res = download_images(URL, tmp_path, DEFAULT_CONFIG, session=_session(), record=self.RECORD_ALT)
+
+        assert [r.alt for r in res] == ["Un chat noir", None]
+        cmd = _exiftool.call_args_list[0].args[0]
+        assert "-ImageDescription=Un chat noir" in cmd
+        assert cmd.index("-ImageDescription=Un chat noir") < cmd.index("-overwrite_original")
+
+    def test_alt_vide_n_ajoute_pas_imagedescription(self, tmp_path, _exiftool):
+        download_images(URL, tmp_path, DEFAULT_CONFIG, session=_session(), record=self.RECORD_ALT)
+        cmd_sans_alt = _exiftool.call_args_list[1].args[0]
+        assert not any(arg.startswith("-ImageDescription") for arg in cmd_sans_alt)
+
+    def test_alt_conserve_sur_le_repli_cdn(self, tmp_path, _exiftool):
+        session = _session(indisponibles=(BLOB1, BLOB2))
+        res = download_images(URL, tmp_path, DEFAULT_CONFIG, session=session, record=self.RECORD_ALT)
+        assert res[0].alt == "Un chat noir"
+        assert "-ImageDescription=Un chat noir" in _exiftool.call_args_list[0].args[0]
+
+    def test_alt_d_une_image_sautee(self, tmp_path):
+        fichier = tmp_path / "deja.png"
+        fichier.write_bytes(b"x")
+        res = download_images(URL, tmp_path, DEFAULT_CONFIG, session=_session(), record=self.RECORD_ALT,
+                              existing_cid=lambda cid: str(fichier))
+        assert res[0].skipped and res[0].alt == "Un chat noir"
+
+
 class TestFindMediaByCid:
     def test_retrouve_le_fichier(self, tmp_db):
         tmp_db.add_post(URL, "3abc", "user.bsky.social")

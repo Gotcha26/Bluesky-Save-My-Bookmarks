@@ -8,6 +8,7 @@ Ajoute les métadonnées EXIF suivantes (si exiftool est installé) :
   - Auteur : identifiant du compte Bluesky
   - Date d'acquisition : date du post
   - Copyright : URL du post
+  - Description : texte alternatif de l'image (s'il existe)
 Ne télécharge QUE les images (pas les thumbs de vidéo).
 
 Usage manuel : python downloaders/images.py <dossier> <url_post | fichier_urls>
@@ -225,8 +226,10 @@ def ext_from_mime(mime: str) -> str:
     return MIME_EXT.get(mime) or mimetypes.guess_extension(mime) or ".jpg"
 
 # -------------------- Téléchargement --------------------
-def download_image(url, filepath, handle, post_id, post_url, post_text, created_at, http=requests):
-    """Télécharge une image dans filepath puis ajoute les métadonnées EXIF (best effort)."""
+def download_image(url, filepath, handle, post_id, post_url, post_text, created_at, http=requests, alt=""):
+    """Télécharge une image dans filepath puis ajoute les métadonnées EXIF (best effort).
+
+    alt : texte alternatif, écrit dans ImageDescription s'il n'est pas vide."""
     r = http.get(url, timeout=30, allow_redirects=True)
     r.raise_for_status()
     type_contenu = (r.headers.get("content-type") or "").strip().lower()
@@ -247,9 +250,10 @@ def download_image(url, filepath, handle, post_id, post_url, post_text, created_
             f"-Artist={handle}",
             f"-DateTimeOriginal={created_at.replace('Z','') if created_at else ''}",
             f"-Copyright={post_url}",
-            "-overwrite_original",
-            str(filepath)
         ]
+        if alt:
+            exif_cmd.append(f"-ImageDescription={alt}")
+        exif_cmd += ["-overwrite_original", str(filepath)]
         subprocess.run(exif_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except Exception:
         pass
@@ -336,12 +340,13 @@ def download_images(post_url, dest_dir, config, session=None, name_prefix=None,
     for idx, img_url in enumerate(image_urls, start=1):
         blob = _blob_de_l_image(img_url, idx - 1, propres, blobs, par_cid)
         cid, mime = blob.get("cid"), blob.get("mime", "")
+        alt = blob.get("alt") or ""
 
         if sauter:
             existant = _existant_sur_disque(existing_cid, cid)
             if existant:
                 results.append(DownloadResult(existant.name, existant, "image", existant.stat().st_size,
-                                              cid, skipped=True))
+                                              cid, skipped=True, alt=alt or None))
                 continue
 
         def chemin_pour(ext, idx=idx):
@@ -364,7 +369,7 @@ def download_images(post_url, dest_dir, config, session=None, name_prefix=None,
         for url_dl, ext in candidats:
             filename, filepath = chemin_pour(ext or get_extension_for_url(url_dl, http) or ".jpg")
             try:
-                download_image(url_dl, filepath, handle, post_id, post_url, post_text, created_at, http)
+                download_image(url_dl, filepath, handle, post_id, post_url, post_text, created_at, http, alt)
             except Exception as e:
                 echecs.append(f"Impossible de télécharger {url_dl} : {e}")
                 continue
@@ -373,7 +378,8 @@ def download_images(post_url, dest_dir, config, session=None, name_prefix=None,
         if ecrit is None:
             erreurs.extend(echecs)
             continue
-        results.append(DownloadResult(ecrit[0], ecrit[1], "image", ecrit[1].stat().st_size, cid))
+        results.append(DownloadResult(ecrit[0], ecrit[1], "image", ecrit[1].stat().st_size, cid,
+                                      alt=alt or None))
 
     if erreurs and not results:
         raise DownloadError(" ; ".join(erreurs))
