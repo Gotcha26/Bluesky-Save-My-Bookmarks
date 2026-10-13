@@ -227,7 +227,7 @@ if __name__ == "__main__":
         if result["expired"]:
             print("\n❌ TOKEN EXPIRÉ")
             print("   Le token Bearer a expiré ou est invalide.")
-            print("👉 Récupérez un nouveau token (voir Instructions-token.md)")
+            print("👉 Récupérez un nouveau token (voir ADVANCED.md, « Token Bearer manuel »)")
         else:
             print(f"\n❌ {result['error']}")
 

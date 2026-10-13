@@ -12,7 +12,7 @@ Une fois activé, des options supplémentaires apparaissent dans les Paramètres
 
 | Option | Description |
 |--------|-------------|
-| **Fichier token** | Chemin vers `Token-Bearer.txt` (fallback si createSession échoue) |
+| **Fichier token** | Chemin vers `Token-Bearer.txt` (secours, voir « Méthode 2 ») |
 | **Fichier URLs** | Chemin vers `urls.txt` (liste des bookmarks exportés) |
 | **Supprimer les logs** | Efface tous les fichiers de log |
 | **Mode dev** | Traite urls.txt sans token ni mise à jour de la base |
@@ -31,25 +31,35 @@ C'est la méthode par défaut. BSMB appelle `com.atproto.server.createSession` a
 - Pas d'expiration tant que l'App Password existe
 - Configuration unique
 
-**Stockage :** `config.json` (champs `bsky_handle` et `bsky_app_password`)
+**Stockage :** le handle est dans `config.json` (`bsky_handle`). L'App Password va dans le trousseau du système (Credential Manager, Keychain, Secret Service) si la bibliothèque optionnelle `keyring` est installée (`pip install -r requirements-optional.txt`) ; sinon il reste **en clair** dans `config.json` (`bsky_app_password`, fichier local ignoré par Git, droits `600` sous Linux et macOS), et BSMB l'affiche une fois. Un App Password déjà présent dans `config.json` est déplacé vers le trousseau au lancement suivant l'installation de `keyring`. Conseil : créez un App Password dédié à BSMB et révoquez-le en cas de doute (menu **Mon compte** > **D** le supprime de cet ordinateur).
 
-### Méthode 2 : Token Bearer manuel (fallback)
+### Méthode 2 : Token Bearer manuel (secours)
 
-Si createSession échoue, BSMB tente de lire le fichier `Token-Bearer.txt`.
+À n'utiliser que si vous ne voulez pas confier d'App Password à BSMB. BSMB lit alors le fichier `Token-Bearer.txt` (chemin réglable dans les options avancées), **mais seulement si aucun handle + App Password n'est configuré** : un App Password refusé ne fait pas basculer sur ce fichier. Le menu interactif exige un compte connecté pour proposer la synchronisation ; avec un token manuel, utilisez donc la ligne de commande : `python bsmb.py sync`, puis `python bsmb.py download` (ou `python bsmb.py run --yes`).
 
-**Comment obtenir un Token Bearer :**
-1. Connectez-vous sur [bsky.app](https://bsky.app)
-2. Ouvrez les DevTools du navigateur (F12)
-3. Onglet Network > filtrez par `getBookmarks`
-4. Copiez le header `Authorization: Bearer ...`
-5. Collez-le dans `Token-Bearer.txt`
+**Récupérer le token :**
 
-**Limitations :**
-- Le token expire après quelques jours
-- Doit être renouvelé manuellement
-- Plus complexe à obtenir
+1. Connectez-vous sur [bsky.app](https://bsky.app) et ouvrez vos éléments enregistrés (bookmarks).
+2. Ouvrez les outils de développement du navigateur (F12), onglet **Réseau** (Network).
+3. Rafraîchissez la page (F5) et filtrez par `getBookmarks`.
+4. Cliquez sur la requête GET, cherchez dans les **en-têtes de la requête** la ligne `Authorization`, puis copiez sa valeur.
+5. Collez-la dans `Token-Bearer.txt` (à la racine de BSMB), sans retour à la ligne ni espace superflu.
 
-Consultez [Instructions-token.md](Instructions-token.md) pour un guide détaillé.
+Sous Safari, activez d'abord les fonctionnalités pour développeurs dans les réglages avancés, puis suivez les mêmes étapes.
+
+La valeur doit **commencer par `Bearer `** (avec l'espace) suivi du jeton :
+
+```
+Bearer eyJ0eXAiOiJKV1QiLCJhbGciOi...
+```
+
+BSMB ignore le fichier si le contenu ne commence pas par `Bearer `. Si vous avez copié seulement le jeton, ajoutez `Bearer ` devant.
+
+**Limites :**
+- Le token d'accès expire vite (environ 2 h) et BSMB ne peut pas le renouveler (pas de jeton de rafraîchissement) : recopiez-en un nouveau quand la synchronisation répond « Token expiré », après une déconnexion de Bluesky ou un changement de mot de passe.
+- Seule la synchronisation a besoin du token : les posts sont ensuite téléchargés sans authentification.
+
+**Sécurité :** le token donne accès à votre compte, ne le partagez ni ne le publiez. `Token-Bearer.txt` est ignoré par Git ; sous Linux et macOS, BSMB le passe en lecture réservée (`chmod 600`) quand le menu le lit.
 
 ### Comparaison
 
@@ -57,8 +67,9 @@ Consultez [Instructions-token.md](Instructions-token.md) pour un guide détaill�
 |--------|-------------|-------------|
 | Configuration | Une seule fois | À chaque expiration |
 | Renouvellement | Automatique | Manuel |
-| Facilité | Simple | Complexe (DevTools) |
-| Sécurité | Local dans config.json | Local dans Token-Bearer.txt |
+| Facilité | Simple | Complexe (outils du navigateur) |
+| Stockage | Trousseau du système (si `keyring` est installé) ou `config.json` | `Token-Bearer.txt` |
+| Interface | Menu et ligne de commande | Ligne de commande seulement |
 
 ---
 
@@ -158,53 +169,61 @@ Les lignes `Langue`, `[Image N : …]` / `[Vidéo : …]` (seulement si le texte
 
 ## Architecture technique
 
+Ce schéma est **le seul** du dépôt : `DEVELOPMENT.md` et `CONTRIBUTING.md` y renvoient. Toute modification de structure doit être répercutée ici.
+
 ```
 bsmb/
-├── bsmb.py                      # Interface principale (menu TUI)
-├── Start.bat                    # Lanceur Windows automatique
+├── bsmb.py                      # Point d'entrée : menu TUI + sous-commandes (--version, sync, download, run, status)
+├── Start.bat / start.sh         # Lanceurs Windows / Linux-macOS (venv + dépendances + ffmpeg/exiftool)
+├── pyproject.toml               # Paquet installable (pipx) : commande `bsmb`, dépendance requests
+├── requirements*.txt            # Exécution / optionnel (keyring) / développement (pytest, ruff)
 │
 ├── core/                        # Logique métier
-│   ├── auth.py                 # createSession + refreshSession + get_token
-│   ├── http.py                 # Session HTTP partagée (reprises, limiteur de débit)
-│   ├── version.py              # __version__ (source unique)
-│   ├── bookmarks.py            # BookmarkSync (pont API ↔ DB)
+│   ├── auth.py                 # createSession + refreshSession + get_session / get_token
+│   ├── bookmarks.py            # BookmarkSync (pont API ↔ DB, renouvellement du token)
 │   ├── bookmarks_cache.py      # Cache bookmarks.json (postView bruts)
+│   ├── cli.py                  # Sous-commandes non interactives et codes de retour
 │   ├── colors.py               # Couleurs ANSI cross-platform
-│   ├── config.py               # Configuration JSON + migration
-│   ├── database.py             # SQLite (posts + media tracking)
+│   ├── config.py               # Configuration JSON + migration + resolve_path
+│   ├── database.py             # SQLite (posts + media + meta, migrations)
+│   ├── http.py                 # Session HTTP partagée (reprises, limiteur de débit)
+│   ├── orchestrator.py         # run() : ThreadPoolExecutor, logs, rapport
 │   ├── paths.py                # PROJECT_ROOT (racine des chemins relatifs)
-│   └── orchestrator.py         # Orchestrateur : run() (ThreadPoolExecutor)
+│   ├── post_ref.py             # Identité d'un post : AT-URI (DID + rkey)
+│   ├── secret_store.py         # App Password : keyring, repli config.json
+│   ├── ui.py                   # Mode (non) interactif : confirm(), pause(), --yes
+│   └── version.py              # __version__ (source unique)
 │
 ├── api/                         # Interactions API Bluesky
-│   ├── export_bookmarks.py     # fetch_bookmarks() + mode standalone
-│   ├── post_analyzer.py        # Détection type post (image/vidéo/texte/citation)
-│   ├── quote_resolver.py       # QuoteResolver : record cité par une citation (DID → handle)
-│   └── repost_resolver.py      # Alias déprécié de quote_resolver
+│   ├── export_bookmarks.py     # fetch_bookmarks() + mode autonome
+│   ├── post_analyzer.py        # Détection du type de post (image/vidéo/texte/lien/citation)
+│   └── quote_resolver.py       # QuoteResolver : record cité par une citation
 │
 ├── downloaders/                 # Téléchargeurs (fonctions importables)
 │   ├── __init__.py             # DownloadResult, DownloadError
 │   ├── images.py               # download_images() : images avec EXIF
-│   ├── videos.py               # download_video() : vidéos avec ffmpeg
+│   ├── videos.py               # download_video() : vidéos avec ffmpeg, sous-titres
 │   ├── text.py                 # save_text() : texte seul
 │   ├── archive.py              # write_text() / write_sidecar() : .txt lisible et fiche JSON
 │   └── external.py             # download_external() : cartes de lien, GIF Tenor
 │
-├── tests/                       # Tests unitaires (pytest)
-└── logs/                        # Fichiers de log (auto-créé)
+├── tests/                       # Tests (pytest, aucun accès réseau) ; fixtures/ : réponses d'API réelles
+├── .github/                     # CI (ruff, tests 3.11-3.14, couverture), Dependabot, modèles d'issues
+└── logs/                        # Fichiers de log (créé automatiquement, ignoré par Git)
 ```
 
 ### Flux de données
 
 ```
-bsmb.py (menu)
+bsmb.py (menu ou sous-commande → core/cli.py)
   → core/auth.py (createSession → Bearer token)
   → core/bookmarks.py (sync: API → urls.txt + bookmarks.json → compare DB)
   → core/orchestrator.run() (appel direct, ThreadPoolExecutor)
-    → api/post_analyzer.py (détecte type)
+    → api/post_analyzer.py (détecte le type ; sans requête si le postView est en cache)
     → api/quote_resolver.py (résout le post cité d'une citation, profondeur max 2)
-    → downloaders/*.py (fonctions appelées dans les threads : télécharge,
-                        renvoie des DownloadResult)
-    → core/database.py (tracking SQLite)
+    → downloaders/*.py (fonctions appelées dans les threads : téléchargent,
+                        renvoient des DownloadResult)
+    → core/database.py (suivi SQLite)
 ```
 
 Aucun sous-processus Python n'est lancé : seuls `exiftool` et `ffmpeg` sont exécutés en externe. Les downloaders restent utilisables seuls pour déboguer un post : `python downloaders/images.py <dossier> <url>`.
@@ -406,7 +425,7 @@ python -m pytest tests/ -v
 python -m pytest tests/test_database.py -v
 ```
 
-154 tests couvrent : config, database, auth, colors, post_analyzer, quote_resolver, images, parallélisation, bookmarks, export_bookmarks.
+Les tests n'effectuent jamais d'appel réseau (la session HTTP est remplacée par un faux, les réponses d'API réelles sont dans `tests/fixtures/`). Ils couvrent l'ensemble des modules : configuration, base de données et migrations, authentification, réseau, analyse des posts, citations, téléchargeurs, orchestrateur, CLI, stockage du secret. La CI (`.github/workflows/ci.yml`) exécute ruff puis la suite sur Python 3.11 à 3.14 (Ubuntu et Windows) avec un seuil de couverture de 70 %. Voir [CONTRIBUTING.md](CONTRIBUTING.md) pour le détail.
 
 ---
 
@@ -426,6 +445,10 @@ python -m pytest tests/test_database.py -v
 
 **"Erreur SQLite"** — Réinitialisez la DB via Stockage local > Réinitialiser, ou supprimez `bsmb.db` manuellement.
 
+**"Aucun média trouvé" alors que le post en contient** — Consultez `logs/quotes_unresolved_*.txt` (citation dont le post cité n'a pas pu être archivé), `logs/unknown_types_*.txt` (type d'embed non géré : ouvrez une issue) et `logs/download_*.log` (détail de la session).
+
+**Beaucoup de posts « trackés » mais peu de médias** — Normal : un post est enregistré dès qu'il est traité, même sans média (texte seul, supprimé, bloqué, erreur). Les fichiers `logs/deleted_posts_*.txt`, `failed_downloads_*.txt`, `error_500_*.txt` et `rate_limited_*.txt` expliquent chaque cas.
+
 ### Couleurs
 
 **Les couleurs ne s'affichent pas** — Essayez Windows Terminal au lieu de CMD. Variables : `NO_COLOR=1` (désactiver) ou `FORCE_COLOR=1` (forcer).
@@ -436,4 +459,4 @@ python -m pytest tests/test_database.py -v
 
 Consultez [CONTRIBUTING.md](CONTRIBUTING.md) pour les guidelines de développement.
 
-Consultez [DEVELOPMENT.md](DEVELOPMENT.md) pour l'architecture détaillée et les diagrammes.
+Consultez [DEVELOPMENT.md](DEVELOPMENT.md) pour le détail des modules (le schéma d'architecture reste celui de ce guide).

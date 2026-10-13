@@ -151,26 +151,76 @@ Chaque fichier est traçable vers son post d'origine sur Bluesky.
 
 ## FAQ
 
+### Compte et sécurité
+
 **Mon App Password fonctionne-t-il après un redémarrage ?**
 Oui. BSMB conserve vos identifiants (trousseau du système si `keyring` est installé, sinon `config.json`) et génère un nouveau token à chaque lancement. L'App Password ne change pas.
 
-**Mes fichiers déjà téléchargés sont-ils en sécurité ?**
-Oui. La réinitialisation de la base de données ne supprime jamais les fichiers téléchargés. Elle efface uniquement l'historique de suivi.
+**À quoi sert le token ?**
+Seule la synchronisation des bookmarks (`getBookmarks`) demande une authentification : BSMB obtient un token temporaire à partir de votre App Password et le garde en mémoire. Le téléchargement des posts, lui, n'utilise que des requêtes publiques. Vous n'avez jamais à copier de token à la main (sauf secours : voir [ADVANCED.md](ADVANCED.md#méthode-2--token-bearer-manuel-secours)).
 
-**Puis-je changer le dossier de téléchargement ?**
-Oui, dans **Paramètres** > **Dossier téléchargements**.
+**Message « Token expiré » ou « Identifiants invalides » ?**
+Avec un App Password, BSMB renouvelle lui-même le token ; si le message persiste, vérifiez le handle et l'App Password dans **Paramètres** > **1. Identifiants Bluesky**, et recréez l'App Password sur bsky.app si besoin. Avec un `Token-Bearer.txt` manuel, il faut en recopier un nouveau.
 
-**Que se passe-t-il si un post est supprimé ?**
-BSMB le marque comme « lien mort ». Vous pouvez nettoyer ces entrées dans **Stockage local** > **Nettoyer les liens morts**.
+### Téléchargement
 
-**ffmpeg ou exiftool ne sont pas installés ?**
-Les médias seront téléchargés normalement, mais sans métadonnées intégrées (auteur, date, etc.).
+**Comment sont gérés les nouveaux bookmarks ?**
+**Mon compte** > **Synchroniser**, puis **Télécharger**. Seuls les nouveaux posts (et ceux en erreur temporaire depuis plus de 7 jours) sont traités ; les autres ne sont pas retéléchargés.
 
-**Puis-je utiliser la liste de bookmarks avec d'autres outils ?**
-Oui. Le fichier `urls.txt` est compatible avec `yt-dlp -a urls.txt`, `wget -i urls.txt`, etc.
+**Puis-je tout retélécharger, ou seulement une liste restreinte ?**
+Oui, dans les options avancées (**Paramètres** > **4. Mode avancé**) : **Force DL** retraite toutes les URLs de `urls.txt`, **Mode dev** les traite sans toucher à la base. Pour une liste restreinte, éditez d'abord `urls.txt`. En ligne de commande : `python bsmb.py download --force`. Détails dans [ADVANCED.md](ADVANCED.md#mode-développeur).
+
+**Que se passe-t-il si un post est supprimé par son auteur ?**
+BSMB le marque comme « lien mort », le signale dans le rapport final et dans `logs/deleted_posts_*.txt`, et ne le retente pas. Un post bloqué est traité de même. Vous pouvez nettoyer ces entrées dans **Stockage local** > **Nettoyer les liens morts**.
+
+**Les citations (quote posts) sont-elles gérées ?**
+Oui. Un post qui en cite un autre est archivé comme n'importe quel post, puis le post cité l'est à son tour (fichiers `…_quote…`, deux niveaux au plus). Si le post cité est supprimé ou bloqué, une note est ajoutée au log et le bookmark reste « ok » ; si une erreur réseau l'empêche d'être archivé, il est listé dans `logs/quotes_unresolved_*.txt`.
+
+**J'ai des posts « traités » mais peu de médias, pourquoi ?**
+C'est normal : un post est enregistré dès qu'il a été traité, même sans média (texte seul, supprimé, bloqué, erreur). Les raisons se lisent dans le dossier `logs/` : `failed_downloads_*.txt`, `deleted_posts_*.txt`, `quotes_unresolved_*.txt`, `error_500_*.txt`, `rate_limited_*.txt`, `unknown_types_*.txt`, et `download_*.log` pour le détail de la session.
+
+**Certains posts sont en « Échec » ou en « Erreur 500 ».**
+Souvent une erreur réseau ou serveur temporaire (Bluesky). Une erreur 500 ou une limite de débit (429) du serveur est retentée automatiquement après 7 jours. Un échec de téléchargement (liste dans `logs/failed_downloads_*.txt`) n'est en revanche pas retenté tout seul : le post reste marqué comme traité. Pour le retenter, utilisez **Force DL** (ou `python bsmb.py download --force`).
 
 **Que devient un post qui partage un lien (article, YouTube, x.com…) ?**
-BSMB archive le texte du post, le lien, son titre, sa description et la vignette de la carte. Le contenu du site lié n'est pas téléchargé (sauf un GIF Tenor ou un fichier `.gif` / `.mp4` / `.webp` direct) : `yt-dlp -a urls.txt` reste utilisable pour ces cas.
+BSMB archive le texte du post, le lien, son titre, sa description et la vignette de la carte. Le contenu du site lié n'est pas téléchargé (sauf un GIF Tenor ou un fichier `.gif` / `.mp4` / `.webp` direct) ; pour ces cas, un outil externe comme `yt-dlp -a urls.txt` reste utilisable.
+
+**Puis-je utiliser la liste de bookmarks avec d'autres outils ?**
+Oui. Le fichier `urls.txt` contient une URL par ligne : il est compatible avec `wget -i urls.txt` ou `yt-dlp -a urls.txt` (outils externes, facultatifs). `bookmarks.json` garde la réponse complète de Bluesky.
+
+### Stockage et données
+
+**Où sont mes données ?**
+Par défaut dans `~/Downloads/BSMB/` (`images/`, `videos/`, `texts/`). La base `bsmb.db`, `config.json`, `urls.txt`, `bookmarks.json` et `logs/` sont dans le dossier d'installation de BSMB.
+
+**Puis-je changer le dossier de téléchargement ?**
+Oui, dans **Paramètres** > **2. Dossier téléchargements**. Les fichiers déjà téléchargés ne sont pas déplacés : faites-le à la main si vous le souhaitez.
+
+**Puis-je déplacer ou renommer mes médias sans risque ?**
+Oui. La base ne mémorise que les noms de fichiers, pas leur emplacement. BSMB ne « voit » plus les fichiers déplacés, mais les posts restent marqués comme traités : rien n'est retéléchargé automatiquement (sauf avec Force DL).
+
+**Que contient la base de données ?**
+`bsmb.db` (SQLite) garde l'historique de tous les posts traités (URL, auteur, statut) et des médias téléchargés (type, nom de fichier). Elle ne contient pas les médias eux-mêmes. Elle est **cumulative** : `urls.txt` reflète vos bookmarks actuels, la base tout ce qui a été traité, même si vous avez retiré le bookmark depuis. Pour la consulter, ouvrez-la avec [DB Browser for SQLite](https://sqlitebrowser.org/) (schéma dans [ADVANCED.md](ADVANCED.md#base-de-données-sqlite)).
+
+**Mes fichiers déjà téléchargés sont-ils en sécurité ?**
+Oui. La réinitialisation de la base de données ne supprime jamais les fichiers téléchargés, elle efface uniquement l'historique de suivi.
+
+**Dois-je supprimer mes bookmarks Bluesky après le téléchargement ?**
+Non. Ils sont indépendants de BSMB : gardez-les, ajoutez-en de nouveaux, relancez BSMB de temps en temps, il ne récupère que les nouveaux. BSMB est votre sauvegarde locale.
+
+### Installation et compatibilité
+
+**Je ne connais rien à l'informatique, que dois-je installer ?**
+Sous Windows, double-cliquez sur `Start.bat` : il installe Python, les bibliothèques, ffmpeg et exiftool (5 à 10 minutes, connexion Internet requise). Sous Linux et macOS, lancez `./start.sh`.
+
+**BSMB fonctionne-t-il sans ffmpeg ou exiftool ?**
+Oui, mais sans métadonnées intégrées (auteur, date, texte alternatif) dans les vidéos et les images. Les médias sont téléchargés et nommés normalement.
+
+**Quelle version de Python ?**
+Python 3.11 ou plus récent.
+
+**Je ne vois pas toutes les options du menu.**
+Le menu s'adapte à votre situation : **4. Télécharger** n'est actif qu'une fois le compte connecté et les bookmarks synchronisés, et indique « Tout est à jour » quand il n'y a rien de nouveau. Les options avancées n'apparaissent dans **Paramètres** qu'avec le mode avancé activé.
 
 ---
 
