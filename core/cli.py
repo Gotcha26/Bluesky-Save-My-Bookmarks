@@ -25,6 +25,7 @@ from core.config import (
 )
 from core.database import Database
 from core.secret_store import migrate_secret_to_keyring
+from core.version import __version__
 
 EXIT_OK = 0
 EXIT_AUTH = 1
@@ -43,6 +44,7 @@ def build_parser():
         prog="bsmb",
         description="BSMB - Bsky Save My Bookmarks. Sans sous-commande : menu interactif.",
     )
+    parser.add_argument("--version", action="version", version=f"BSMB {__version__}")
     parser.add_argument("--yes", action="store_true",
                         help="mode non interactif : accepte les valeurs par défaut")
     sub = parser.add_subparsers(dest="command", metavar="{sync,download,run,status}")
