@@ -1,6 +1,6 @@
 """Tests pour core/bookmarks.py — classe BookmarkSync"""
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from core.bookmarks import BookmarkSync
 from core.database import Database

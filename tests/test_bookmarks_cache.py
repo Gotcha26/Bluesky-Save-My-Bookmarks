@@ -1,6 +1,5 @@
 """Tests de core/bookmarks_cache.py : cache JSON de la dernière réponse getBookmarks (issue #3)."""
 import json
-from pathlib import Path
 
 from core.bookmarks_cache import load_cache, save_cache
 

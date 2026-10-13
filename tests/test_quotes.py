@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 import requests
 
-from api.post_analyzer import PostAnalyzer, PostType
+from api.post_analyzer import PostAnalyzer
 from api.quote_resolver import QuoteResolver
 from core import orchestrator
 from core.orchestrator import process_post

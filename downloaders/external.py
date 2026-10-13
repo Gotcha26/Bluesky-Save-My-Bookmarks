@@ -16,7 +16,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from core import http as bsmb_http
-from downloaders import DownloadError, DownloadResult
+from downloaders import DownloadResult
 from downloaders.archive import write_text
 from downloaders.text import nom_base_texte
 

@@ -361,7 +361,7 @@ def do_sync(config):
             print(c.error(f"Erreur : {result['error']}"))
     else:
         print()
-        print(c.success(f"Synchronisation terminée"))
+        print(c.success("Synchronisation terminée"))
         print(c.config_line("Bookmarks en ligne", str(result["online_count"])))
         print(c.config_line("Déjà traités", str(result["local_count"])))
         if result["new_count"] > 0:

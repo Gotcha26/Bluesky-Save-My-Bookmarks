@@ -4,7 +4,6 @@ import json
 import os
 import sys
 import time
-import traceback
 from pathlib import Path
 
 import requests
@@ -221,7 +220,7 @@ if __name__ == "__main__":
 
     if result["error"]:
         if result["expired"]:
-            print(f"\n❌ TOKEN EXPIRÉ")
+            print("\n❌ TOKEN EXPIRÉ")
             print("   Le token Bearer a expiré ou est invalide.")
             print("👉 Récupérez un nouveau token (voir Instructions-token.md)")
         else:

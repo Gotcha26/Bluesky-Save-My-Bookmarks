@@ -1,5 +1,5 @@
 """Tests pour api/export_bookmarks.py — fonction fetch_bookmarks()"""
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from api.export_bookmarks import fetch_bookmarks
 
