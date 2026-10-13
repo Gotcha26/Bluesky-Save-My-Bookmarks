@@ -27,7 +27,8 @@ DEFAULT_CONFIG = {
     "retry_after_days": 7,  # délai avant de retenter un post en erreur (500, inconnu, repost)
     "last_sync": "",
     "advanced_mode": False,
-    "open_folder_after_download": True,  # propose d'ouvrir le dossier après un téléchargement (ignoré en non interactif)
+    # propose d'ouvrir le dossier après un téléchargement (ignoré en non interactif)
+    "open_folder_after_download": True,
     "warned_plaintext_secret": False,  # avertissement « App Password en clair » déjà affiché
     "image_quality": "original",  # "original" (blob getBlob, repli CDN) ou "cdn" (image fullsize du CDN)
     "skip_existing_cid": True,  # ne pas retélécharger un blob dont le cid est en base avec un fichier présent

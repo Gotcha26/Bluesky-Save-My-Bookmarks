@@ -190,19 +190,23 @@ class TestMigrations:
             (URL,),
         )
         conn.execute(
-            "INSERT INTO media (post_url, media_type, filename, downloaded_at) VALUES (?, 'image', 'image_0', 't1')",
+            "INSERT INTO media (post_url, media_type, filename, downloaded_at) "
+            "VALUES (?, 'image', 'image_0', 't1')",
             (URL,),
         )
         conn.execute(
-            "INSERT INTO media (post_url, media_type, filename, downloaded_at) VALUES (?, 'image', 'image_0', 't2')",
+            "INSERT INTO media (post_url, media_type, filename, downloaded_at) "
+            "VALUES (?, 'image', 'image_0', 't2')",
             (URL,),
         )
         conn.execute(
-            "INSERT INTO media (post_url, media_type, filename, downloaded_at) VALUES (?, 'video', 'v.mp4', 't3')",
+            "INSERT INTO media (post_url, media_type, filename, downloaded_at) "
+            "VALUES (?, 'video', 'v.mp4', 't3')",
             (URL,),
         )
         conn.execute(
-            "INSERT INTO media (post_url, media_type, filename, downloaded_at) VALUES ('https://orphelin', 'image', 'x.jpg', 't4')"
+            "INSERT INTO media (post_url, media_type, filename, downloaded_at) "
+            "VALUES ('https://orphelin', 'image', 'x.jpg', 't4')"
         )
         conn.commit()
         conn.close()
