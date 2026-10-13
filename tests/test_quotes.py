@@ -259,11 +259,13 @@ class TestRecordCiteNonArchivable:
         assert any("post cité supprimé" in m for m in journal)
         assert not any("CITATION NON ARCHIVÉE" in m for m in journal)
 
-    def test_cite_en_erreur_serveur_le_citant_reste_ok_et_la_citation_est_notee(self, tmp_db, tmp_path):
+    @pytest.mark.parametrize("statut_http", [500, 429])
+    def test_cite_en_erreur_serveur_le_citant_reste_ok_et_la_citation_est_notee(self, tmp_db, tmp_path, statut_http):
         url = url_citant("quote_text.json")
         non_resolues = []
         res, dl, journal, _ = lancer(url, [charger("quote_text.json"), post_texte(D2, "3kcited0001")],
-                                     tmp_db, tmp_path, statuts={"3kcited0001": 500}, non_resolues=non_resolues)
+                                     tmp_db, tmp_path, statuts={"3kcited0001": statut_http},
+                                     non_resolues=non_resolues)
         assert res[4] == "success"
         assert statut(tmp_db, url) == "ok"
         assert non_resolues == [url]

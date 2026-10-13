@@ -119,7 +119,7 @@ class TestGetPendingPosts:
     def test_nouvelles_urls_incluses(self, tmp_db):
         assert tmp_db.get_pending_posts([URL]) == [URL]
 
-    @pytest.mark.parametrize("statut", ["error_500", "unknown", "repost"])
+    @pytest.mark.parametrize("statut", ["error_500", "error_429", "unknown", "repost"])
     def test_statut_en_erreur_ancien_est_retente(self, tmp_db, statut):
         tmp_db.add_post(URL)
         tmp_db.mark_post_status(URL, statut)

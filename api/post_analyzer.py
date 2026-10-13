@@ -10,6 +10,7 @@ from core.post_ref import PostRef, _is_valid_handle
 
 class PostType(Enum):
     ERROR_500 = "error_500"
+    ERROR_429 = "error_429"
     ERROR_400 = "error_400"
     QUOTE = "quote"
     REPOST = "quote"  # alias déprécié : un repost n'est jamais bookmarké, c'est une citation
@@ -82,8 +83,13 @@ class PostAnalyzer:
 
             if resp.status_code == 400:
                 return PostType.ERROR_400, {"handle": handle, "post_id": post_id, **identity}, {"status": 400}
-            elif resp.status_code == 500:
-                return PostType.ERROR_500, {"handle": handle, "post_id": post_id, **identity}, {"status": 500}
+            elif resp.status_code == 429:
+                # Encore limité après les reprises de core.http : à retenter plus tard
+                return PostType.ERROR_429, {"handle": handle, "post_id": post_id, **identity}, {"status": 429}
+            elif resp.status_code >= 500:
+                # 5xx encore là après les reprises (502/503/504 comprises)
+                return PostType.ERROR_500, {"handle": handle, "post_id": post_id, **identity}, {
+                    "status": resp.status_code}
 
             resp.raise_for_status()
             data = resp.json()

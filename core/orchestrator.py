@@ -294,7 +294,8 @@ def _archiver_citation(url, quote_uri, depth, base, ctx, post_view=None):
         ctx.buf_print(f"  {c.DIM}Post cité supprimé{c.RESET}")
         ctx.log_func(f"   NOTE: post cité supprimé ({cible.url}) pour {url}", to_console=False)
         return [], [("not_found", cible.url)]
-    if post_type == PostType.ERROR_500 or (post_type == PostType.UNKNOWN and "error" in debug_info):
+    if post_type in (PostType.ERROR_500, PostType.ERROR_429) or (
+            post_type == PostType.UNKNOWN and "error" in debug_info):
         ctx.buf_print(c.warning("Post cité inaccessible"))
         ctx.log_func(f"   CITATION NON ARCHIVÉE: {cible.url}", to_console=False)
         return [], [("failed", cible.url)]
@@ -373,6 +374,15 @@ def process_post(url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_d
             db.update_last_check(url)
             db.mark_post_status(url, 'error_500')
         return False, 0, 0, 0, 'error_500', output
+
+    # Limite de débit (429) persistante après les reprises : retenté à la prochaine exécution
+    if post_type == PostType.ERROR_429:
+        buf_print(c.warning("Limite de débit (429)"))
+        log_func(f"   LIMITE DE DÉBIT 429: {url}", to_console=False)
+        if db:
+            db.update_last_check(url)
+            db.mark_post_status(url, 'error_429')
+        return False, 0, 0, 0, 'error_429', output
 
     # Post supprimé
     if post_type == PostType.ERROR_400:
@@ -485,6 +495,8 @@ def _format_job_summary(idx, total, url, status, img_count, vid_count, text_coun
         return f"  {c.DIM}{counter}{c.RESET} {c.RED}--{c.RESET} {c.DIM}post supprimé (400){c.RESET}"
     elif status == 'error_500':
         return f"  {c.DIM}{counter}{c.RESET} {c.RED}--{c.RESET} {c.DIM}erreur serveur (500){c.RESET}"
+    elif status == 'error_429':
+        return f"  {c.DIM}{counter}{c.RESET} {c.YELLOW}--{c.RESET} {c.DIM}limite de débit (429){c.RESET}"
     elif status == 'unknown':
         return f"  {c.DIM}{counter}{c.RESET} {c.YELLOW}??{c.RESET} {c.DIM}type inconnu{c.RESET}"
     else:
@@ -533,7 +545,7 @@ def print_report(stats, duration, total_size, no_db_mode, log_file, max_workers,
     # Problèmes (seulement si présents)
     non_resolues = stats.get('quotes_unresolved', stats.get('reposts', []))
     has_problems = any([
-        stats['error_500'], stats['error_400'],
+        stats['error_500'], stats.get('error_429', []), stats['error_400'],
         non_resolues, stats['unknown'], stats['failed']
     ])
 
@@ -544,6 +556,8 @@ def print_report(stats, duration, total_size, no_db_mode, log_file, max_workers,
             print(c.config_line("Posts supprimés (400)", str(len(stats['error_400'])), 28))
         if stats['error_500']:
             print(c.config_line("Erreurs serveur (500)", str(len(stats['error_500'])), 28))
+        if stats.get('error_429'):
+            print(c.config_line("Limite de débit (429)", str(len(stats['error_429'])), 28))
         if non_resolues:
             print(c.config_line("Citations non archivées", str(len(non_resolues)), 28))
         if stats['unknown']:
@@ -586,6 +600,7 @@ def _save_problem_logs(stats, logs_dir):
         ("error_400", "deleted_posts", "posts supprimés"),
         ("quotes_unresolved", "quotes_unresolved", "citations non archivées"),
         ("error_500", "error_500", "erreurs 500"),
+        ("error_429", "rate_limited", "limites de débit (429)"),
         ("unknown", "unknown_types", "types inconnus"),
         ("failed", "failed_downloads", "échecs"),
     ]
@@ -616,8 +631,10 @@ def run(urls, config, no_db=False, on_progress=None, quiet=False, post_views=Non
 
     Returns:
         dict: {"total", "success", "images", "videos", "texts", "sidecars",
-               "error_500", "error_400", "quotes_unresolved", "reposts", "unknown", "failed"}
-        (les six dernières clés sont des listes d'URLs ; "quotes_unresolved" liste les
+               "error_500", "error_429", "error_400", "quotes_unresolved", "reposts", "unknown",
+               "failed"}
+        (les sept dernières clés sont des listes d'URLs ; "error_429" : limite de débit encore
+        atteinte après les reprises, post retenté à la prochaine exécution ; "quotes_unresolved" liste les
         bookmarks archivés dont le post cité ne l'a pas été, "reposts" est son ancien nom)
     """
     return _run(urls, config, media_dirs=get_media_dirs(config), no_db=no_db,
@@ -649,6 +666,7 @@ def _run(urls, config, media_dirs, no_db=False, on_progress=None, quiet=False, p
     deleted_urls = []
     quotes_unresolved_urls = []  # alimentée par les workers (list.append est atomique)
     error_500_urls = []
+    error_429_urls = []
     unknown_urls = []
 
     # Logs
@@ -715,6 +733,8 @@ def _run(urls, config, media_dirs, no_db=False, on_progress=None, quiet=False, p
 
                 if status == 'error_500':
                     error_500_urls.append(url)
+                elif status == 'error_429':
+                    error_429_urls.append(url)
                 elif status == 'error_400':
                     deleted_urls.append(url)
                 elif status == 'unknown':
@@ -746,6 +766,7 @@ def _run(urls, config, media_dirs, no_db=False, on_progress=None, quiet=False, p
         'texts': text_count,
         'sidecars': sidecar_count,
         'error_500': error_500_urls,
+        'error_429': error_429_urls,
         'error_400': deleted_urls,
         'quotes_unresolved': quotes_unresolved_urls,
         'reposts': quotes_unresolved_urls,  # ancien nom, même liste

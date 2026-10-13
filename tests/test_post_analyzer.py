@@ -48,6 +48,26 @@ class TestAnalyzeURLParsing:
         )
         assert post_type == PostType.ERROR_500
 
+    def test_error_429(self, mock_get):
+        """429 encore là après les reprises : statut distinct, retenté plus tard."""
+        mock_get.return_value = MagicMock(status_code=429)
+
+        post_type, data, debug = self.analyzer.analyze(
+            "https://bsky.app/profile/user.bsky.social/post/limit429"
+        )
+        assert post_type == PostType.ERROR_429
+        assert PostType.ERROR_429.value == "error_429"
+        assert data["handle"] == "user.bsky.social"
+        assert data["post_id"] == "limit429"
+        assert debug == {"status": 429}
+
+    @pytest.mark.parametrize("statut", [502, 503, 504])
+    def test_autres_5xx_sont_des_erreurs_serveur(self, mock_get, statut):
+        mock_get.return_value = MagicMock(status_code=statut)
+        post_type, _, debug = self.analyzer.analyze("https://bsky.app/profile/user.bsky.social/post/srv")
+        assert post_type == PostType.ERROR_500
+        assert debug == {"status": statut}
+
 
 class TestAnalyzePostTypes:
     def setup_method(self):
