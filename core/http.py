@@ -105,23 +105,32 @@ class RateLimiter:
                     self._reprise = 0.0
 
 
-class _SessionBsmb(requests.Session):
-    """Session qui passe chaque requête (reprises comprises) par le limiteur."""
+class _AdaptateurBsmb(HTTPAdapter):
+    """Adaptateur qui passe chaque échange HTTP (reprises urllib3 comprises) par le limiteur.
 
-    def __init__(self, limiteur):
-        super().__init__()
+    Le créneau est pris ici et non dans `Session.send` : `Session.send` est réentrant
+    (il rappelle `self.send` à chaque redirection), ce qui ferait redemander un créneau
+    à un thread qui en tient déjà un (interblocage). `HTTPAdapter.send` n'est jamais
+    réentrant : chaque saut de redirection prend puis rend son propre créneau."""
+
+    def __init__(self, limiteur, **kwargs):
+        super().__init__(**kwargs)
         self.limiteur = limiteur
-        self.hooks["response"].append(limiteur.observer)
 
     def send(self, request, **kwargs):
         self.limiteur.attendre()
         with self.limiteur.creneau():
-            return super().send(request, **kwargs)
+            return self._envoyer(request, **kwargs)
+
+    def _envoyer(self, request, **kwargs):
+        return super().send(request, **kwargs)
 
 
 def build_session(limiteur=None):
     """Construit une session configurée (utile aux tests ; le code appelle `get_session()`)."""
-    session = _SessionBsmb(limiteur or RateLimiter())
+    limiteur = limiteur or RateLimiter()
+    session = requests.Session()
+    session.hooks["response"].append(limiteur.observer)
     session.headers["User-Agent"] = USER_AGENT
     retry = _Retry(
         total=4,
@@ -131,7 +140,8 @@ def build_session(limiteur=None):
         respect_retry_after_header=True,
         raise_on_status=False,
     )
-    adaptateur = HTTPAdapter(pool_connections=TAILLE_POOL, pool_maxsize=TAILLE_POOL, max_retries=retry)
+    adaptateur = _AdaptateurBsmb(limiteur, pool_connections=TAILLE_POOL, pool_maxsize=TAILLE_POOL,
+                                 max_retries=retry)
     session.mount("http://", adaptateur)
     session.mount("https://", adaptateur)
     return session

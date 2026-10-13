@@ -3,6 +3,8 @@ import re
 from pathlib import Path
 from unittest.mock import MagicMock
 
+import pytest
+
 from api.export_bookmarks import fetch_bookmarks
 from api.post_analyzer import PostAnalyzer, PostType
 from api.quote_resolver import QuoteResolver
@@ -28,6 +30,26 @@ def test_aucun_appel_direct_a_requests():
                 if motif.search(ligne):
                     fautifs.append(f"{fichier.relative_to(RACINE)}:{n}")
     assert fautifs == []
+
+
+def test_aucun_import_direct_de_get_session():
+    """`from core.http import get_session` lierait le nom au module et échapperait au patch des
+    tests : les modules de production passent par `bsmb_http.get_session()`."""
+    motif = re.compile(r"^\s*from\s+core\.http\s+import\s+.*\bget_session\b", re.MULTILINE)
+    fautifs = []
+    for dossier in ("api", "core", "downloaders", "tools", "bsmb.py"):
+        chemin = RACINE / dossier
+        fichiers = [chemin] if chemin.is_file() else sorted(chemin.glob("*.py"))
+        for fichier in fichiers:
+            if motif.search(fichier.read_text(encoding="utf-8")):
+                fautifs.append(str(fichier.relative_to(RACINE)))
+    assert fautifs == []
+
+
+def test_la_barriere_reseau_bloque_les_hotes_externes():
+    import socket
+    with pytest.raises(AssertionError, match="interdit"):
+        socket.create_connection(("bsky.social", 443), timeout=1)
 
 
 def test_analyseur_utilise_la_session_partagee_par_defaut(fake_session):

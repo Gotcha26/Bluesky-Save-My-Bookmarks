@@ -128,6 +128,19 @@ class TestSyncRefresh:
 
     @patch("core.bookmarks.refresh_session")
     @patch("core.bookmarks.fetch_bookmarks")
+    def test_panne_reseau_du_rafraichissement_est_une_erreur_reseau(self, fetch, refresh, sync):
+        fetch.return_value = _resultat(expired=True)
+        refresh.side_effect = NetworkError("timeout")
+
+        resultat = sync.sync("Bearer vieux", session_info={"refresh_jwt": "r1"})
+
+        assert fetch.call_count == 1
+        assert resultat["expired"] is False
+        assert "timeout" in resultat["error"] and "réseau" in resultat["error"]
+        assert resultat["new_urls"] == []
+
+    @patch("core.bookmarks.refresh_session")
+    @patch("core.bookmarks.fetch_bookmarks")
     def test_sans_refresh_jwt_aucun_appel(self, fetch, refresh, sync):
         fetch.return_value = _resultat(expired=True)
         for info in (None, {}, {"refresh_jwt": None}):

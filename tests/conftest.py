@@ -1,4 +1,5 @@
 """Fixtures partagées pour les tests BSMB."""
+import socket
 import sys
 from pathlib import Path
 
@@ -26,6 +27,20 @@ def fake_session(monkeypatch):
     session = MagicMock(name="session_factice")
     monkeypatch.setattr(_http, "get_session", lambda: session)
     return session
+
+
+@pytest.fixture(autouse=True)
+def _barriere_reseau(monkeypatch):
+    """Dernier rempart : toute connexion TCP vers un hôte autre que la boucle locale échoue
+    (même si un test contourne `fake_session`). Les tests de core/http.py parlent à 127.0.0.1."""
+    reel = socket.create_connection
+
+    def create_connection(address, *args, **kwargs):
+        if address[0] not in ("127.0.0.1", "localhost", "::1"):
+            raise AssertionError(f"accès réseau réel interdit pendant les tests : {address!r}")
+        return reel(address, *args, **kwargs)
+
+    monkeypatch.setattr(socket, "create_connection", create_connection)
 
 
 @pytest.fixture
