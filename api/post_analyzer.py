@@ -32,7 +32,7 @@ def _external_info(embed_external):
         "uri": uri,
         "title": embed_external.get("title", ""),
         "description": embed_external.get("description", ""),
-        "thumb_cid": embed_external.get("thumb", {}).get("ref", {}).get("$link"),
+        "thumb_cid": ((embed_external.get("thumb") or {}).get("ref") or {}).get("$link"),
     }
 
 
@@ -68,7 +68,11 @@ class PostAnalyzer:
             return PostType.UNKNOWN, {}, {"error": "URL invalide"}
 
         if post_view and isinstance(post_view.get("record"), dict):
-            return self._analyze_view(post_url, post_view)
+            try:
+                return self._analyze_view(post_url, post_view)
+            except Exception as e:
+                # Vue de forme inattendue : le post est « inconnu », jamais une exception
+                return PostType.UNKNOWN, {"handle": parts[1], "post_id": parts[-1]}, {"error": str(e)}
 
         # Le segment de l'URL est un handle ou un DID ; getRecord accepte les deux.
         handle = parts[1]
@@ -94,12 +98,14 @@ class PostAnalyzer:
                 )
 
             resp.raise_for_status()
-            data = resp.json()
+            data = resp.json() or {}
+            # Dans le try : un record de forme inattendue donne UNKNOWN, pas une exception
+            return self._classify(
+                data.get("value") or {}, data.get("uri") or "", handle, post_id, identity, data
+            )
 
         except Exception as e:
             return PostType.UNKNOWN, {"handle": handle, "post_id": post_id, **identity}, {"error": str(e)}
-
-        return self._classify(data.get("value", {}), data.get("uri", ""), handle, post_id, identity, data)
 
     def _analyze_view(self, post_url, post_view):
         """Classe un post à partir de sa vue hydratée (`postView` de getBookmarks), sans requête."""
@@ -131,8 +137,8 @@ class PostAnalyzer:
         full_data: réponse brute, conservée dans debug_info ;
         view_embed: embed au format `#view` (playlist, fullsize…), si la vue hydratée est connue.
         """
-        embed = value.get("embed", {})
-        embed_type = embed.get("$type", "")
+        embed = value.get("embed") or {}
+        embed_type = embed.get("$type") or ""
 
         # Le DID figure dans l'`uri` de la réponse : aucun appel supplémentaire
         if not identity:
@@ -143,8 +149,8 @@ class PostAnalyzer:
             "handle": handle,
             "post_id": post_id,
             **identity,
-            "created_at": value.get("createdAt", ""),
-            "text": value.get("text", ""),
+            "created_at": value.get("createdAt") or "",
+            "text": value.get("text") or "",
             "embed_type": embed_type,
         }
         if view_embed is not None:
@@ -154,8 +160,8 @@ class PostAnalyzer:
 
         # 1. Vidéo
         if embed_type == "app.bsky.embed.video":
-            video_blob = embed.get("video", {})
-            cid = video_blob.get("ref", {}).get("$link")
+            video_blob = embed.get("video") or {}
+            cid = (video_blob.get("ref") or {}).get("$link")
             if cid:
                 did = uri.split("/")[2] if "/" in uri else None
                 if did:
@@ -169,10 +175,10 @@ class PostAnalyzer:
 
         # 2. Images directes
         if embed_type == "app.bsky.embed.images":
-            images_list = embed.get("images", [])
+            images_list = embed.get("images") or []
             images = []
             for img in images_list:
-                img_ref = img.get("image", {}).get("ref", {}).get("$link")
+                img_ref = ((img.get("image") or {}).get("ref") or {}).get("$link")
                 if img_ref:
                     images.append(f"https://cdn.bsky.app/img/feed_fullsize/plain/{img_ref}@jpeg")
 
@@ -183,7 +189,7 @@ class PostAnalyzer:
 
         # 2 bis. Carte de lien / GIF (external)
         if embed_type == "app.bsky.embed.external":
-            external = _external_info(embed.get("external", {}))
+            external = _external_info(embed.get("external") or {})
             if external:
                 result_data["external"] = external
                 return PostType.EXTERNAL, result_data, debug_info
@@ -191,19 +197,19 @@ class PostAnalyzer:
         # 3. Citation (quote post) sans média : le post citant a son propre texte
         if embed_type == "app.bsky.embed.record":
             result_data["is_quote"] = True
-            result_data["quote_uri"] = embed.get("record", {}).get("uri", "")
+            result_data["quote_uri"] = (embed.get("record") or {}).get("uri") or ""
             return PostType.QUOTE, result_data, debug_info
 
         # 4. Citation avec média : le média du citant prime, `is_quote` signale le record cité
         if embed_type == "app.bsky.embed.recordWithMedia":
-            media = embed.get("media", {})
+            media = embed.get("media") or {}
             result_data["is_quote"] = True
-            result_data["quote_uri"] = embed.get("record", {}).get("record", {}).get("uri", "")
+            result_data["quote_uri"] = ((embed.get("record") or {}).get("record") or {}).get("uri") or ""
             media_type = media.get("$type", "")
 
             if media_type == "app.bsky.embed.video":
-                video_blob = media.get("video", {})
-                cid = video_blob.get("ref", {}).get("$link")
+                video_blob = media.get("video") or {}
+                cid = (video_blob.get("ref") or {}).get("$link")
                 if cid:
                     did = uri.split("/")[2] if "/" in uri else None
                     if did:
@@ -214,10 +220,10 @@ class PostAnalyzer:
                         return PostType.VIDEO, result_data, debug_info
 
             if media_type == "app.bsky.embed.images":
-                images_list = media.get("images", [])
+                images_list = media.get("images") or []
                 images = []
                 for img in images_list:
-                    img_ref = img.get("image", {}).get("ref", {}).get("$link")
+                    img_ref = ((img.get("image") or {}).get("ref") or {}).get("$link")
                     if img_ref:
                         images.append(f"https://cdn.bsky.app/img/feed_fullsize/plain/{img_ref}@jpeg")
 
@@ -227,7 +233,7 @@ class PostAnalyzer:
                     return PostType.IMAGES, result_data, debug_info
 
             if media_type == "app.bsky.embed.external":
-                external = _external_info(media.get("external", {}))
+                external = _external_info(media.get("external") or {})
                 if external:
                     result_data["external"] = external
                     return PostType.EXTERNAL, result_data, debug_info
