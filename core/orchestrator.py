@@ -34,6 +34,7 @@ from downloaders import DownloadError, lignes_console  # noqa: E402
 from downloaders.images import download_images  # noqa: E402
 from downloaders.videos import download_video  # noqa: E402
 from downloaders.text import save_text  # noqa: E402
+from downloaders.external import download_external  # noqa: E402
 
 # Lock global pour l'affichage console (évite les lignes entrelacées)
 _print_lock = threading.Lock()
@@ -199,6 +200,17 @@ def process_post(url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_d
         buf_print(c.info("Vidéo détectée"))
         results = _telecharger(download_video, url, VID_DIR, config, buf_print, log_func)
         vid_count = len(results)
+
+    # Embed externe : carte de lien, GIF, lien tiers
+    elif post_type == PostType.EXTERNAL:
+        buf_print(c.info("Lien externe détecté"))
+        dirs = {"img_dir": IMG_DIR, "vid_dir": VID_DIR, "text_dir": TEXT_DIR}
+        results = _telecharger(
+            lambda u, _dest, cfg: download_external(u, data, dirs, cfg),
+            url, TEXT_DIR, config, buf_print, log_func)
+        img_count = sum(r.media_type == "image" for r in results)
+        vid_count = sum(r.media_type == "video" for r in results)
+        text_count = sum(r.media_type == "text" for r in results)
 
     # Texte seul
     elif post_type == PostType.TEXT_ONLY:
