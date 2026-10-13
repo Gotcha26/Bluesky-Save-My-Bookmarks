@@ -80,15 +80,22 @@ def save_debug_info(post_id, debug_info, logs_dir):
     return debug_file
 
 
-def _telecharger(downloader, url, dest_dir, config, buf_print):
+def _telecharger(downloader, url, dest_dir, config, buf_print, log_func):
     """
     Appelle un downloader et affiche ses résultats.
+    Toute exception est isolée au post (journalisée, statut « failed ») pour
+    ne jamais interrompre le lot.
     Returns: la liste de DownloadResult (vide en cas d'erreur ou sans média).
     """
     try:
         results = downloader(url, dest_dir, config)
     except DownloadError as e:
         buf_print(f"       [ERR] {e}")
+        log_func(f"   ERREUR DE TÉLÉCHARGEMENT: {url} - {e}", to_console=False)
+        return []
+    except Exception as e:
+        buf_print(f"       [ERR] Erreur inattendue : {e}")
+        log_func(f"   ERREUR INATTENDUE: {url} - {type(e).__name__}: {e}", to_console=False)
         return []
     if not results:
         buf_print("       [!] Aucun média trouvé")
@@ -184,19 +191,19 @@ def process_post(url, IMG_DIR, VID_DIR, TEXT_DIR, db, analyzer, resolver, logs_d
     # Images
     if post_type == PostType.IMAGES:
         buf_print(c.info(f"{data['image_count']} image(s) détectée(s)"))
-        results = _telecharger(download_images, url, IMG_DIR, config, buf_print)
+        results = _telecharger(download_images, url, IMG_DIR, config, buf_print, log_func)
         img_count = len(results)
 
     # Vidéo
     elif post_type == PostType.VIDEO:
         buf_print(c.info("Vidéo détectée"))
-        results = _telecharger(download_video, url, VID_DIR, config, buf_print)
+        results = _telecharger(download_video, url, VID_DIR, config, buf_print, log_func)
         vid_count = len(results)
 
     # Texte seul
     elif post_type == PostType.TEXT_ONLY:
         buf_print(c.info("Texte seul détecté"))
-        results = _telecharger(save_text, url, TEXT_DIR, config, buf_print)
+        results = _telecharger(save_text, url, TEXT_DIR, config, buf_print, log_func)
         text_count = len(results)
 
     # Cas inconnu - MODE DEBUG
@@ -393,8 +400,6 @@ def _run(urls, config, media_dirs, no_db=False, on_progress=None, quiet=False):
     VID_DIR = media_dirs["vid_dir"]
     TEXT_DIR = media_dirs["text_dir"]
 
-    cleanup_old_logs(config)
-
     max_workers = max(1, int(config.get("max_workers", 4)))
     analyzer = PostAnalyzer()
     resolver = RepostResolver()
@@ -429,6 +434,8 @@ def _run(urls, config, media_dirs, no_db=False, on_progress=None, quiet=False):
                 print(msg)
 
     log(f"=== Début du téléchargement : {total_jobs} posts à traiter ({max_workers} workers) ===")
+    # Nettoyage après création du nouveau log : max_logs fichiers au total, celui-ci compris
+    cleanup_old_logs(config)
     if no_db:
         log("MODE DEV: Base de données désactivée", to_console=False)
 
