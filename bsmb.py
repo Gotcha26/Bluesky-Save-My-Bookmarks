@@ -10,7 +10,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from core import cli
+from core import cli, i18n
 from core.bookmarks_cache import post_views_from_config
 from core.colors import c
 from core.config import ensure_dirs, load_config, resolve_path, restrict_permissions, save_config
@@ -556,6 +556,7 @@ def menu_settings(config, state):
             print(c.config_line(_("4. Mode avancé"), f"{c.OK}{_('activé')}{c.RESET}"))
         else:
             print(c.config_line(_("4. Mode avancé"), f"{c.DIM}{_('désactivé')}{c.RESET}"))
+        print(c.config_line(_("L. Langue"), _langue_libelle(config)))
 
         if advanced:
             print()
@@ -578,10 +579,12 @@ def menu_settings(config, state):
         print()
 
         max_choice = "9" if advanced else "4"
-        choice = input(_invite_choix(f" (0-{max_choice})")).strip()
+        choice = input(_invite_choix(f" (0-{max_choice}, L)")).strip()
 
         if choice == "0":
             break
+        elif choice.upper() == "L":
+            _edit_language(config)
         elif choice == "1":
             configure_credentials(config)
             get_app_state(config)
@@ -724,6 +727,41 @@ def _edit_config_value(config, key, label, after_save=None):
         print(c.success(_("Sauvegardé")))
     else:
         print(c.success(_("Valeur inchangée")))
+
+    pause()
+
+
+LANGUES_NOMS = {"fr": "Français", "en": "English"}  # noms dans leur propre langue : jamais traduits
+
+
+def _langue_libelle(config):
+    """Langue choisie dans la config, pour l'affichage (« auto » : la langue détectée est indiquée)."""
+    code = config.get("language") or ""
+    if code in LANGUES_NOMS:
+        return LANGUES_NOMS[code]
+    return _("Automatique ({langue})").format(langue=LANGUES_NOMS.get(i18n.detect_language(), "?"))
+
+
+def _edit_language(config):
+    """Choix de la langue de l'interface ; prise en compte immédiate (config["language"] : fr, en ou "")."""
+    print()
+    print(f"  {c.KEY}{_('Actuel:')}{c.RESET} {c.VALUE}{_langue_libelle(config)}{c.RESET}")
+    print()
+    print(c.menu_option("1", LANGUES_NOMS["fr"]))
+    print(c.menu_option("2", LANGUES_NOMS["en"]))
+    print(c.menu_option("3", _("Automatique (langue du système)")))
+    print()
+    choice = input(c.prompt(f"  {_('Votre choix (ENTRÉE pour garder):')} ")).strip()
+
+    if not choice:
+        print(c.success(_("Valeur inchangée")))
+    elif choice in ("1", "2", "3"):
+        config["language"] = {"1": "fr", "2": "en", "3": ""}[choice]
+        save_config(config)
+        i18n.init(config["language"] or None)  # prise en compte immédiate
+        print(c.success(_("Langue mise à jour : {langue}").format(langue=_langue_libelle(config))))
+    else:
+        print(_choix_invalide(choice))
 
     pause()
 
@@ -914,6 +952,9 @@ def main(argv=None):
     Retourne le code de retour du processus (voir core/cli.py).
     """
     argv = sys.argv[1:] if argv is None else list(argv)
+    demandee = cli.langue_demandee(argv)
+    if demandee in cli.LANGUES_CLI:
+        i18n.init(demandee)  # aide et erreurs d'argparse dans la langue demandée
     args = cli.build_parser().parse_args(argv)
     if args.command is not None:
         return cli.main(argv)
@@ -921,6 +962,7 @@ def main(argv=None):
     if args.yes:
         set_yes(True)
     config = load_config()
+    i18n.init(args.lang or config.get("language") or None)  # --lang l'emporte sur la configuration
     migrate_secret_to_keyring(config)  # App Password en clair -> keyring si disponible
     ensure_dirs(config)
     from core.config import cleanup_old_logs

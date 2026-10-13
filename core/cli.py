@@ -8,6 +8,7 @@ Interface en ligne de commande non interactive de BSMB.
     python bsmb.py run                 # sync puis download
     python bsmb.py status [--json]     # état du compte et des compteurs
     python bsmb.py --yes ...           # répond par défaut à toutes les confirmations
+    python bsmb.py --lang en ...       # langue de l'interface (fr, en, auto), prioritaire sur la config
 
 Codes de retour : 0 succès, 1 erreur d'authentification, 2 erreur réseau,
 3 téléchargements en échec.
@@ -15,8 +16,9 @@ Codes de retour : 0 succès, 1 erreur d'authentification, 2 erreur réseau,
 
 import argparse
 import json
+import sys
 
-from core import orchestrator, ui
+from core import i18n, orchestrator, ui
 from core.auth import AuthError, NetworkError, get_session, has_credentials
 from core.bookmarks import BookmarkSync
 from core.bookmarks_cache import post_views_from_config
@@ -38,10 +40,24 @@ EXIT_AUTH = 1
 EXIT_NETWORK = 2
 EXIT_DOWNLOAD = 3
 
+LANGUES_CLI = ("fr", "en", "auto")  # valeurs acceptées par --lang
+
 
 def is_interactive():
     """True si le programme peut poser des questions (terminal réel, pas de --yes)."""
     return ui.is_interactive()
+
+
+def langue_demandee(argv):
+    """Valeur de `--lang` dans `argv` (None si absente), lue avant l'analyse complète des arguments
+    pour que l'aide (`--help`) et les erreurs d'argparse soient déjà dans la bonne langue."""
+    argv = sys.argv[1:] if argv is None else list(argv)
+    for i, arg in enumerate(argv):
+        if arg == "--lang" and i + 1 < len(argv):
+            return argv[i + 1]
+        if arg.startswith("--lang="):
+            return arg.split("=", 1)[1]
+    return None
 
 
 def build_parser():
@@ -54,6 +70,12 @@ def build_parser():
     parser.add_argument(
         "--yes", action="store_true", help=_("mode non interactif : accepte les valeurs par défaut")
     )
+    parser.add_argument(
+        "--lang",
+        choices=LANGUES_CLI,
+        metavar="{fr,en,auto}",
+        help=_("langue de l'interface (prioritaire sur la configuration)"),
+    )
     sub = parser.add_subparsers(dest="command", metavar="{sync,download,run,status}")
 
     def ajouter(nom, aide):
@@ -63,6 +85,13 @@ def build_parser():
             action="store_true",
             default=argparse.SUPPRESS,
             help=_("mode non interactif : accepte les valeurs par défaut"),
+        )
+        p.add_argument(
+            "--lang",
+            choices=LANGUES_CLI,
+            metavar="{fr,en,auto}",
+            default=argparse.SUPPRESS,
+            help=_("langue de l'interface (prioritaire sur la configuration)"),
         )
         return p
 
@@ -233,6 +262,9 @@ def cmd_status(config, args=None):
 
 def main(argv=None):
     """Point d'entrée de la CLI. Retourne le code de retour du processus."""
+    demandee = langue_demandee(argv)
+    if demandee in LANGUES_CLI:
+        i18n.init(demandee)
     args = build_parser().parse_args(argv)
     if args.yes:
         ui.set_yes(True)
@@ -240,5 +272,6 @@ def main(argv=None):
         build_parser().print_help()
         return EXIT_OK
     config = _preparer_config()
+    i18n.init(args.lang or config.get("language") or None)  # --lang l'emporte sur la configuration
     # Résolution à l'appel (et non au chargement du module) pour rester mockable
     return globals()["cmd_" + args.command](config, args)

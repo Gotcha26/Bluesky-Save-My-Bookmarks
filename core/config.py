@@ -36,6 +36,7 @@ DEFAULT_CONFIG = {
     "gif_subfolder": False,  # GIF (vidéo presentation=gif) rangés dans videos/gifs/ au lieu du suffixe _gif
     "download_video_thumbnail": False,  # télécharge aussi la miniature de la vidéo (_01_thumb.jpg)
     "save_sidecar": True,  # écrit texts/<base>.json (record brut + postView) pour chaque post archivé
+    "language": "",  # langue de l'interface : "fr", "en" ou "" (auto : d'après la locale du système)
 }
 
 
