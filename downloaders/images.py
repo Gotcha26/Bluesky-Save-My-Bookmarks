@@ -33,6 +33,7 @@ from downloaders import DownloadError, DownloadResult, lignes_console  # noqa: E
 
 SPACER = " - "
 GET_RECORD_URL = "https://bsky.social/xrpc/com.atproto.repo.getRecord"
+BLOB_HOST = "https://bsky.social"  # relaie (302) vers le PDS de l'auteur, quel qu'il soit
 
 
 def safe_part(s: str) -> str:
@@ -226,13 +227,18 @@ def ext_from_mime(mime: str) -> str:
 # -------------------- Téléchargement --------------------
 def download_image(url, filepath, handle, post_id, post_url, post_text, created_at, http=requests):
     """Télécharge une image dans filepath puis ajoute les métadonnées EXIF (best effort)."""
-    r = http.get(url, timeout=30)
+    r = http.get(url, timeout=30, allow_redirects=True)
     r.raise_for_status()
+    type_contenu = (r.headers.get("content-type") or "").strip().lower()
+    if not r.content:
+        raise ValueError("réponse vide")
+    if type_contenu and not type_contenu.startswith("image/"):
+        raise ValueError(f"contenu inattendu ({type_contenu})")
     with open(filepath, "wb") as f:
         f.write(r.content)
     # --- Ajout des métadonnées EXIF ---
     try:
-        full_comment = f"{post_text}\n\nLien du post : {url}"
+        full_comment = f"{post_text}\n\nLien du post : {post_url}"
 
         exif_cmd = [
             "exiftool",
@@ -252,6 +258,23 @@ def build_prefixed_filename(prefix: str, index: int, ext: str, max_len, index_di
     """<prefix>_<n><ext>, le préfixe étant tronqué pour tenir dans max_len."""
     suffix = f"_{index:0{index_digits}d}{ext}"
     return prefix[:max(1, max_len - len(suffix))] + suffix
+
+
+def _blob_de_l_image(img_url, index, propres, blobs, par_cid):
+    """Blob (cid, mime) du record correspondant à une image de la vue, ou {}.
+
+    La vue hydratée peut omettre des images que le record garde : on apparie d'abord par
+    le cid de l'URL CDN (.../<did>/<cid>@jpeg), puis par position seulement si les deux
+    listes ont la même longueur. Les images d'un post cité n'ont pas de blob.
+    """
+    if index >= propres:
+        return {}
+    cid_url = urlparse(img_url).path.rsplit("/", 1)[-1].split("@", 1)[0]
+    if cid_url in par_cid:
+        return par_cid[cid_url]
+    if len(blobs) == propres:
+        return blobs[index]
+    return {}
 
 
 def _existant_sur_disque(existing_cid, cid):
@@ -296,10 +319,10 @@ def download_images(post_url, dest_dir, config, session=None, name_prefix=None,
     propres = details.get("propres", 0)
     if record is None and propres:
         record = fetch_record(urlparse(post_url).path.strip("/").split("/")[1], post_id, http)
-    blobs = images_du_record(record)[:propres]
+    blobs = images_du_record(record)
+    par_cid = {b["cid"]: b for b in blobs if b["cid"]}
     did = details.get("did")
     original = config.get("image_quality", DEFAULT_CONFIG["image_quality"]) != "cdn"
-    pds = (config.get("pds_url") or "https://bsky.social").rstrip("/")
     sauter = config.get("skip_existing_cid", DEFAULT_CONFIG["skip_existing_cid"])
 
     dest_dir = Path(dest_dir)
@@ -311,7 +334,7 @@ def download_images(post_url, dest_dir, config, session=None, name_prefix=None,
     results = []
     erreurs = []
     for idx, img_url in enumerate(image_urls, start=1):
-        blob = blobs[idx - 1] if idx - 1 < len(blobs) else {}
+        blob = _blob_de_l_image(img_url, idx - 1, propres, blobs, par_cid)
         cid, mime = blob.get("cid"), blob.get("mime", "")
 
         if sauter:
@@ -332,7 +355,7 @@ def download_images(post_url, dest_dir, config, session=None, name_prefix=None,
         # Candidats dans l'ordre : (url, extension connue ou None -> deviner par l'URL)
         candidats = []
         if original and cid and did:
-            candidats.append((f"{pds}/xrpc/com.atproto.sync.getBlob?did={did}&cid={cid}",
+            candidats.append((f"{BLOB_HOST}/xrpc/com.atproto.sync.getBlob?did={did}&cid={cid}",
                               ext_from_mime(mime) or ".jpg"))
         candidats.append((img_url, ext_from_mime(mime) if not original else None))
 
